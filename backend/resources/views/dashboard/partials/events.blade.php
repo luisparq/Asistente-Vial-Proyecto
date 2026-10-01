@@ -1,0 +1,5 @@
+@php($d = \App\Support\DashboardDisplay::class)
+@if($events->isEmpty())<div class="empty"><span aria-hidden="true">≋</span><h3>No hay eventos disponibles para este período.</h3><p>Solo se muestran eventos recibidos. No se generan registros para completar esta vista.</p></div>
+@else<div class="table-wrap"><table><caption class="sr-only">Eventos recibidos</caption><thead><tr><th>Evento / UUID</th><th>Tipo</th><th>Origen</th><th>Fecha · Lima</th>@if(!isset($hideTrip))<th>Recorrido</th>@endif</tr></thead><tbody>
+@foreach($events as $event)<tr><td class="uuid">{{ $event->client_event_id }}</td><td>{{ $d::type($event->type) }}<small class="code">{{ $event->type }}</small></td><td><span class="badge simulated">{{ $d::origin($event->origin) }}</span></td><td class="date">{{ $d::date($event->occurred_at) }}</td>@if(!isset($hideTrip))<td><a class="uuid" href="{{ route('dashboard.trip', $event->trip->client_trip_id) }}">{{ $event->trip->client_trip_id }}</a></td>@endif</tr>@endforeach
+</tbody></table></div>@endif

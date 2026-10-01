@@ -35,7 +35,7 @@ class AndroidBlePlatformTest {
     }
 
     @Suppress("DEPRECATION")
-    @Test fun manifestKeepsBleOptionalAndDoesNotRequestNetworkOrAdvertising() {
+    @Test fun manifestKeepsBleOptionalAllowsApiNetworkAndDoesNotAdvertise() {
         val info = context.packageManager.getPackageInfo(context.packageName,
             PackageManager.GET_PERMISSIONS or PackageManager.GET_CONFIGURATIONS)
         val feature = info.reqFeatures!!.first { it.name == PackageManager.FEATURE_BLUETOOTH_LE }
@@ -43,7 +43,7 @@ class AndroidBlePlatformTest {
         val permissions = info.requestedPermissions!!.toList()
         assertTrue(permissions.contains(BlePermissionPolicy.SCAN))
         assertTrue(permissions.contains(BlePermissionPolicy.CONNECT))
-        assertFalse(permissions.contains("android.permission.INTERNET"))
+        assertTrue(permissions.contains("android.permission.INTERNET")) // Required by the approved API integration.
         assertFalse(permissions.contains("android.permission.BLUETOOTH_ADVERTISE"))
         assertFalse(permissions.contains("android.permission.ACCESS_BACKGROUND_LOCATION"))
     }

@@ -1,0 +1,2 @@
+@if(session('success'))<div class="notice" role="status">{{ session('success') }}</div>@endif
+@if(session('activation_code'))<section class="panel"><h2>Código de activación / restablecimiento</h2><p>Se muestra una sola vez. Vence en 24 horas. Entrégalo por un canal privado; no se envió correo. El destinatario lo introduce en <a href="{{ route('access') }}">Activar acceso</a>.</p><code class="activation-code">{{ session('activation_code') }}</code></section>@endif

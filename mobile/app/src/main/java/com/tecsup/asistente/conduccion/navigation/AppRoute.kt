@@ -10,4 +10,5 @@ enum class AppRoute(val path: String) {
     History("history"),
     TripDetail("history/{tripId}"),
     Settings("settings"),
+    Profile("profile"),
 }

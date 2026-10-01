@@ -44,6 +44,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onDiagnostic = { navController.open(AppRoute.Diagnostic) },
                 onHistory = { navController.open(AppRoute.History) },
                 onSettings = { navController.open(AppRoute.Settings) },
+                onProfile = { navController.open(AppRoute.Profile) },
             )
         }
         composable(AppRoute.Trip.path) {
@@ -55,6 +56,9 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             })
         }
         composable(AppRoute.Ble.path) { BleScreen(onBack) }
+        composable(AppRoute.Profile.path) {
+            com.tecsup.asistente.conduccion.feature.profile.ProfileScreen(onBack, onSettings = { navController.open(AppRoute.Settings) })
+        }
         composable(AppRoute.Diagnostic.path) { DiagnosticScreen(onBack) }
         composable(AppRoute.History.path) {
             HistoryScreen(onBack, onTripSelected = { id -> navController.navigate("history/$id") })

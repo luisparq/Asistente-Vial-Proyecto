@@ -17,6 +17,10 @@ class TenantContext
             throw new ApiProblem(401, 'invalid_token_context', 'La sesión no corresponde al contexto autorizado.');
         }
 
+        if (! $user->accessEnabled() || $user->role === 'platform_admin') {
+            throw new ApiProblem(403, 'access_disabled', 'Acceso no disponible para esta cuenta o empresa.');
+        }
+
         return $next($request);
     }
 }

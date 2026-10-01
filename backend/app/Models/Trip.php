@@ -34,4 +34,14 @@ class Trip extends Model
     {
         return $this->hasMany(DrivingEvent::class);
     }
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class);
+    }
+
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class);
+    }
 }

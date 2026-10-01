@@ -27,6 +27,9 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE id = :id")
     suspend fun findTrip(id: Long): TripEntity?
 
+    @Query("SELECT * FROM driving_events WHERE tripId = :id")
+    suspend fun events(id: Long): List<DrivingEventEntity>
+
     @Transaction
     @Query("SELECT * FROM trips WHERE id = :id")
     fun observeTrip(id: Long): Flow<TripWithEventsEntity?>

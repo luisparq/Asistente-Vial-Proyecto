@@ -25,6 +25,7 @@ fun HomeScreen(
     onDiagnostic: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
+    onProfile: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val active by viewModel.activeTrip.collectAsStateWithLifecycle()
@@ -50,6 +51,7 @@ fun HomeScreen(
         if (action.failed) Text(stringResource(R.string.write_error), color = MaterialTheme.colorScheme.error)
         if (action.busy) CircularProgressIndicator()
         listOf(
+            R.string.profile_title to onProfile,
             R.string.ble_title to onBle,
             R.string.diagnostic_title to onDiagnostic,
             R.string.history_title to onHistory,

@@ -36,7 +36,8 @@ class RestartPersistenceTest {
     private fun text(id: Int, vararg args: Any) = context.getString(id, *args)
 
     private fun <T> withRepository(block: (RoomTripRepository) -> T): T {
-        val database = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, AsistenteVialDatabase.NAME).build()
+        val database = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, AsistenteVialDatabase.NAME)
+            .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2).build()
         return try { block(RoomTripRepository(database, Clock.systemUTC())) } finally { database.close() }
     }
 

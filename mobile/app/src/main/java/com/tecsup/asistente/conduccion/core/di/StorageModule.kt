@@ -21,6 +21,7 @@ object StorageModule {
     @Singleton
     fun database(@ApplicationContext context: Context): AsistenteVialDatabase =
         Room.databaseBuilder(context, AsistenteVialDatabase::class.java, AsistenteVialDatabase.NAME)
+            .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2)
             .build()
 
     @Provides

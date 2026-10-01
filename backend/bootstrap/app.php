@@ -17,11 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->redirectGuestsTo(fn () => null);
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : route($request->is('platform*') ? 'platform.login' : 'login'));
         $middleware->trimStrings(except: [fn ($request) => $request->is('api/*')]);
         $middleware->convertEmptyStringsToNull(except: [fn ($request) => $request->is('api/*')]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->dontFlash(['activation_code']);
         $exceptions->shouldRenderJsonWhen(fn ($request) => $request->is('api/*') || $request->expectsJson());
         $exceptions->render(function (Throwable $error, Request $request) {
             if (! $request->is('api/*')) {

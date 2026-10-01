@@ -10,15 +10,6 @@ import com.tecsup.asistente.conduccion.domain.model.DrivingEvent
 import com.tecsup.asistente.conduccion.domain.model.DrivingEventType
 import com.tecsup.asistente.conduccion.domain.model.Trip
 import com.tecsup.asistente.conduccion.domain.model.TripStatus
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-
-fun formatTimestamp(time: Instant): String =
-    DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
-        .withZone(ZoneId.systemDefault()).format(time)
-
 fun DrivingEventType.labelResource(): Int = when (this) {
     DrivingEventType.HARSH_BRAKING -> R.string.event_braking
     DrivingEventType.HARSH_ACCELERATION -> R.string.event_acceleration

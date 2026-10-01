@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DriverProfileController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\TripController;
 use App\Http\Middleware\ApiBoundary;
@@ -12,6 +13,7 @@ Route::prefix('v1')->middleware(ApiBoundary::class)->group(function () {
     Route::post('auth/token', [AuthController::class, 'issue'])->middleware('throttle:login');
     Route::middleware(['auth:sanctum', TenantContext::class, 'throttle:api', ResourceIds::class])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
+        Route::get('me/driver', [DriverProfileController::class, 'show']);
         Route::delete('auth/token', [AuthController::class, 'revoke']);
         Route::put('trips/{client_trip_id}', [TripController::class, 'put']);
         Route::get('trips', [TripController::class, 'index'])->name('trips.index');

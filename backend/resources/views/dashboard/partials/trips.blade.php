@@ -1,0 +1,5 @@
+@php($d = \App\Support\DashboardDisplay::class)
+@if($trips->isEmpty())<div class="empty"><span aria-hidden="true">↗</span><h3>No hay recorridos registrados todavía.</h3><p>Los recorridos aparecerán cuando Android los sincronice. Si aplicaste filtros, prueba otro período.</p></div>
+@else<div class="table-wrap"><table><caption class="sr-only">Recorridos de la empresa</caption><thead><tr><th>Recorrido / UUID</th><th>Usuario que registró</th><th>Inicio · Lima</th><th>Final · Lima</th><th>Estado</th><th>Revisión</th></tr></thead><tbody>
+@foreach($trips as $trip)<tr><td><a class="uuid" href="{{ route('dashboard.trip', $trip->client_trip_id) }}">{{ $trip->client_trip_id }}</a></td><td>{{ $trip->creator->name }}</td><td class="date">{{ $d::date($trip->started_at) }}</td><td class="date">{{ $d::date($trip->ended_at) }}</td><td><span class="badge {{ $trip->status === 'COMPLETED' ? 'completed' : 'active' }}">{{ $d::status($trip->status) }}</span></td><td>{{ $trip->client_revision }}</td></tr>@endforeach
+</tbody></table></div>@endif
