@@ -1,8 +1,30 @@
 # Etapa 3B — ESP32 + MPU6050 → BLE → Android
 
-Implementación de telemetría cruda. **La Etapa 3B está bloqueada en la validación física del MPU6050.** El dispositivo responde por I2C en `0x68`, pero las pruebas actuales de `WHO_AM_I` (registro `0x75`) devuelven `0x75`, no el valor esperado `0x68`.
+**Estado al 2026-10-03: transmisión de mediciones crudas ESP32 → BLE → Android validada físicamente**, según la prueba realizada y reportada por el responsable del proyecto. La identificación física del sensor sigue sin confirmarse: `WHO_AM_I = 0x75` tanto en firmware como en una prueba aislada. `0x75` no es una identidad válida de MPU6050 ni demuestra la causa de la anomalía. Se conserva el modo experimental explícito.
 
-Este resultado no se considera una identidad válida: está prohibido aceptar `0x75` artificialmente, omitir/eliminar la validación `WHO_AM_I` o habilitar la telemetría SENSOR como si la comprobación hubiese pasado. El firmware conserva el bloqueo seguro y no publica muestras hasta confirmar `WHO_AM_I = 0x68`. Consultar `ESTADO_ACTUAL.md` antes de modificar esta etapa.
+## Evidencia física reportada — 2026-10-03
+
+Prueba con ESP32, módulo IMU y teléfono Android real. El responsable confirmó el flujo `IMU → I2C → ESP32 → BLE GATT/NOTIFY → Android` y observó:
+
+- Respuesta estable en I2C `0x68`, inicialización y recepción del bloque crudo de los seis ejes.
+- Advertencia WHO_AM_I anómalo `0x75` y continuación en modo experimental, sin confirmar identidad.
+- Anuncio `AsistenteVial-IMU`, detección Android, conexión GATT real y notificaciones habilitadas.
+- Transmisión/recepción del frame IMU_RAW de 12 bytes a 4 Hz, según lo reportado.
+- Visualización de ax/ay/az/gx/gy/gz; los seis valores cambiaron al mover físicamente el circuito de forma controlada y los cambios se observaron tanto en Android como en Serial Monitor.
+
+Se valida el transporte físico de cuentas crudas en esta prueba, no maniobras peligrosas, infracciones, precisión, calibración ni identidad del sensor. La frecuencia nominal del firmware es 250 ms; no se dispone de una medición independiente de jitter, pérdidas o latencia. No se inventan valores numéricos, capturas o registros instrumentales. El agente registra la evidencia comunicada por el responsable; no ejecutó esa prueba física.
+
+Pendientes: conversión/calibración, criterios y validación de detección, generación de eventos `DataOrigin.SENSOR`, asociación con viajes/Room/Laravel, GPS, buzzer y pruebas controladas posteriores. `SIMULATED` sigue significando evento manual de prueba; las altas `SENSOR` permanecen deshabilitadas en Laravel.
+
+## Excepción experimental autorizada
+
+Se permite continuar las pruebas controladas de integración BLE con identidad no confirmada, exclusivamente si el arranque comprueba respuesta I2C, reset terminado, escrituras de wake/configuración exitosas y recepción completa del bloque de 14 bytes `0x3B…0x48` que contiene los seis ejes. El éxito de una transacción no valida físicamente las mediciones ni certifica el modelo del chip. No se comprueba movimiento ni se inventan valores.
+
+Después de configurar y leer el bloque, se consulta `WHO_AM_I` con repeated START y respaldo STOP. Si devuelve `0x68`, se usa el modo normal. Si se recibe otro valor, se imprime su valor real y `Modo experimental: identidad del sensor no confirmada`, y se permite anunciar BLE con datos crudos. Si no hay comunicación, falla el reset/configuración, no se recibe el bloque completo o ambas consultas de identidad fallan por transporte, no se inicia BLE. Durante la transmisión se siguen omitiendo las muestras cuya lectura falla, sin valores sustitutos.
+
+Esta excepción no convierte `0x75` en identificación válida, no elimina la consulta de identidad, no habilita eventos `SENSOR`, no modifica Android ni envía mediciones a Laravel. El frame existente no incluye un indicador de identidad: Android no conoce automáticamente este modo. Debe interpretarse junto con la advertencia de Serial y este documento; la validación física del transporte no certifica el sensor ni detecciones de maniobras.
+
+La carga, conexión GATT y recepción física de esta revisión fueron confirmadas por el responsable en la prueba descrita arriba. La anomalía de identidad permanece abierta.
 
 ## Protocolo permanente
 
@@ -24,11 +46,11 @@ Este resultado no se considera una identidad válida: está prohibido aceptar `0
 | 8–9 | gy |
 | 10–11 | gz |
 
-Cada entero se transmite con el byte bajo primero. Valores posibles: −32768…32767. Frecuencia inicial nominal: **4 Hz, una muestra cada 250 ms**; no es una métrica física verificada. La trama cabe en el MTU BLE mínimo, sin negociación adicional.
+Cada entero se transmite con el byte bajo primero. Valores posibles: −32768…32767. Frecuencia nominal: **4 Hz, una muestra cada 250 ms**; la prueba reportó recepción a 4 Hz, sin certificar regularidad temporal ni pérdidas. La trama cabe en el MTU BLE mínimo, sin negociación adicional.
 
 ## Firmware
 
-Archivo: `firmware/AsistenteVialImu/AsistenteVialImu.ino`. Compilación comprobada con Arduino CLI 1.5.1, core Espressif **3.3.12**, placa `esp32:esp32:esp32` y partición predeterminada. Utiliza Wire y BLE incluidas en el core; no necesita otra biblioteca MPU6050.
+Archivo: `firmware/AsistenteVialImu/AsistenteVialImu.ino`. Compilación comprobada con Arduino CLI 1.5.1, core Espressif **3.3.12**, placa `esp32:esp32:esp32` y partición predeterminada. Utiliza el controlador I2C nativo de ESP-IDF y BLE incluidos en el core; no inicializa Wire ni necesita otra biblioteca MPU6050.
 
 Conexiones conservadas: VCC → 3.3 V, GND → GND, SDA → GPIO21, SCL → GPIO22. I2C 100 kHz, dirección **0x68**. Inicializa el sensor, habilita sus seis ejes y fija ACCEL_CONFIG/GYRO_CONFIG a cero. Estos registros fijan rangos del hardware, pero la trama conserva cuentas crudas: no convierte unidades. No añade calibración, filtros de software ni umbrales. Los filtros internos del chip quedan en su configuración de reset.
 
@@ -48,11 +70,11 @@ Los bytes y la última lectura viven en memoria. No crean `DrivingEvent`, no se 
 
 No existe servicio de ejecución permanente en segundo plano. La prueba debe realizarse con la app abierta; cierre de proceso requiere volver a seleccionar/conectar. El perfil inicial no añade bonding, cifrado BLE ni autenticación del periférico: reconocer el UUID no acredita la identidad del dispositivo. Esto debe resolverse antes de utilizarlo en producción.
 
-## Prueba física personal (solo después de resolver el bloqueo)
+## Prueba física personal (normal o experimental explícita)
 
 1. Abrir en Arduino IDE `D:\Proyectos\AsistenteVialInteligente\firmware\AsistenteVialImu\AsistenteVialImu.ino`.
 2. Seleccionar **ESP32 Dev Module**, core Espressif 3.3.12, partición predeterminada y el puerto que actualmente corresponda al ESP32 (**COM9** fue el de tu prueba anterior). Mantener los cuatro cables del MPU como arriba. Pulsar **Verificar** y después **Subir**. Si la placa pide BOOT durante la carga, mantener BOOT hasta que comience la escritura y soltarlo.
-3. Abrir Serial Monitor a **115200**. Si no aparece el inicio, pulsar EN/reset. Mientras `WHO_AM_I` siga devolviendo `0x75`, el resultado correcto es que el firmware se detenga sin publicar BLE/RAW. No continuar con la prueba de BLE como si el sensor estuviera validado. Cuando una verificación legítima devuelva `0x68`, debe mostrar el sensor listo, nombre y ambos UUID; las líneas RAW empiezan después de que Android confirme NOTIFY.
+3. Abrir Serial Monitor a **115200**. Si no aparece el inicio, pulsar EN/reset. Debe mostrar `I2C device 0x68 OK`, la configuración, recepción del bloque de seis ejes y el valor realmente leído de WHO_AM_I. Con `0x68` confirma identidad; con otro valor muestra la advertencia y el modo experimental. En ambos casos autorizados debe aparecer `Anunciando AsistenteVial-IMU`. Ante fallo de comunicación/configuración/lectura se detiene. Las líneas RAW empiezan después de que Android confirme NOTIFY. Continuar los pasos siguientes únicamente como prueba controlada, conservando la advertencia de identidad si aparece.
 4. En el celular físico activar opciones de desarrollador y depuración USB; conectarlo al equipo y aceptar su autorización. Abrir `D:\Proyectos\AsistenteVialInteligente\mobile` en Android Studio, elegir variante **debug**, seleccionar el **celular** como destino y pulsar **Run**. Actualizar la app instalada conservando sus datos; no desinstalar ni borrar almacenamiento. Para esta prueba BLE no hace falta iniciar Laravel ni tener Internet.
 5. En la app pulsar **Explorar aplicación → Dispositivo BLE**. Conceder dispositivos cercanos en Android 12+, o ubicación para escaneo en Android 8–11. Activar Bluetooth; Android 8–11 también necesita el servicio de ubicación activado. Esto no introduce GPS en la app.
 6. Pulsar **Iniciar escaneo**, localizar **AsistenteVial-IMU** y pulsar **Seleccionar dispositivo**. El escaneo dura hasta 10 segundos; puede repetirse. El firmware debe estar encendido y sin otra app conectada.
@@ -71,11 +93,13 @@ Modificados en Android: `BleModule.kt`, `BleLabels.kt`, `AndroidBlePlatform.kt`,
 
 ## Verificación
 
-Firmware compilado correctamente: **1.119.779 bytes (85%)** de programa; **42.708 bytes (13%)** de RAM estática. La validación física no está aprobada: I2C responde en `0x68`, pero `WHO_AM_I` devuelve `0x75`. No se realizó una validación física aprobada de radio/mediciones.
+Revisión de compatibilidad experimental: compilación ejecutada y aprobada con Arduino CLI, core Espressif **3.3.12**, placa `esp32:esp32:esp32`: **1.112.223 bytes (84%)** de programa y **41.364 bytes (12%)** de RAM estática. También se comparó el código con HEAD: nombre, UUID, pines, periodo, lectura/serialización de frames, callbacks y transmisión BLE conservados. Se comprobó el orden comunicación → configuración → bloque crudo → consulta de identidad. Esa ejecución de compilación no incluyó carga física; posteriormente el responsable realizó y confirmó la prueba GATT/RAW descrita arriba. Android y Laravel no se modificaron ni se volvieron a probar al incorporar esta excepción/documentación.
+
+Registro histórico anterior al modo experimental: firmware compilado con **1.119.779 bytes (85%)** de programa y **42.708 bytes (13%)** de RAM estática. En ese momento WHO_AM_I `0x75` bloqueaba la publicación y aún no había prueba física GATT aprobada. Ese bloqueo histórico fue sustituido por la excepción explícita; la identidad permanece sin confirmar, pero el transporte crudo fue validado posteriormente.
 
 Verificación Android completada: `assembleDebug` y `assembleDebugAndroidTest` correctos; **31 pruebas unitarias aprobadas**; **29 pruebas instrumentadas aprobadas y 1 omitida** (Laravel HTTP real, opt-in), en emulador Android 14; `lintDebug`: **0 errores y 23 advertencias existentes**. Se comprobaron little-endian, extremos signed, longitudes inválidas, frescura de datos, perfil GATT incompleto, suscripción rechazada, timeout, desconexión, callbacks tardíos y pérdida de permisos/Bluetooth. También pasaron navegación, Room/migración, cola y sincronización existentes dentro de la suite seleccionada.
 
-Las pruebas usan vectores TEST y transporte simulado; nunca se presentan como lecturas físicas. Se excluyeron los cuatro casos antiguos de TripFlowTest/RestartPersistenceTest que escriben en la base manual, para conservar recorridos existentes. No se ejecutó nuevamente la prueba HTTP real Laravel ni se afirma una prueba física ESP32 → celular.
+Las pruebas automatizadas anteriores usan vectores TEST y transporte simulado; nunca se presentan como lecturas físicas. Se excluyeron los cuatro casos antiguos de TripFlowTest/RestartPersistenceTest que escriben en la base manual, para conservar recorridos existentes. No se ejecutó nuevamente la prueba HTTP real Laravel en aquella suite. La prueba física posterior ESP32 → celular es evidencia separada, reportada por el responsable.
 
 Comando ejecutado desde `mobile`, con JDK 17 y SDK local configurados:
 

@@ -2,7 +2,9 @@
  * Arduino ESP32 Dev Module, core Espressif 3.3.12.
  * Protocolo permanente: ../../docs/ETAPA_3B_BLE.md
  */
-#include <Wire.h>
+#include <driver/i2c_master.h>
+#include <esp_err.h>
+#include <cstring>
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
@@ -23,54 +25,75 @@ std::atomic_bool connected{false};
 std::atomic_bool subscribed{false};
 std::atomic_bool restartAdvertising{false};
 uint32_t lastSample = 0;
-// Selected only after a successful WHO_AM_I check; also used for raw samples.
-bool stopBeforeRegisterRead = true;
+i2c_master_bus_handle_t imuBus = nullptr;
+i2c_master_dev_handle_t imuDevice = nullptr;
+constexpr int I2C_TIMEOUT_MS = 50;
+// Selected after a complete raw-block read; identity does not override this mode.
+bool stopBeforeRegisterRead = false;
+bool sensorIdentityConfirmed = false;
+
+bool initializeI2c() {
+  // Own this bus directly: do not initialize Wire or another I2C driver on it.
+  i2c_master_bus_config_t busConfig = {};
+  busConfig.i2c_port = I2C_NUM_0;
+  busConfig.sda_io_num = gpio_num_t(SDA_PIN);
+  busConfig.scl_io_num = gpio_num_t(SCL_PIN);
+  busConfig.clk_source = I2C_CLK_SRC_DEFAULT;
+  busConfig.glitch_ignore_cnt = 7;
+  busConfig.flags.enable_internal_pullup = true;
+  esp_err_t result = i2c_new_master_bus(&busConfig, &imuBus);
+  if (result != ESP_OK) {
+    Serial.printf("I2C ERROR inicio bus SDA=21 SCL=22: %s\n", esp_err_to_name(result));
+    return false;
+  }
+  i2c_device_config_t deviceConfig = {};
+  deviceConfig.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+  deviceConfig.device_address = MPU_ADDRESS;
+  deviceConfig.scl_speed_hz = 100000;
+  result = i2c_master_bus_add_device(imuBus, &deviceConfig, &imuDevice);
+  if (result != ESP_OK) {
+    Serial.printf("I2C ERROR registro dispositivo 0x68: %s\n", esp_err_to_name(result));
+    i2c_del_master_bus(imuBus);
+    imuBus = nullptr;
+    return false;
+  }
+  Serial.println("I2C: controlador nativo ESP-IDF, 100 kHz.");
+  return true;
+}
 
 bool writeRegister(uint8_t reg, uint8_t value) {
-  Wire.beginTransmission(MPU_ADDRESS);
-  Wire.write(reg);
-  Wire.write(value);
-  const uint8_t result = Wire.endTransmission(true);
-  if (result != 0) {
-    Serial.printf("I2C ERROR escritura: direccion=0x%02X registro=0x%02X valor=0x%02X endTransmission=%u\n",
-                  MPU_ADDRESS, reg, value, unsigned(result));
+  const uint8_t command[2] = {reg, value};
+  const esp_err_t result = i2c_master_transmit(imuDevice, command, sizeof(command), I2C_TIMEOUT_MS);
+  if (result != ESP_OK) {
+    Serial.printf("I2C ERROR escritura: reg=0x%02X valor=0x%02X: %s\n",
+                  reg, value, esp_err_to_name(result));
     return false;
   }
   return true;
 }
 
 bool readRegistersWithTransaction(uint8_t reg, uint8_t *destination, size_t size, bool selectionStop) {
-  // Discard any unread RX bytes before starting a new register transaction.
-  while (Wire.available() > 0) Wire.read();
-  Wire.beginTransmission(MPU_ADDRESS);
-  // This byte selects the register; it is never assigned to destination.
-  if (Wire.write(reg) != 1) {
-    Wire.endTransmission(true);
-    Serial.printf("I2C ERROR: no se pudo encolar registro 0x%02X.\n", reg);
-    return false;
-  }
-  const uint8_t result = Wire.endTransmission(selectionStop);
-  if (result != 0) {
-    Serial.printf("I2C ERROR seleccion de registro: reg=0x%02X endTransmission=%u\n", reg, unsigned(result));
-    return false;
-  }
-  if (selectionStop) delayMicroseconds(100);
-  // requestFrom returns a BYTE COUNT. Only Wire.read returns register content.
-  const size_t received = Wire.requestFrom(MPU_ADDRESS, size, true);
-  if (received != size || size_t(Wire.available()) < size) {
-    Serial.printf("I2C ERROR lectura: reg=0x%02X esperados=%u recibidos=%u disponibles=%d\n",
-                  reg, unsigned(size), unsigned(received), Wire.available());
-    while (Wire.available()) Wire.read();
-    return false;
-  }
-  for (size_t i = 0; i < size; ++i) {
-    const int value = Wire.read();
-    if (value < 0) {
-      Serial.printf("I2C ERROR buffer de lectura: reg=0x%02X byte=%u\n", reg, unsigned(i));
+  uint8_t received[14]; // Separate RX storage; never copy the register address into it.
+  if (destination == nullptr || size == 0 || size > sizeof(received)) return false;
+  esp_err_t result;
+  if (selectionStop) {
+    result = i2c_master_transmit(imuDevice, &reg, 1, I2C_TIMEOUT_MS);
+    if (result != ESP_OK) {
+      Serial.printf("I2C ERROR seleccion reg=0x%02X (STOP): %s\n", reg, esp_err_to_name(result));
       return false;
     }
-    destination[i] = uint8_t(value);
+    delayMicroseconds(100);
+    result = i2c_master_receive(imuDevice, received, size, I2C_TIMEOUT_MS);
+  } else {
+    result = i2c_master_transmit_receive(imuDevice, &reg, 1, received, size, I2C_TIMEOUT_MS);
   }
+  if (result != ESP_OK) {
+    Serial.printf("I2C ERROR lectura reg=0x%02X (%s): %s\n", reg,
+                  selectionStop ? "STOP" : "repeated START", esp_err_to_name(result));
+    return false;
+  }
+  // Only a successful, complete driver transaction updates the caller's buffer.
+  memcpy(destination, received, size);
   return true;
 }
 
@@ -79,16 +102,20 @@ bool readRegisters(uint8_t reg, uint8_t *destination, size_t size) {
 }
 
 bool verifyMpuIdentity() {
-  // First try a separate write/read with STOP; then repeated START if needed.
+  bool identityReceived = false;
+  uint8_t lastIdentity = 0;
+  // Native combined transfer first; separate STOP transfer as compatibility fallback.
   for (int attempt = 0; attempt < 2; ++attempt) {
-    const bool selectionStop = attempt == 0;
+    const bool selectionStop = attempt == 1;
     Serial.printf("MPU INIT: WHO_AM_I con %s.\n", selectionStop ? "STOP" : "repeated START");
     uint8_t identity = 0;
     if (readRegistersWithTransaction(0x75, &identity, 1, selectionStop)) {
+      identityReceived = true;
+      lastIdentity = identity;
       Serial.printf("WHO_AM_I leído = 0x%02X\n", identity);
       if (identity == 0x68) {
-        stopBeforeRegisterRead = selectionStop;
-        Serial.printf("MPU INIT: identidad confirmada; lecturas con %s.\n", selectionStop ? "STOP" : "repeated START");
+        sensorIdentityConfirmed = true;
+        Serial.println("MPU INIT: identidad MPU6050 confirmada.");
         return true;
       }
       Serial.println("MPU INIT: identidad recibida distinta de 0x68.");
@@ -96,24 +123,27 @@ bool verifyMpuIdentity() {
       Serial.println("MPU INIT: WHO_AM_I no recibido; fallo de transaccion I2C.");
     }
     if (attempt == 0) {
-      Serial.println("MPU INIT: se probara una segunda lectura con repeated START.");
+      Serial.println("MPU INIT: se probara una segunda lectura con STOP.");
       delay(2);
     }
   }
-  Serial.println("MPU INIT ERROR: ninguna de las dos transacciones confirma WHO_AM_I=0x68. No se acepta 0x75 ni se publicaran muestras.");
+  if (identityReceived) {
+    Serial.printf("ADVERTENCIA: WHO_AM_I anomalo = 0x%02X\n", lastIdentity);
+    Serial.println("Modo experimental: identidad del sensor no confirmada");
+    Serial.println("Solo mediciones crudas para pruebas controladas; no son detecciones validadas.");
+    return true; // Communication checked, NOT a valid MPU6050 identification.
+  }
+  Serial.println("MPU INIT ERROR: WHO_AM_I no pudo leerse; no se publicaran muestras.");
   return false;
 }
 
 bool initializeMpu() {
-  Wire.beginTransmission(MPU_ADDRESS);
-  const uint8_t probe = Wire.endTransmission(true);
-  if (probe != 0) {
-    Serial.printf("I2C ERROR: dispositivo 0x68 no responde; endTransmission=%u\n", unsigned(probe));
+  const esp_err_t probe = i2c_master_probe(imuBus, MPU_ADDRESS, I2C_TIMEOUT_MS);
+  if (probe != ESP_OK) {
+    Serial.printf("I2C ERROR: dispositivo 0x68 no responde: %s\n", esp_err_to_name(probe));
     return false;
   }
   Serial.println("I2C device 0x68 OK");
-  // Verify identity before reset/configuration. No unrelated device is configured.
-  if (!verifyMpuIdentity()) return false;
   // Reset, wake with X gyro PLL, all six axes enabled. No software filtering.
   Serial.println("MPU INIT: reset PWR_MGMT_1 (0x6B <- 0x80).");
   if (!writeRegister(0x6B, 0x80)) {
@@ -151,6 +181,18 @@ bool initializeMpu() {
       return false;
     }
   }
+  // Require a complete 14-byte transfer containing all six axes, before identity.
+  uint8_t rawRegisters[14];
+  if (!readRegisters(0x3B, rawRegisters, sizeof(rawRegisters))) {
+    if (!readRegistersWithTransaction(0x3B, rawRegisters, sizeof(rawRegisters), true)) {
+      Serial.println("MPU INIT ERROR: bloque crudo de seis ejes no recibido.");
+      return false;
+    }
+    stopBeforeRegisterRead = true;
+  }
+  Serial.printf("MPU INIT: bloque crudo de seis ejes recibido (%s).\n",
+                stopBeforeRegisterRead ? "STOP" : "repeated START");
+  if (!verifyMpuIdentity()) return false;
   Serial.println("MPU INIT: inicializacion completada.");
   return true;
 }
@@ -193,16 +235,16 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   Serial.println("Asistente Vial - Etapa 3B - solo mediciones crudas.");
-  if (!Wire.begin(SDA_PIN, SCL_PIN, 100000)) {
-    Serial.println("I2C ERROR: Wire.begin fallo (SDA=21, SCL=22, 100 kHz).");
+  if (!initializeI2c()) {
     while (true) delay(1000);
   }
-  Wire.setTimeOut(50);
   if (!initializeMpu()) {
     Serial.println("ERROR MPU6050: no se publicaran muestras. Revisar conexion y reiniciar.");
     while (true) delay(1000);
   }
-  Serial.println("MPU6050 listo: 0x68, SDA=21, SCL=22.");
+  Serial.println(sensorIdentityConfirmed
+      ? "MPU6050 listo: identidad confirmada, 0x68, SDA=21, SCL=22."
+      : "Dispositivo I2C listo en modo experimental: identidad NO confirmada, 0x68, SDA=21, SCL=22.");
   BLEDevice::init(DEVICE_NAME);
   BLEServer *server = BLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());

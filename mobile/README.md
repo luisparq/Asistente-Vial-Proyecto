@@ -1,57 +1,28 @@
-# AsistenteVial — Etapa 3A
+# AsistenteVial — Android
 
-Aplicación Android del conductor, creada en Kotlin con Jetpack Compose y Material 3.
-Application ID: `com.tecsup.asistente.conduccion`.
+Aplicación del conductor en Kotlin, Jetpack Compose y Material 3. Application ID: `com.tecsup.asistente.conduccion`; versión declarada 0.4.0. Estado actualizado: 2026-10-03. Consultar primero [estado general](../docs/ESTADO_ACTUAL.md) y [contrato Android ↔ Laravel](../docs/CONTRATO_ANDROID_LARAVEL.md).
 
-Etapa 3A verificada: compilación correcta, 10 pruebas unitarias y 15 pruebas
-instrumentadas aprobadas; las 3 fases de persistencia con cierre de proceso
-también aprobaron. Lint: 0 errores, 15 avisos detallados en
-[ETAPA_3A.md](ETAPA_3A.md). No hay pruebas de conexión física ni mediciones.
+## Implementado
 
-Etapa 2 verificada: compilación correcta, 9 pruebas instrumentadas aprobadas y
-3 fases adicionales aprobadas con cierre real del proceso entre ellas. Lint:
-0 errores y 14 avisos de actualizaciones de dependencias. El inventario completo
-de archivos y los resultados están en [ETAPA_2.md](ETAPA_2.md).
+- Arquitectura `core`, `data`, `domain`, `feature`, `navigation`; Hilt, ViewModel/StateFlow, Coroutines y Navigation Compose.
+- Iniciar/reanudar viaje → eventos manuales SIMULATED → finalizar → historial/detalle desde Room, sin depender de Internet.
+- Room biblioteca 2.7.2, esquema 2 y migración aditiva; UUID persistentes, propietario y outbox transaccional.
+- OkHttp/DTO de contrato, autenticación Sanctum desde Ajustes y sesión cifrada con Android Keystore.
+- **Sincronizar** llama directamente a SyncEngine; evita pulsaciones simultáneas, muestra resultado y conserva WorkManager como respaldo offline. Respeta Retry-After y bloqueos; solo adelanta reintentos network_unavailable.
+- Perfil propio consultado en Laravel, en memoria; servidor no disponible no bloquea viajes locales.
+- Soporte/permisos/escaneo BLE, selección y conexión GATT real; Diagnóstico recibe cuentas crudas ax/ay/az/gx/gy/gz.
 
-## Alcance
+**Etapa 3B físicamente validada para transporte crudo**, según prueba reportada por el responsable con ESP32, IMU y teléfono Android real el 2026-10-03. `WHO_AM_I = 0x75` continúa anómalo: identidad no confirmada y firmware en modo experimental explícito. Los cambios de seis ejes fueron observados en Android y Serial al mover el módulo.
 
-Sistema previsto: sensores/MPU6050 → ESP32 → BLE → Android → API REST/HTTPS →
-Laravel → base de datos → dashboard. Android y Laravel son componentes del mismo
-sistema; Laravel será API/backend y dashboard del administrador de flota.
+Las cuentas BLE viven solo en memoria: no generan DrivingEvent, no se guardan en Room ni se envían a Laravel. SIMULATED es prueba; SENSOR no está habilitado como productor de eventos ni representa detecciones físicas validadas. Conversión/calibración, detección, GPS y buzzer siguen pendientes.
 
-La base incluye viajes y eventos manuales de prueba persistidos en Room.
-Permite iniciar o continuar un recorrido, generar eventos SIMULATED, finalizar
-y consultar el historial y el detalle. El recorrido activo se conserva al salir.
-Etapa 3A añade soporte/estado BLE, permisos, escaneo, selección y preparación de
-conexión. Diagnóstico muestra ausencia de mediciones. No implementa autenticación,
-conexión GATT, sensores, GPS, algoritmos de detección ni API. No contiene UUID BLE,
-endpoints, credenciales ni mediciones. No solicita permisos de red; solicita los
-permisos BLE según la versión de Android solo desde la pantalla BLE. Los eventos
-de viajes siguen siendo SIMULATED, no detecciones reales ni infracciones.
+Nombre, UUID, frame little-endian de 12 bytes y 4 Hz se conservan según [protocolo BLE](../docs/ETAPA_3B_BLE.md). No cambiarlos arbitrariamente. Hilt enlaza GattBleConnection/RawSensorDataSource; no hay un servicio BLE permanente en segundo plano.
 
-El alcance BLE, inventario de archivos y límites de validación están en
-[ETAPA_3A.md](ETAPA_3A.md). La integración física 3B queda pendiente hasta que el
-usuario confirme que dispone de ESP32 y MPU6050. El backend requiere autorización
-separada y comenzará revisando el contrato con los modelos Android actuales.
+## Configuración y guías
 
-## Organización
+En Ajustes introducir URL del servidor y credenciales suministradas por el operador. Debug usa por defecto `http://10.0.2.2:8000/` para emulador, configurable con la propiedad Gradle `apiBaseUrl`; un teléfono requiere una dirección alcanzable del servidor. HTTP permitido solo en debug/local, HTTPS para producción. No hay cuentas predeterminadas.
 
-- `core/ui`: tema claro/oscuro del sistema y estructura compartida de pantallas.
-- `data`: Room y repositorio local, acceso Android BLE y preparación GATT pendiente.
-- `domain`: modelos/contratos de viajes, BLE y recepción futura de sensores.
-- `feature`: splash, login, home, trip, ble, diagnostic, history y settings.
-- `navigation`: rutas centralizadas y `AppNavHost`.
-
-Hilt configura Application, Activity, ViewModels, repositorio, Room y Clock.
-Los ViewModels exponen StateFlow a Compose mediante collectAsStateWithLifecycle;
-las escrituras se ejecutan en viewModelScope y las consultas Room exponen Flow.
-
-Flujo: Splash → Acceso → Inicio → iniciar/continuar recorrido → Viaje →
-generar eventos simulados → finalizar → Historial → Detalle del recorrido.
-Inicio también permite abrir BLE, Diagnóstico, Historial y Ajustes.
-Splash y Acceso se retiran de la pila al avanzar. Las pantallas secundarias
-permiten volver a Inicio; Ajustes permite volver a Acceso limpiando Inicio.
-«Explorar aplicación» permite navegar sin representar un inicio de sesión real.
+Guías: [Etapa 2](ETAPA_2.md), [3A](ETAPA_3A.md), [integración Laravel](ETAPA_INTEGRACION_LARAVEL.md), [sincronización manual](CORRECCION_SINCRONIZACION_MANUAL.md), [perfil](ETAPA_PERFIL_CONDUCTOR.md) y [3B física](../docs/ETAPA_3B_BLE.md). Sus resultados de pruebas son históricos y no se ejecutaron nuevamente por actualizar este README.
 
 ## Abrir y compilar
 

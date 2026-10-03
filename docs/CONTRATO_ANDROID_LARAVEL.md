@@ -1,8 +1,10 @@
 # Contrato propuesto Android ↔ Laravel
 
-Fecha de revisión: 2026-09-28. Estado: **PROPUESTA PARA APROBACIÓN; NO IMPLEMENTADA**.
+Fecha de auditoría original: 2026-09-28. **Contrato aprobado en sección 11, puntos 1–6, e implementado posteriormente.** Actualización de contexto: 2026-10-03.
 
-Este documento corresponde al paso 1 de backend. Describe lo comprobado en el código Android y propone una futura interoperabilidad. No crea Laravel, tablas remotas, endpoints operativos ni autenticación. No modifica Android. La Etapa 3B continúa pendiente del ESP32 + MPU6050 y de la definición y validación del protocolo físico.
+Las secciones de evidencia conservan el estado histórico de Android al diseñar el contrato; no describen todas las funciones actuales. La implementación vigente incluye API Laravel, sincronización Room, dashboard/gestión de flota y BLE crudo validado físicamente en modo experimental con identidad del sensor no confirmada. Consultar [ESTADO_ACTUAL.md](ESTADO_ACTUAL.md), [integración](../mobile/ETAPA_INTEGRACION_LARAVEL.md) y [BLE](ETAPA_3B_BLE.md). Esta nota no modifica campos, endpoints ni decisiones aprobadas.
+
+Este documento corresponde históricamente al paso 1 de backend. Su elaboración describió lo comprobado en Android y propuso la interoperabilidad, sin crear código ni tablas. Las implementaciones y validaciones posteriores están documentadas en las referencias anteriores; las descripciones originales se conservan como antecedente.
 
 Sistema objetivo: `MPU6050 → ESP32 → BLE → Android → API REST/HTTPS → Laravel → base de datos → dashboard`.
 
@@ -21,7 +23,7 @@ Las rutas siguientes son relativas a este documento y constituyen la evidencia d
 - Reglas y reloj: [RoomTripRepository.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/data/repository/RoomTripRepository.kt) y [StorageModule.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/core/di/StorageModule.kt).
 - Flujo: [HomeViewModel.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/feature/home/HomeViewModel.kt), [TripViewModel.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/feature/trip/TripViewModel.kt), [HistoryViewModel.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/feature/history/HistoryViewModel.kt), [TripDetailViewModel.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/feature/history/TripDetailViewModel.kt), sus pantallas y [AppNavHost.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/navigation/AppNavHost.kt).
 - Presentación de fechas y acceso: [TripComponents.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/core/ui/TripComponents.kt) y [LoginScreen.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/feature/login/LoginScreen.kt).
-- Preparación física: [SensorDataSource.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/domain/diagnostic/SensorDataSource.kt), [PendingSensorDataSource.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/data/ble/PendingSensorDataSource.kt), [PendingGattConnection.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/data/ble/PendingGattConnection.kt) y [DiagnosticViewModel.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/feature/diagnostic/DiagnosticViewModel.kt).
+- Preparación física: [SensorDataSource.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/domain/diagnostic/SensorDataSource.kt), `PendingSensorDataSource.kt` (placeholder histórico eliminado), `PendingGattConnection.kt` (placeholder histórico eliminado) y [DiagnosticViewModel.kt](../mobile/app/src/main/java/com/tecsup/asistente/conduccion/feature/diagnostic/DiagnosticViewModel.kt).
 - Pruebas existentes inspeccionadas: [RoomTripRepositoryTest.kt](../mobile/app/src/androidTest/java/com/tecsup/asistente/conduccion/RoomTripRepositoryTest.kt) y [TripFlowTest.kt](../mobile/app/src/androidTest/java/com/tecsup/asistente/conduccion/TripFlowTest.kt). Su lectura no equivale a una nueva ejecución.
 
 ### 1.2 Hechos encontrados
