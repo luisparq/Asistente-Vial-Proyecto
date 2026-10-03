@@ -1,7 +1,7 @@
 package com.tecsup.asistente.conduccion
 
 import com.tecsup.asistente.conduccion.data.ble.DefaultBleRepository
-import com.tecsup.asistente.conduccion.data.ble.PendingGattConnection
+import com.tecsup.asistente.conduccion.data.ble.*
 import com.tecsup.asistente.conduccion.domain.ble.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -14,7 +14,7 @@ import org.junit.Test
 class BleRepositoryTest {
     @Test fun unavailableEnvironmentsBlockScanning() = runTest {
         val platform = TestBlePlatform()
-        val repository = DefaultBleRepository(platform, PendingGattConnection(), backgroundScope)
+        val repository = DefaultBleRepository(platform, testConnection(platform, backgroundScope), backgroundScope)
         for (availability in listOf(BleAvailability.UNSUPPORTED, BleAvailability.PERMISSION_REQUIRED,
             BleAvailability.BLUETOOTH_OFF, BleAvailability.LOCATION_OFF, BleAvailability.UNAVAILABLE)) {
             platform.available.value = availability
@@ -27,7 +27,7 @@ class BleRepositoryTest {
 
     @Test fun duplicateAdvertisementsUpdateOneDeviceAndScanTimesOut() = runTest {
         val platform = TestBlePlatform()
-        val repository = DefaultBleRepository(platform, PendingGattConnection(), backgroundScope)
+        val repository = DefaultBleRepository(platform, testConnection(platform, backgroundScope), backgroundScope)
         repository.startScan()
         repository.startScan()
         runCurrent()
@@ -46,7 +46,7 @@ class BleRepositoryTest {
 
     @Test fun stopAndRestartIgnoreLateCallbacksFromPreviousScan() = runTest {
         val platform = TestBlePlatform()
-        val repository = DefaultBleRepository(platform, PendingGattConnection(), backgroundScope)
+        val repository = DefaultBleRepository(platform, testConnection(platform, backgroundScope), backgroundScope)
         repository.startScan()
         runCurrent()
         repository.stopScan()
@@ -68,7 +68,7 @@ class BleRepositoryTest {
 
     @Test fun permissionRevocationOrBluetoothOffStopsWithoutAutoRestart() = runTest {
         val platform = TestBlePlatform()
-        val repository = DefaultBleRepository(platform, PendingGattConnection(), backgroundScope)
+        val repository = DefaultBleRepository(platform, testConnection(platform, backgroundScope), backgroundScope)
         for (unavailable in listOf(BleAvailability.PERMISSION_REQUIRED, BleAvailability.BLUETOOTH_OFF,
             BleAvailability.LOCATION_OFF)) {
             platform.available.value = BleAvailability.READY
@@ -87,7 +87,7 @@ class BleRepositoryTest {
 
     @Test fun platformFailureStopsAndPreservesItsErrorCode() = runTest {
         val platform = TestBlePlatform()
-        val repository = DefaultBleRepository(platform, PendingGattConnection(), backgroundScope)
+        val repository = DefaultBleRepository(platform, testConnection(platform, backgroundScope), backgroundScope)
         repository.startScan()
         runCurrent()
         platform.sessions[0].fail(ScanFailure(ScanFailureReason.PLATFORM, 2))
@@ -100,7 +100,7 @@ class BleRepositoryTest {
     @Test fun synchronousFailureDoesNotLeakSessionOrTimeout() = runTest {
         val platform = TestBlePlatform().apply { failImmediately = true }
         val scope = CoroutineScope(backgroundScope.coroutineContext + UnconfinedTestDispatcher(testScheduler))
-        val repository = DefaultBleRepository(platform, PendingGattConnection(), scope)
+        val repository = DefaultBleRepository(platform, testConnection(platform, scope), scope)
         repository.startScan()
         runCurrent()
         assertEquals(ScanStatus.FAILED, repository.scan.value.status)
@@ -111,9 +111,9 @@ class BleRepositoryTest {
         assertEquals(ScanStatus.FAILED, repository.scan.value.status)
     }
 
-    @Test fun selectionOnlyAcceptsDiscoveredDevicesAndPreparationNeverConnects() = runTest {
+    @Test fun selectionOnlyAcceptsDiscoveredDevicesAndPreparationStartsGatt() = runTest {
         val platform = TestBlePlatform()
-        val repository = DefaultBleRepository(platform, PendingGattConnection(), backgroundScope)
+        val repository = DefaultBleRepository(platform, testConnection(platform, backgroundScope), backgroundScope)
         repository.selectDevice("not-discovered")
         repository.prepareConnection()
         runCurrent()
@@ -132,7 +132,7 @@ class BleRepositoryTest {
         repository.prepareConnection()
         runCurrent()
         assertTrue(platform.sessions.last().stopped)
-        assertEquals(ConnectionStatus.AWAITING_GATT_PROFILE, repository.connection.value.status)
+        assertEquals(ConnectionStatus.CONNECTING, repository.connection.value.status)
         assertEquals(device, repository.connection.value.device)
         repository.clearSelection()
         runCurrent()

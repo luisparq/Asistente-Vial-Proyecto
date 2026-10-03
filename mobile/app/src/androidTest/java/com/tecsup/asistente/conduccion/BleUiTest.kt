@@ -31,7 +31,7 @@ class BleUiTest {
         compose.activityRule.scenario.onActivity { it.viewModelStore.put("ble-test", repository.viewModel) }
     }
 
-    @Test fun fixtureSelectionRemainsPendingWithoutConnecting() {
+    @Test fun fixtureSelectionStartsConnectingUntilSubscriptionConfirmed() {
         val repository = RecordingBleRepository()
         show(repository)
         compose.clickText(text(R.string.ble_start))
@@ -39,8 +39,8 @@ class BleUiTest {
         compose.clickText(text(R.string.ble_select))
         compose.onNodeWithTag("ble_list").performScrollToNode(hasText(text(R.string.ble_prepare)))
         compose.clickText(text(R.string.ble_prepare))
-        compose.waitForText(text(R.string.connection_pending))
-        assertEquals(ConnectionStatus.AWAITING_GATT_PROFILE, repository.connection.value.status)
+        compose.waitForText(text(R.string.connection_connecting))
+        assertEquals(ConnectionStatus.CONNECTING, repository.connection.value.status)
         assertEquals(ScanStatus.STOPPED, repository.scan.value.status)
         compose.onNodeWithText(text(R.string.connection_connected)).assertDoesNotExist()
     }
@@ -101,7 +101,7 @@ private class RecordingBleRepository(availability: BleAvailability = BleAvailabi
             scan.value.devices.first { it.address == address })
     }
     override fun prepareConnection() {
-        mutableConnection.value = connection.value.copy(status = ConnectionStatus.AWAITING_GATT_PROFILE)
+        mutableConnection.value = connection.value.copy(status = ConnectionStatus.CONNECTING)
     }
     override fun clearSelection() { mutableConnection.value = BleConnectionState() }
 }

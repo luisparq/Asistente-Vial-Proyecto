@@ -94,11 +94,13 @@ fun BleContent(
                     state.connection.device?.let { device ->
                         Text(device.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.ble_unnamed))
                         Text(device.address)
-                        Button(onClick = onPrepare, enabled = state.connection.status == ConnectionStatus.SELECTED) {
+                        Button(onClick = onPrepare, enabled = state.connection.status in listOf(
+                            ConnectionStatus.SELECTED, ConnectionStatus.DISCONNECTED, ConnectionStatus.FAILED)) {
                             Text(stringResource(R.string.ble_prepare))
                         }
                         OutlinedButton(onClick = onClear) { Text(stringResource(R.string.ble_clear_selection)) }
                     }
+                    state.connection.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Text(stringResource(R.string.ble_not_verified))
                 }
             }

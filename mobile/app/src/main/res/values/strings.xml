@@ -10,9 +10,9 @@
     <string name="home_description">Registra recorridos locales y genera eventos manuales para probar la aplicación. No se detectan maniobras reales.</string>
     <string name="trip_title">Viaje</string>
     <string name="ble_title">Dispositivo BLE</string>
-    <string name="ble_description">Busca dispositivos BLE cercanos y selecciona uno. La comunicación con el ESP32 queda pendiente de la Etapa 3B.</string>
+    <string name="ble_description">Escanea y selecciona AsistenteVial-IMU. Conecta para recibir mediciones crudas del MPU6050.</string>
     <string name="diagnostic_title">Diagnóstico</string>
-    <string name="diagnostic_description">Preparado para la futura integración del ESP32 y MPU6050. No hay lecturas de sensores ni detecciones de maniobras en esta etapa.</string>
+    <string name="diagnostic_description">Lecturas crudas del MPU6050 recibidas por BLE. Mantén esta pantalla abierta durante la prueba física.</string>
     <string name="history_title">Historial</string>
     <string name="history_description">Recorridos guardados en este dispositivo, incluidos los activos. Sus eventos son simulados de prueba, no detecciones reales ni infracciones.</string>
     <string name="settings_title">Ajustes</string>
@@ -70,20 +70,18 @@
     <string name="ble_no_devices">No hay dispositivos encontrados en este escaneo.</string>
     <string name="ble_unnamed">Dispositivo sin nombre</string>
     <string name="ble_select">Seleccionar dispositivo</string>
-    <string name="ble_prepare">Preparar conexión</string>
-    <string name="ble_clear_selection">Quitar selección</string>
+    <string name="ble_prepare">Conectar GATT</string>
+    <string name="ble_clear_selection">Desconectar y quitar selección</string>
     <string name="ble_not_verified">Un dispositivo encontrado no implica que sea nuestro ESP32 ni que esté conectado.</string>
     <string name="connection_none">Sin dispositivo seleccionado · sin conexión.</string>
     <string name="connection_selected">Dispositivo seleccionado · sin conexión.</string>
-    <string name="connection_pending">Conexión pendiente del perfil GATT real en Etapa 3B. No se ha establecido una conexión.</string>
     <string name="connection_connecting">Conectando…</string>
-    <string name="connection_connected">Conexión establecida.</string>
+    <string name="connection_connected">Conexión establecida · notificaciones habilitadas.</string>
     <string name="connection_disconnected">Dispositivo desconectado.</string>
     <string name="connection_failed">Error de conexión.</string>
-    <string name="diagnostic_pending">Recepción pendiente del hardware y del protocolo de la Etapa 3B.</string>
     <string name="diagnostic_waiting">Esperando datos del dispositivo.</string>
-    <string name="diagnostic_receiving">Recibiendo datos del dispositivo.</string>
-    <string name="diagnostic_failed">No se pudieron recibir datos del dispositivo.</string>
+    <string name="diagnostic_receiving">Recibiendo mediciones crudas del dispositivo.</string>
+    <string name="diagnostic_failed">Error de recepción: conexión fallida o trama IMU_RAW inválida.</string>
     <string name="diagnostic_no_measurements">Sin mediciones disponibles. No se muestran valores simulados del MPU6050.</string>
     <string name="profile_title">Mi perfil</string>
     <string name="profile_description">Información de tu empresa consultada en Laravel. Los recorridos siguen funcionando sin Internet.</string>
@@ -113,4 +111,5 @@
     <string name="profile_verified">Revisado</string>
     <string name="profile_rejected">Rechazado</string>
     <string name="profile_unknown">No disponible</string>
+    <string name="diagnostic_raw_notice">Cuentas crudas int16, sin unidades convertidas, calibración ni detección de maniobras. No se guardan como eventos SENSOR ni se envían a Laravel.</string>
 </resources>

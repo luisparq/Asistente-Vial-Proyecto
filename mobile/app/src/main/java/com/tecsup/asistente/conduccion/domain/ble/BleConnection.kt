@@ -2,7 +2,7 @@ package com.tecsup.asistente.conduccion.domain.ble
 
 import kotlinx.coroutines.flow.StateFlow
 
-/** Se sustituirá por el transporte GATT cuando exista el perfil real del ESP32. */
+/** Conexión del dispositivo seleccionado; prepare inicia descubrimiento y suscripción GATT. */
 interface BleConnection {
     val state: StateFlow<BleConnectionState>
     fun select(device: BleDevice)

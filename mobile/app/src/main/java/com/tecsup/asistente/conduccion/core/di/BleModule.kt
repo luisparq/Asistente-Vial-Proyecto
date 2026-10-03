@@ -2,8 +2,10 @@ package com.tecsup.asistente.conduccion.core.di
 
 import com.tecsup.asistente.conduccion.data.ble.AndroidBlePlatform
 import com.tecsup.asistente.conduccion.data.ble.DefaultBleRepository
-import com.tecsup.asistente.conduccion.data.ble.PendingGattConnection
-import com.tecsup.asistente.conduccion.data.ble.PendingSensorDataSource
+import com.tecsup.asistente.conduccion.data.ble.GattBleConnection
+import com.tecsup.asistente.conduccion.data.ble.RawSensorDataSource
+import com.tecsup.asistente.conduccion.data.ble.GattTransport
+import com.tecsup.asistente.conduccion.data.ble.AndroidGattTransport
 import com.tecsup.asistente.conduccion.domain.ble.BleConnection
 import com.tecsup.asistente.conduccion.domain.ble.BlePlatform
 import com.tecsup.asistente.conduccion.domain.ble.BleRepository
@@ -28,8 +30,9 @@ annotation class BleScope
 abstract class BleModule {
     @Binds @Singleton abstract fun platform(value: AndroidBlePlatform): BlePlatform
     @Binds @Singleton abstract fun repository(value: DefaultBleRepository): BleRepository
-    @Binds @Singleton abstract fun connection(value: PendingGattConnection): BleConnection
-    @Binds @Singleton abstract fun sensorData(value: PendingSensorDataSource): SensorDataSource
+    @Binds @Singleton abstract fun connection(value: GattBleConnection): BleConnection
+    @Binds @Singleton abstract fun sensorData(value: RawSensorDataSource): SensorDataSource
+    @Binds @Singleton abstract fun transport(value: AndroidGattTransport): GattTransport
 
     companion object {
         @Provides @Singleton @BleScope

@@ -18,12 +18,12 @@ data class BleScanState(
 )
 
 enum class ConnectionStatus {
-    NOT_SELECTED, SELECTED, AWAITING_GATT_PROFILE,
-    // Reservados para la implementación real de 3B. No se emiten en 3A.
+    NOT_SELECTED, SELECTED,
     CONNECTING, CONNECTED, DISCONNECTED, FAILED,
 }
 
 data class BleConnectionState(
     val status: ConnectionStatus = ConnectionStatus.NOT_SELECTED,
     val device: BleDevice? = null,
+    val error: String? = null,
 )

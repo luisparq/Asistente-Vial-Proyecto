@@ -117,7 +117,7 @@ class AndroidBlePlatform @Inject constructor(
                     onFailure(ScanFailure(ScanFailureReason.PLATFORM, errorCode))
                 }
             }
-            // Sin UUID ni filtros del ESP32: se muestran anuncios BLE cercanos.
+            // Se conservan los anuncios cercanos; el perfil esperado se valida al conectar.
             scanner.startScan(null, ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(), callback)
             ScanSession {
                 try {

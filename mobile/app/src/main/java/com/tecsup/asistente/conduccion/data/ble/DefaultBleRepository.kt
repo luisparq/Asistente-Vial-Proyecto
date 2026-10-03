@@ -115,8 +115,8 @@ class DefaultBleRepository @Inject constructor(
 
     override fun prepareConnection() {
         scope.launch {
-            if (connection.value.device == null) return@launch
             if (scan.value.status == ScanStatus.SCANNING) endScan(ScanStatus.STOPPED)
+            // The connector checks selection after previously queued selection commands.
             connector.prepare()
         }
     }

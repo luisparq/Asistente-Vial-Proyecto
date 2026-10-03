@@ -6,6 +6,7 @@ import com.tecsup.asistente.conduccion.domain.ble.BleConnectionState
 import com.tecsup.asistente.conduccion.domain.ble.BleRepository
 import com.tecsup.asistente.conduccion.domain.diagnostic.SensorDataSource
 import com.tecsup.asistente.conduccion.domain.diagnostic.SensorDataStatus
+import com.tecsup.asistente.conduccion.domain.diagnostic.RawImuSample
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -14,11 +15,12 @@ import kotlinx.coroutines.flow.stateIn
 
 data class DiagnosticUiState(
     val connection: BleConnectionState = BleConnectionState(),
-    val sensorStatus: SensorDataStatus = SensorDataStatus.PENDING_HARDWARE,
+    val sensorStatus: SensorDataStatus = SensorDataStatus.DISCONNECTED,
+    val sample: RawImuSample? = null,
 )
 
 @HiltViewModel
 class DiagnosticViewModel @Inject constructor(repository: BleRepository, source: SensorDataSource) : ViewModel() {
-    val state = combine(repository.connection, source.status, ::DiagnosticUiState)
+    val state = combine(repository.connection, source.status, source.sample, ::DiagnosticUiState)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiagnosticUiState())
 }

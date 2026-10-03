@@ -3,13 +3,13 @@ package com.tecsup.asistente.conduccion.domain.diagnostic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
-enum class SensorDataStatus { PENDING_HARDWARE, WAITING_FOR_DATA, RECEIVING, FAILED }
+enum class SensorDataStatus { DISCONNECTED, WAITING_FOR_DATA, RECEIVING, FAILED }
 
 /**
- * Punto de entrada de futuras notificaciones BLE. Los bytes no tienen formato
- * ni unidades definidos aún: el contrato y el decodificador pertenecen a 3B.
+ * Telemetría IMU_RAW en memoria. No crea DrivingEvent ni escribe en Room/API.
  */
 interface SensorDataSource {
     val status: StateFlow<SensorDataStatus>
     val frames: Flow<ByteArray>
+    val sample: StateFlow<RawImuSample?>
 }
