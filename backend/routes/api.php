@@ -24,3 +24,21 @@ Route::prefix('v1')->middleware(ApiBoundary::class)->group(function () {
         Route::get('trips/{client_trip_id}/events', [EventController::class, 'index'])->name('events.index');
     });
 });
+
+// Rutas Telemétricas y Analítica
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/trips/{trip}/telemetry-batch', [App\Http\Controllers\Api\TelemetryController::class, 'syncBatch']);
+    Route::get('/dashboard/stats', [App\Http\Controllers\Api\TelemetryController::class, 'dashboardStats']);
+});
+
+// Rutas Telemétricas y Analítica
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/trips/{trip}/telemetry-batch', [App\Http\Controllers\Api\TelemetryController::class, 'syncBatch']);
+    Route::get('/dashboard/stats', [App\Http\Controllers\Api\TelemetryController::class, 'dashboardStats']);
+});
+
+// Rutas Telemétricas y Analítica v1
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    Route::post('/trips/{trip}/telemetry-batch', [App\Http\Controllers\Api\TelemetryController::class, 'syncBatch']);
+    Route::get('/dashboard/stats', [App\Http\Controllers\Api\TelemetryController::class, 'dashboardStats']);
+});

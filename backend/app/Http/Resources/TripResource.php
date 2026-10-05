@@ -7,13 +7,15 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class TripResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        return [
+            "id"          => $this->id,
+            "user_id"     => $this->user_id,
+            "latitude"    => (float) $this->latitude,
+            "longitude"   => (float) $this->longitude,
+            "speed"       => (float) $this->speed,
+            "recorded_at" => $this->created_at?->toIso8601String(),
+        ];
     }
 }
