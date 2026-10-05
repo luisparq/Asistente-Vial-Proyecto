@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -17,6 +18,17 @@ class User extends Authenticatable
 
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $user) {
+            if (($user->role === 'platform_admin') !== ($user->company_id === null)) {
+                throw ValidationException::withMessages([
+                    'company_id' => 'El administrador global no pertenece a una empresa; los usuarios empresariales requieren empresa.',
+                ]);
+            }
+        });
+    }
 
     public function company(): BelongsTo
     {

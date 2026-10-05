@@ -18,6 +18,9 @@ class AccessInvitations
             if ($user->access_status === 'DISABLED') {
                 throw ValidationException::withMessages(['access' => 'Primero habilita la cuenta.']);
             }
+            if ($user->role === 'driver' && ($user->access_status !== 'PENDING' || ! $user->driver()->where('status', 'ACTIVE')->exists())) {
+                throw ValidationException::withMessages(['access' => 'Solo un conductor pendiente y con perfil activo puede recibir un código.']);
+            }
             AccessInvitation::where('user_id', $user->id)->whereNull('consumed_at')->update(['consumed_at' => now()]);
             $code = bin2hex(random_bytes(32));
             AccessInvitation::create(['company_id' => $user->company_id, 'user_id' => $user->id, 'token_hash' => hash('sha256', $code), 'expires_at' => now()->addDay()]);
@@ -27,9 +30,9 @@ class AccessInvitations
         }, 5);
     }
 
-    public function consume(string $code, string $password): void
+    public function consume(string $code, string $password, ?string $channel = null): void
     {
-        DB::transaction(function () use ($code, $password) {
+        DB::transaction(function () use ($code, $password, $channel) {
             $hash = hash('sha256', $code);
             $claimed = AccessInvitation::where('token_hash', $hash)->whereNull('consumed_at')->where('expires_at', '>', now())->update(['consumed_at' => now()]);
             if ($claimed !== 1) {
@@ -37,6 +40,10 @@ class AccessInvitations
             }
             $invitation = AccessInvitation::where('token_hash', $hash)->firstOrFail();
             $user = User::findOrFail($invitation->user_id);
+            if (($channel === 'android' && ($user->role !== 'driver' || $user->access_status !== 'PENDING' || ! $user->driver()->where('status', 'ACTIVE')->exists()))
+                || ($channel === 'web' && $user->role === 'driver')) {
+                throw ValidationException::withMessages(['activation_code' => 'Código no disponible para este canal de activación.']);
+            }
             if ($user->access_status === 'DISABLED' || $user->company->status !== 'ACTIVE') {
                 throw ValidationException::withMessages(['activation_code' => 'Acceso no disponible.']);
             }

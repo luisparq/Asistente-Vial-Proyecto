@@ -14,23 +14,45 @@ use App\Services\AdministrativeAudit;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class PlatformController extends Controller
 {
-    public function companies()
+    public function companies(Request $r)
     {
-        return view('platform.companies', ['companies' => Company::withCount(['users', 'trips', 'events'])->orderBy('name')->paginate(20)]);
+        $token = (string) Str::uuid();
+        $submissions = $r->session()->get('company_submissions', []);
+        $submissions[$token] = null;
+        $r->session()->put('company_submissions', array_slice($submissions, -20, null, true));
+
+        return view('platform.companies', ['submissionToken' => $token, 'companies' => Company::withCount(['users', 'trips', 'events'])->orderBy('name')->paginate(20)]);
     }
 
     public function storeCompany(Request $r)
     {
-        $data = $r->validate(['name' => 'required|string|max:255']);
-        DB::transaction(function () use ($r, $data) {
-            $c = Company::create($data);
+        $data = $r->validate(['name' => 'required|string|max:255', 'submission_token' => 'required|uuid']);
+        $submissions = $r->session()->get('company_submissions', []);
+        $token = $data['submission_token'];
+        if (! array_key_exists($token, $submissions)) {
+            throw ValidationException::withMessages(['name' => 'El formulario venció. Recarga Empresas antes de registrar.']);
+        }
+        if ($submissions[$token] !== null) {
+            if ($submissions[$token]['name'] !== $data['name']) {
+                throw ValidationException::withMessages(['name' => 'Este formulario ya fue utilizado. Recarga Empresas.']);
+            }
+
+            return back()->with('success', 'Empresa ya registrada; no se creó un duplicado.');
+        }
+        $company = DB::transaction(function () use ($r, $data) {
+            $c = Company::create(['name' => $data['name']]);
             AdministrativeAudit::record($r->user(), $c->id, 'company.created', $c, ['name']);
+
+            return $c;
         });
+        $submissions[$token] = ['id' => $company->id, 'name' => $company->name];
+        $r->session()->put('company_submissions', $submissions);
 
         return back()->with('success', 'Empresa registrada.');
     }

@@ -22,7 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tecsup.asistente.conduccion.core.permissions.BlePermissionPolicy
 
 @Composable
-fun BleScreen(onBack: () -> Unit, viewModel: BleViewModel = hiltViewModel()) {
+fun BleScreen(onBack: () -> Unit, viewModel: BleViewModel = hiltViewModel(), onDiagnostic: () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var permissionDenied by rememberSaveable { mutableStateOf(false) }
@@ -60,5 +60,6 @@ fun BleScreen(onBack: () -> Unit, viewModel: BleViewModel = hiltViewModel()) {
             Uri.fromParts("package", context.packageName, null))) },
         onRefresh = viewModel::refresh, onStart = viewModel::startScan, onStop = viewModel::stopScan,
         onSelect = viewModel::select, onPrepare = viewModel::prepareConnection, onClear = viewModel::clearSelection,
+        onDiagnostic = onDiagnostic,
     )
 }

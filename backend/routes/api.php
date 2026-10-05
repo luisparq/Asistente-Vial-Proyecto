@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccessController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DriverProfileController;
 use App\Http\Controllers\EventController;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->middleware(ApiBoundary::class)->group(function () {
     Route::post('auth/token', [AuthController::class, 'issue'])->middleware('throttle:login');
+    Route::post('auth/activate', [AccessController::class, 'activateDriver'])->middleware('throttle:activation');
     Route::middleware(['auth:sanctum', TenantContext::class, 'throttle:api', ResourceIds::class])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::get('me/driver', [DriverProfileController::class, 'show']);

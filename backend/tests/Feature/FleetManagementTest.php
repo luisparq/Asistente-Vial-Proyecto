@@ -38,7 +38,7 @@ class FleetManagementTest extends TestCase
                 return false;
             }
         });
-        foreach (['/dashboard/drivers', '/dashboard/vehicles', '/platform/users', '/platform/companies', '/access'] as $url) {
+        foreach (['/dashboard/drivers', '/dashboard/vehicles', '/admin/users', '/admin/companies', '/access'] as $url) {
             $this->post($url, [])->assertStatus(419);
         }
         foreach (['/dashboard/drivers', '/dashboard/vehicles', '/dashboard/documents/1'] as $url) {
@@ -46,24 +46,23 @@ class FleetManagementTest extends TestCase
         }
     }
 
-    public function test_platform_provision_is_explicit_and_preserves_existing_accounts(): void
+    public function test_platform_provision_needs_no_company_and_issues_no_api_token(): void
     {
-        $company = Company::factory()->create();
-        $this->artisan('platform:provision', ['--company-id' => $company->id])
+        $this->artisan('platform:provision')
             ->expectsQuestion('Nombre', 'TEST Platform')
             ->expectsQuestion('Email', 'platform-test@example.test')
             ->expectsQuestion('Contraseña (mínimo 12 caracteres)', 'TEST platform password')
             ->expectsQuestion('Repite la contraseña', 'TEST platform password')
             ->assertSuccessful();
-        $this->assertDatabaseHas('users', ['email' => 'platform-test@example.test', 'role' => 'platform_admin', 'company_id' => $company->id]);
+        $this->assertDatabaseHas('users', ['email' => 'platform-test@example.test', 'role' => 'platform_admin', 'company_id' => null]);
         $this->assertDatabaseCount('personal_access_tokens', 0);
         $this->assertDatabaseHas('administrative_audits', ['action' => 'platform_admin.provisioned']);
-        $this->artisan('platform:provision', ['--company-id' => 999])->assertFailed();
+        $this->assertDatabaseCount('companies', 0);
     }
 
     private function admin(?Company $company = null, string $role = 'fleet_admin'): User
     {
-        return User::factory()->create(['company_id' => ($company ?? Company::factory()->create())->id, 'role' => $role]);
+        return User::factory()->create(['company_id' => $role === 'platform_admin' ? null : ($company ?? Company::factory()->create())->id, 'role' => $role]);
     }
 
     private function driver(User $admin): Driver
@@ -91,16 +90,19 @@ class FleetManagementTest extends TestCase
     public function test_platform_authentication_and_separate_areas(): void
     {
         $platform = $this->admin(null, 'platform_admin');
+        $this->assertNull($platform->company_id);
         $fleet = $this->admin();
-        $this->get('/platform')->assertRedirect('/platform/login');
-        $this->post('/platform/login', ['email' => $fleet->email, 'password' => 'password'])->assertSessionHasErrors();
-        $this->post('/platform/login', ['email' => $platform->email, 'password' => 'password'])->assertRedirect('/platform');
-        foreach (['/platform', '/platform/companies', '/platform/users', '/platform/reports', '/platform/audits'] as $url) {
+        $this->get('/admin')->assertRedirect('/admin/login');
+        $this->post('/admin/login', ['email' => $fleet->email, 'password' => 'password'])->assertSessionHasErrors();
+        $this->post('/admin/login', ['email' => $platform->email, 'password' => 'password'])->assertRedirect('/admin');
+        foreach (['/admin', '/admin/companies', '/admin/users', '/admin/reports', '/admin/audits'] as $url) {
             $this->get($url)->assertOk();
         }
         $this->get('/dashboard')->assertForbidden();
         $this->postJson('/api/v1/auth/token', ['email' => $platform->email, 'password' => 'password'])->assertUnauthorized();
-        $this->actingAs($fleet)->get('/platform')->assertForbidden();
+        $this->actingAs($fleet)->get('/admin')->assertForbidden();
+        $this->get('/platform/login')->assertRedirect('/admin/login');
+        $this->get('/platform/companies')->assertRedirect('/admin/companies');
     }
 
     public function test_platform_global_company_reads_and_creation_are_audited(): void
@@ -109,8 +111,9 @@ class FleetManagementTest extends TestCase
         $other = $this->admin();
         $d = $this->driver($other);
         $v = $this->vehicle($other);
-        $this->actingAs($p)->get('/platform/companies/'.$other->company_id)->assertOk()->assertSee($d->full_name)->assertSee($v->plate)->assertSee($other->email);
-        $this->post('/platform/companies', ['name' => 'TEST additional company'])->assertRedirect();
+        $this->actingAs($p)->get('/admin/companies/'.$other->company_id)->assertOk()->assertSee($d->full_name)->assertSee($v->plate)->assertSee($other->email);
+        $token = $this->get('/admin/companies')->viewData('submissionToken');
+        $this->post('/admin/companies', ['name' => 'TEST additional company', 'submission_token' => $token])->assertRedirect();
         $this->assertDatabaseHas('administrative_audits', ['action' => 'company.created', 'actor_id' => $p->id]);
     }
 
@@ -118,9 +121,9 @@ class FleetManagementTest extends TestCase
     {
         $p = $this->admin(null, 'platform_admin');
         $c = Company::factory()->create();
-        $this->actingAs($p)->post('/platform/users', ['company_id' => $c->id, 'name' => 'TEST admin', 'email' => 'test-admin@example.test', 'role' => 'platform_admin'])->assertRedirect()->assertSessionHas('activation_code');
+        $this->actingAs($p)->post('/admin/users', ['company_id' => $c->id, 'name' => 'TEST admin', 'email' => 'test-admin@example.test', 'role' => 'platform_admin'])->assertRedirect()->assertSessionHas('activation_code');
         $this->assertDatabaseHas('users', ['email' => 'test-admin@example.test', 'role' => 'fleet_admin', 'access_status' => 'PENDING']);
-        $this->post('/platform/users/'.$p->id.'/access', ['action' => 'disable'])->assertForbidden();
+        $this->post('/admin/users/'.$p->id.'/access', ['action' => 'disable'])->assertForbidden();
     }
 
     public function test_company_disabled_blocks_existing_tokens_and_web_without_deleting_data(): void
@@ -128,7 +131,7 @@ class FleetManagementTest extends TestCase
         $p = $this->admin(null, 'platform_admin');
         $a = $this->admin();
         $token = $this->token($a);
-        $this->actingAs($p)->post('/platform/companies/'.$a->company_id.'/state', ['status' => 'INACTIVE'])->assertRedirect();
+        $this->actingAs($p)->post('/admin/companies/'.$a->company_id.'/state', ['status' => 'INACTIVE'])->assertRedirect();
         $this->actingAs($a)->get('/dashboard')->assertForbidden();
         auth()->forgetGuards();
         $this->withToken($token)->getJson('/api/v1/me')->assertForbidden();
@@ -150,9 +153,9 @@ class FleetManagementTest extends TestCase
         $this->assertSame($v->id, $d->currentAssignment->vehicle_id);
         $this->assertSame('TEST contact', $d->emergencyContact->name);
         $this->assertNotSame($code, AccessInvitation::first()->token_hash);
-        $this->post('/access', ['activation_code' => $code, 'password' => 'TEST password 12345', 'password_confirmation' => 'TEST password 12345'])->assertRedirect('/access')->assertSessionHasNoErrors();
+        $this->postJson('/api/v1/auth/activate', ['activation_code' => $code, 'password' => 'TEST password 12345', 'password_confirmation' => 'TEST password 12345'])->assertNoContent();
         $this->assertTrue(Hash::check('TEST password 12345', $d->user->fresh()->password));
-        $this->post('/access', ['activation_code' => $code, 'password' => 'TEST other password', 'password_confirmation' => 'TEST other password'])->assertSessionHasErrors('activation_code');
+        $this->postJson('/api/v1/auth/activate', ['activation_code' => $code, 'password' => 'TEST other password', 'password_confirmation' => 'TEST other password'])->assertStatus(422);
         $this->postJson('/api/v1/auth/token', ['email' => 'driver@example.test', 'password' => 'TEST password 12345'])->assertCreated();
         $audits = AdministrativeAudit::all()->toJson();
         $this->assertStringNotContainsString($code, $audits);
@@ -164,6 +167,7 @@ class FleetManagementTest extends TestCase
     {
         $a = $this->admin();
         $d = $this->driver($a);
+        $d->user->forceFill(['access_status' => 'PENDING'])->save();
         $code = app(AccessInvitations::class)->issue($a, $d->user);
         $this->travel(25)->hours();
         $this->post('/access', ['activation_code' => $code, 'password' => 'TEST long password', 'password_confirmation' => 'TEST long password'])->assertSessionHasErrors('activation_code');
@@ -335,8 +339,8 @@ class FleetManagementTest extends TestCase
     public function test_reports_filter_actual_activity_and_reject_invalid_dates(): void
     {
         $p = $this->admin(null, 'platform_admin');
-        $this->actingAs($p)->get('/platform/reports?from=2026-01-01&to=2026-12-31')->assertOk()->assertSee('Sin eventos en el período');
-        $this->get('/platform/reports?from=2026-12-31&to=2026-01-01')->assertSessionHasErrors('to');
+        $this->actingAs($p)->get('/admin/reports?from=2026-01-01&to=2026-12-31')->assertOk()->assertSee('Sin eventos en el período');
+        $this->get('/admin/reports?from=2026-12-31&to=2026-01-01')->assertSessionHasErrors('to');
     }
 
     public function test_driver_access_disable_and_reenable_require_activation(): void

@@ -24,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        RateLimiter::for('activation', fn ($request) => Limit::perMinute(6)->by('activation-ip:'.$request->ip()));
         RateLimiter::for('api', fn ($request) => Limit::perMinute(120)->by('api:'.$request->user()->id));
         RateLimiter::for('login', fn ($request) => [
             Limit::perMinute(20)->by('login-ip:'.$request->ip()),

@@ -1,22 +1,22 @@
 <resources>
-    <string name="app_name">AsistenteVial</string>
+    <string name="app_name">Asistente Vial</string>
     <string name="back">Volver</string>
     <string name="stage_label">INTEGRACIÓN ANDROID · LARAVEL</string>
     <string name="splash_description">Interfaz del conductor</string>
-    <string name="login_title">Acceso</string>
-    <string name="login_description">Puedes usar los recorridos sin Internet. Para conectar tu cuenta Laravel y sincronizar datos de prueba, entra en Ajustes desde Inicio.</string>
-    <string name="explore">Explorar aplicación</string>
+    <string name="login_title">Asistente Vial</string>
+    <string name="login_description">Conduce informado. Conduce seguro.</string>
+    <string name="explore">Probar modo demo</string>
     <string name="home_title">Inicio</string>
     <string name="home_description">Registra recorridos locales y genera eventos manuales para probar la aplicación. No se detectan maniobras reales.</string>
     <string name="trip_title">Viaje</string>
-    <string name="ble_title">Dispositivo BLE</string>
-    <string name="ble_description">Escanea y selecciona AsistenteVial-IMU. Conecta para recibir mediciones crudas del MPU6050.</string>
+    <string name="ble_title">Dispositivo</string>
+    <string name="ble_description">Busca y conecta tu dispositivo AsistenteVial-IMU.</string>
     <string name="diagnostic_title">Diagnóstico</string>
     <string name="diagnostic_description">Lecturas crudas del MPU6050 recibidas por BLE. Mantén esta pantalla abierta durante la prueba física.</string>
     <string name="history_title">Historial</string>
     <string name="history_description">Recorridos guardados en este dispositivo, incluidos los activos. Sus eventos son simulados de prueba, no detecciones reales ni infracciones.</string>
     <string name="settings_title">Ajustes</string>
-    <string name="settings_description">Configura la cuenta del servidor y consulta la cola. Los recorridos y eventos se conservan localmente aunque no haya conexión.</string>
+    <string name="settings_description">Gestiona tu cuenta y la configuración de la aplicación.</string>
     <string name="return_access">Volver al acceso</string>
     <string name="test_data_notice">DATOS DE PRUEBA · Los eventos se generan manualmente. No son detecciones reales ni infracciones de tránsito.</string>
     <string name="start_trip">Iniciar recorrido</string>
@@ -84,7 +84,7 @@
     <string name="diagnostic_failed">Error de recepción: conexión fallida o trama IMU_RAW inválida.</string>
     <string name="diagnostic_no_measurements">Sin mediciones disponibles. No se muestran valores simulados del MPU6050.</string>
     <string name="profile_title">Mi perfil</string>
-    <string name="profile_description">Información de tu empresa consultada en Laravel. Los recorridos siguen funcionando sin Internet.</string>
+    <string name="profile_description">Tu información registrada por la empresa.</string>
     <string name="profile_status">Perfil: %1$s · Acceso: %2$s</string>
     <string name="profile_contact">Mi contacto de emergencia</string>
     <string name="profile_vehicle">Mi vehículo actual</string>
@@ -97,7 +97,7 @@
     <string name="profile_expiry">Vencimiento: %1$s</string>
     <string name="profile_expired">Documento vencido según la fecha registrada.</string>
     <string name="profile_review_notice">La revisión administrativa no constituye validación legal. Los archivos privados no se descargan en esta pantalla.</string>
-    <string name="profile_signed_out">Inicia sesión con Laravel desde Ajustes para consultar tu perfil.</string>
+    <string name="profile_signed_out">Inicia sesión con tu cuenta para consultar tu perfil.</string>
     <string name="profile_not_registered">Tu cuenta aún no tiene un perfil de conductor registrado. Consulta al administrador de tu empresa.</string>
     <string name="profile_offline">No se pudo conectar con el servidor. El perfil requiere conexión y no se guarda en este dispositivo. Puedes continuar tus recorridos offline.</string>
     <string name="profile_session_expired">La sesión no es válida o ha expirado. Vuelve a iniciar sesión en Ajustes.</string>

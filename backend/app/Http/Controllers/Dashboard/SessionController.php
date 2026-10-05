@@ -12,7 +12,7 @@ class SessionController extends Controller
 {
     public function create(Request $request)
     {
-        $platform = $request->is('platform/*');
+        $platform = $request->is('admin/*');
 
         return $request->user('web')?->role === ($platform ? 'platform_admin' : 'fleet_admin') && $request->user('web')->accessEnabled()
             ? redirect()->route($platform ? 'platform.index' : 'dashboard.index') : view($platform ? 'platform.login' : 'dashboard.login');
@@ -31,7 +31,7 @@ class SessionController extends Controller
         foreach ($keys as $key => $limit) {
             RateLimiter::hit($key, 60);
         }
-        $platform = $request->is('platform/*');
+        $platform = $request->is('admin/*');
         if (! Auth::guard('web')->attemptWhen($data + ['role' => $platform ? 'platform_admin' : 'fleet_admin'], fn ($user) => $user->accessEnabled(), false)) {
             throw ValidationException::withMessages(['email' => 'No se pudo iniciar sesión con esas credenciales y permisos.']);
         }
@@ -49,6 +49,6 @@ class SessionController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route($request->is('platform/*') ? 'platform.login' : 'login');
+        return redirect()->route($request->is('admin/*') ? 'platform.login' : 'login');
     }
 }

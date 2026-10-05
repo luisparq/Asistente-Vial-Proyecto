@@ -40,11 +40,16 @@ fun BleContent(
     onSelect: (String) -> Unit,
     onPrepare: () -> Unit,
     onClear: () -> Unit,
+    onDiagnostic: () -> Unit = {},
 ) {
     ScreenLayout(stringResource(R.string.ble_title), stringResource(R.string.ble_description),
         onBack, scrollable = false) {
         LazyColumn(modifier = Modifier.weight(1f).testTag("ble_list"),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                TextButton(onClick = onDiagnostic) { Text(stringResource(R.string.diagnostic_title)) }
+                Text("Consulta técnica de las mediciones del dispositivo.", style = MaterialTheme.typography.bodySmall)
+            }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val availabilityText = when (state.scan.availability) {

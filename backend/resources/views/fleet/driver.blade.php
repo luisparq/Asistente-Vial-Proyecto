@@ -1,8 +1,18 @@
 @extends('dashboard.layout')
 @section('title',$driver->full_name)
 @section('content')
-<section class="panel"><h2>Perfil y cuenta</h2><p>{{ $driver->user->email }} · {{ $driver->status }} · Acceso: {{ $driver->user->access_status }}</p><a class="button quiet" href="{{ route('dashboard.drivers.edit',$driver->id) }}">Editar perfil y contacto</a>
-<form method="post" action="{{ route('dashboard.drivers.access',$driver->id) }}" class="actions">@csrf<button name="action" value="invite" class="button">Generar código de acceso</button><button name="action" value="disable" class="button quiet">Deshabilitar acceso</button><button name="action" value="enable" class="button quiet">Habilitar para activación</button></form>
+<section class="panel"><h2>Perfil y cuenta</h2><p>{{ $driver->user->email }}</p><p>Estado del conductor: {{ $driver->status === 'ACTIVE' ? 'Activo' : 'Inactivo' }}</p><a class="button quiet" href="{{ route('dashboard.drivers.edit',$driver->id) }}">Editar perfil y contacto</a>
+<h3>Acceso a la aplicación</h3>
+@php($access = $driver->user->access_status)
+<p>Acceso a la app: {{ ['PENDING'=>'Pendiente de activación','ACTIVE'=>'Activo','DISABLED'=>'Deshabilitado'][$access] ?? $access }}</p>
+@if($access === 'PENDING')<p>El conductor todavía no ha activado su cuenta en la aplicación móvil.</p>
+@elseif($access === 'ACTIVE')<p>El conductor tiene acceso a la aplicación móvil.</p>
+@elseif($access === 'DISABLED')<p>El conductor no puede iniciar sesión en la aplicación.</p>@endif
+<form method="post" action="{{ route('dashboard.drivers.access',$driver->id) }}" class="actions">@csrf
+@if($access === 'PENDING' && $driver->status === 'ACTIVE')<button name="action" value="invite" class="button">Generar código de activación</button>
+@elseif($access === 'ACTIVE')<button name="action" value="disable" class="button quiet">Deshabilitar acceso</button>
+@elseif($access === 'DISABLED' && $driver->status === 'ACTIVE')<button name="action" value="enable" class="button quiet">Permitir nueva activación</button>@endif
+</form>
 <h3>Contacto de emergencia</h3>@if($driver->emergencyContact)<p>{{ $driver->emergencyContact->name }} · {{ $driver->emergencyContact->relationship }} · {{ $driver->emergencyContact->phone }}</p>@else<p>Sin contacto de emergencia.</p>@endif</section>
 <section class="panel"><h2>Vehículo actual</h2><p>{{ $driver->currentAssignment?->vehicle->plate ?? 'Sin vehículo asignado' }}</p>
 <form method="post" action="{{ route('dashboard.drivers.assign',$driver->id) }}" class="fleet-form">@csrf<label>Asignar / reasignar<select name="vehicle_id"><option value="">Finalizar asignación / sin vehículo</option>@foreach($vehicles as $vehicle)<option value="{{ $vehicle->id }}" @selected($driver->currentAssignment?->vehicle_id === $vehicle->id)>{{ $vehicle->plate }}</option>@endforeach</select></label><button class="button">Guardar asignación</button></form>

@@ -42,16 +42,17 @@ Route::middleware(DashboardHeaders::class)->group(function () {
         Route::get('/analytics', [DashboardController::class, 'analytics'])->name('analytics');
         Route::get('/settings', [DashboardController::class, 'settings'])->name('settings');
     });
+    Route::get('/platform/{path?}', fn (?string $path = null) => redirect('/admin'.($path ? '/'.$path : ''), 302))->where('path', '.*');
     Route::get('/access', [AccessController::class, 'create'])->name('access');
     Route::post('/access', [AccessController::class, 'store'])->middleware('throttle:6,1')->name('access.store');
-    Route::get('/platform/login', [SessionController::class, 'create'])->name('platform.login');
-    Route::post('/platform/login', [SessionController::class, 'store'])->name('platform.login.store');
-    Route::post('/platform/logout', [SessionController::class, 'destroy'])->middleware('auth:web')->name('platform.logout');
-    Route::prefix('platform')->name('platform.')->middleware(['auth:web', 'auth.session', PlatformAdmin::class])->group(function () {
+    Route::get('/admin/login', [SessionController::class, 'create'])->name('platform.login');
+    Route::post('/admin/login', [SessionController::class, 'store'])->name('platform.login.store');
+    Route::post('/admin/logout', [SessionController::class, 'destroy'])->middleware('auth:web')->name('platform.logout');
+    Route::prefix('admin')->name('platform.')->middleware(['auth:web', 'auth.session', PlatformAdmin::class])->group(function () {
         $controller = PlatformController::class;
         Route::get('/', [$controller, 'companies'])->name('index');
         Route::get('/companies', [$controller, 'companies'])->name('companies');
-        Route::post('/companies', [$controller, 'storeCompany'])->name('companies.store');
+        Route::post('/companies', [$controller, 'storeCompany'])->block(10, 10)->name('companies.store');
         Route::get('/companies/{id}', [$controller, 'company'])->whereNumber('id')->name('companies.show');
         Route::post('/companies/{id}/state', [$controller, 'companyState'])->whereNumber('id')->name('companies.state');
         Route::get('/users', [$controller, 'users'])->name('users');

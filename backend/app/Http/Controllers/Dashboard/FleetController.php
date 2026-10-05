@@ -77,7 +77,7 @@ class FleetController extends Controller
             return [$driver, $invitations->issue($r->user(), $user)];
         });
 
-        return redirect()->route('dashboard.drivers.show', $driver->id)->with('activation_code', $code);
+        return redirect()->route('dashboard.drivers.show', $driver->id)->with('activation_code', $code)->with('activation_for_driver', true);
     }
 
     public function showDriver(Request $r, int $id)
@@ -117,8 +117,12 @@ class FleetController extends Controller
     {
         $driver = $this->driver($r, $id);
         $data = $r->validate(['action' => ['required', Rule::in(['invite', 'enable', 'disable'])]]);
+        $expected = ['invite' => 'PENDING', 'disable' => 'ACTIVE', 'enable' => 'DISABLED'];
+        if ($driver->user->access_status !== $expected[$data['action']]) {
+            throw ValidationException::withMessages(['access' => 'Esta acción no corresponde al estado actual del acceso.']);
+        }
         if ($data['action'] === 'invite') {
-            return back()->with('activation_code', $invitations->issue($r->user(), $driver->user));
+            return back()->with('activation_code', $invitations->issue($r->user(), $driver->user))->with('activation_for_driver', true);
         }
         if ($data['action'] === 'enable' && $driver->status !== 'ACTIVE') {
             throw ValidationException::withMessages(['access' => 'Activa primero el perfil.']);
@@ -130,7 +134,9 @@ class FleetController extends Controller
             AdministrativeAudit::record($r->user(), $driver->company_id, 'user.access_changed', $driver->user, ['access_status']);
         });
 
-        return back()->with('success', 'Estado de acceso actualizado. Para habilitar el ingreso, genera un código de activación.');
+        return back()->with('success', $data['action'] === 'enable'
+            ? 'Acceso pendiente. Genera un código para que el conductor se active desde Android.'
+            : 'Acceso deshabilitado. El conductor no puede iniciar sesión en la aplicación.');
     }
 
     public function assign(Request $r, int $id, VehicleAssignments $assignments)

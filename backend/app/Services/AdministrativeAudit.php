@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class AdministrativeAudit
 {
-    public static function record(?User $actor, int $company, string $action, Model $entity, array $changedFields = []): void
+    public static function record(?User $actor, ?int $company, string $action, Model $entity, array $changedFields = []): void
     {
         // Only field names, never submitted values, passwords, paths or credentials.
         $allowed = ['name', 'full_name', 'email', 'status', 'access_status', 'plate', 'brand', 'model', 'contact', 'vehicle_id', 'review_status', 'document', 'password_reset'];

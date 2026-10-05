@@ -28,6 +28,7 @@ fun HistoryScreen(
     onBack: () -> Unit,
     onTripSelected: (Long) -> Unit,
     viewModel: HistoryViewModel = hiltViewModel(),
+    excludedTripIds: Set<Long>? = emptySet(),
 ) {
     val state by viewModel.trips.collectAsStateWithLifecycle()
     ScreenLayout(
@@ -38,9 +39,11 @@ fun HistoryScreen(
             LoadState.Loading -> CircularProgressIndicator()
             LoadState.Error -> ReadError()
             is LoadState.Ready -> {
-                if (current.value.isEmpty()) Text(stringResource(R.string.empty_history))
+                val visible = if (excludedTripIds == null) emptyList() else current.value.filterNot { it.trip.id in excludedTripIds }
+                if (excludedTripIds == null) CircularProgressIndicator()
+                else if (visible.isEmpty()) Text(stringResource(R.string.empty_history))
                 LazyColumn(modifier = Modifier.weight(1f).testTag("history_list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(current.value, key = { it.trip.id }) { summary ->
+                    items(visible, key = { it.trip.id }) { summary ->
                         Card(onClick = { onTripSelected(summary.trip.id) }, modifier = Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 TripInfo(summary.trip)

@@ -17,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : route($request->is('platform*') ? 'platform.login' : 'login'));
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : route($request->is('admin*') ? 'platform.login' : 'login'));
         $middleware->trimStrings(except: [fn ($request) => $request->is('api/*')]);
         $middleware->convertEmptyStringsToNull(except: [fn ($request) => $request->is('api/*')]);
     })
