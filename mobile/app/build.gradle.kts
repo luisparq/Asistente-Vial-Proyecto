@@ -22,7 +22,7 @@ android {
     }
     buildTypes {
         debug {
-            val base = providers.gradleProperty("apiBaseUrl").orElse("http://10.0.2.2:8000/").get()
+            val base = providers.gradleProperty("apiBaseUrl").orElse("http://192.168.15.14:8000/").get()
             require(base.matches(Regex("https?://[A-Za-z0-9.\\-:/]+/"))) { "Invalid apiBaseUrl" }
             buildConfigField("String", "API_BASE_URL", "\"$base\"")
         }
