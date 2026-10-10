@@ -4,6 +4,7 @@
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title') · Asistente Vial</title>
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}">
+    @stack('head')
 </head>
 <body class="{{ request()->routeIs('dashboard.drivers*', 'dashboard.vehicles*') ? 'fleet-page' : '' }}">
 <a class="skip" href="#main">Saltar al contenido</a>
@@ -12,7 +13,7 @@
         <a class="brand" href="{{ route('dashboard.index') }}"><span class="brand-mark" aria-hidden="true">AV</span><span>Asistente Vial<small>Administración de flota</small></span></a>
         <p class="nav-label">ESPACIO DE TRABAJO</p>
         <nav aria-label="Principal">
-            @foreach(['index' => ['◫', 'Dashboard'], 'drivers' => ['◉', 'Conductores'], 'vehicles' => ['▣', 'Vehículos'], 'trips' => ['↗', 'Recorridos'], 'events' => ['≋', 'Eventos'], 'analytics' => ['▥', 'Analítica'], 'settings' => ['⚙', 'Configuración']] as $route => [$icon, $label])
+            @foreach(['index' => ['◫', 'Dashboard'], 'drivers' => ['◉', 'Conductores'], 'vehicles' => ['▣', 'Vehículos'], 'trips' => ['↗', 'Recorridos'], 'events' => ['≋', 'Eventos'], 'map' => ['◎', 'Mapa de incidencias'], 'analytics' => ['▥', 'Analítica'], 'settings' => ['⚙', 'Configuración']] as $route => [$icon, $label])
                 @php($active = request()->routeIs('dashboard.'.$route) || ($route === 'trips' && request()->routeIs('dashboard.trip')))
                 <a href="{{ route('dashboard.'.$route) }}" @if($active) aria-current="page" @endif><span aria-hidden="true">{{ $icon }}</span>{{ $label }}</a>
             @endforeach
@@ -31,5 +32,6 @@
         </main>
     </div>
 </div>
+@stack('scripts')
 </body>
 </html>

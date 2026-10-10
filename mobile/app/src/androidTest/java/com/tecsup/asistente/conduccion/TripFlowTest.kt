@@ -27,7 +27,7 @@ class TripFlowTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         fun text(id: Int, vararg args: Any) = context.getString(id, *args)
         val database = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, AsistenteVialDatabase.NAME)
-            .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2).build()
+            .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2, com.tecsup.asistente.conduccion.data.local.MIGRATION_2_3).build()
         val repository = RoomTripRepository(database, Clock.systemUTC())
         try {
             compose.clickText(text(R.string.explore))

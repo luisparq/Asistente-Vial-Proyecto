@@ -21,4 +21,10 @@ data class DrivingEventEntity(
     val type: String,
     val occurredAt: Long,
     val origin: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val locationOrigin: String? = null,
+    val gpsUtcSeconds: Int? = null,
+    val gpsReceivedAt: Long? = null,
+    val gpsAgeMillis: Long? = null,
 )

@@ -89,7 +89,7 @@ class SyncEngine @Inject constructor(
         if (op.eventUuid != null) {
             val sent = Contract.json.decodeFromString<EventDto>(op.payload)
             val receipt = Contract.json.decodeFromString<Receipt<EventReceipt>>(body)
-            return receipt.sync.disposition in listOf("created", "already_applied") && receipt.data == EventReceipt(op.eventUuid, meta.clientTripId, sent.type, sent.occurred_at, sent.origin)
+            return receipt.sync.disposition in listOf("created", "already_applied") && receipt.data == EventReceipt(op.eventUuid, meta.clientTripId, sent.type, sent.occurred_at, sent.origin, sent.latitude, sent.longitude, sent.location_origin, sent.gps_utc_seconds, sent.gps_received_at, sent.gps_age_ms)
         }
         val sent = Contract.json.decodeFromString<TripDto>(op.payload)
         val receipt = Contract.json.decodeFromString<Receipt<TripReceipt>>(body)

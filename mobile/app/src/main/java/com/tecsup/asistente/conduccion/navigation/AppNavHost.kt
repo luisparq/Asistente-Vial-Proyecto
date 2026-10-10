@@ -84,6 +84,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onHistory = { navController.open(AppRoute.History) },
                 onSettings = { navController.open(AppRoute.Settings) },
                 onProfile = { navController.open(AppRoute.Profile) },
+                onMap = { navController.open(AppRoute.Map) },
                 name = name, company = session?.companyName, connection = connection,
             )
         }
@@ -99,6 +100,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         composable(AppRoute.Profile.path) {
             com.tecsup.asistente.conduccion.feature.profile.ProfileScreen(onBack, onSettings = { navController.open(AppRoute.Settings) })
         }
+        composable(AppRoute.Map.path) { com.tecsup.asistente.conduccion.feature.map.DriverMapScreen(onBack) }
         composable(AppRoute.Diagnostic.path) { DiagnosticScreen(onBack) }
         composable(AppRoute.History.path) {
             HistoryScreen(onBack, onTripSelected = { id -> navController.navigate("history/$id") },

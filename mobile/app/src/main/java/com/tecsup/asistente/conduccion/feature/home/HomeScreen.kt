@@ -36,6 +36,7 @@ fun HomeScreen(
     onHistory: () -> Unit,
     onSettings: () -> Unit,
     onProfile: () -> Unit,
+    onMap: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     name: String? = null,
     company: String? = null,
@@ -77,6 +78,7 @@ fun HomeScreen(
                 connection.device?.name?.takeIf { it.isNotBlank() }?.let { Text(it) }
             }
         }
+        OutlinedButton(onClick = onMap, modifier = Modifier.fillMaxWidth()) { Text("Mi mapa") }
         Text("Accesos rápidos", style = MaterialTheme.typography.titleMedium)
         listOf(
             Triple(R.string.profile_title, Icons.Default.Person, onProfile),

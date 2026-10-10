@@ -39,6 +39,7 @@ Route::middleware(DashboardHeaders::class)->group(function () {
         Route::get('/trips', [DashboardController::class, 'trips'])->name('trips');
         Route::get('/trips/{uuid}', [DashboardController::class, 'trip'])->whereUuid('uuid')->name('trip');
         Route::get('/events', [DashboardController::class, 'events'])->name('events');
+        Route::get('/map', \App\Http\Controllers\Dashboard\IncidentMapController::class)->name('map');
         Route::get('/analytics', [DashboardController::class, 'analytics'])->name('analytics');
         Route::get('/settings', [DashboardController::class, 'settings'])->name('settings');
     });

@@ -90,3 +90,11 @@ Desktop.ini
 *.bak
 *.swp
 *~
+
+# Pinned MapLibre browser assets (keep backend/vendor dependencies ignored).
+!/backend/public/vendor/
+/backend/public/vendor/*
+!/backend/public/vendor/maplibre/
+!/backend/public/vendor/maplibre/maplibre-gl.js
+!/backend/public/vendor/maplibre/maplibre-gl.css
+!/backend/public/vendor/maplibre/LICENSE.txt

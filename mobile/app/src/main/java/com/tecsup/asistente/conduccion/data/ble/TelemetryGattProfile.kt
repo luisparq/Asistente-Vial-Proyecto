@@ -4,6 +4,7 @@ package com.tecsup.asistente.conduccion.data.ble
 object TelemetryGattProfile {
     const val SERVICE = "73e8ca02-41d7-45bd-9d39-7187649746ca"
     const val IMU_RAW = "e77a0a03-3641-40f2-87b7-f178622259cd"
+    const val GPS = "af1b5aad-b30b-47b2-a8a5-64f152f6510e"
     const val CCCD = "00002902-0000-1000-8000-00805f9b34fb"
 }
 

@@ -14,4 +14,10 @@ data class DrivingEvent(
     val type: DrivingEventType,
     val occurredAt: Instant,
     val origin: DataOrigin,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val locationOrigin: LocationOrigin? = null,
+    val gpsUtcSeconds: Int? = null,
+    val gpsReceivedAt: Instant? = null,
+    val gpsAgeMillis: Long? = null,
 )

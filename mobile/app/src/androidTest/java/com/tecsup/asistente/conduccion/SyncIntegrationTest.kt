@@ -33,7 +33,7 @@ class SyncIntegrationTest {
     private val clock = Clock.systemUTC()
     private fun repo() = RoomTripRepository(db, clock, session, scheduler)
     private fun engine() = SyncEngine(db, session, api, clock)
-    private fun open() { db = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, name).addMigrations(MIGRATION_1_2).build() }
+    private fun open() { db = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build() }
     @Before fun setup() {
         name = "sync-test-${UUID.randomUUID()}.db"
         open()

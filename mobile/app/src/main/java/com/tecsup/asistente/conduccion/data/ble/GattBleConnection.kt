@@ -90,6 +90,11 @@ class GattBleConnection @Inject constructor(
                         mutableState.value = BleConnectionState(ConnectionStatus.CONNECTED, device)
                     }
                 }
+                override fun gpsFrame(bytes: ByteArray) {
+                    val copy = bytes.copyOf()
+                    event { if (phase == Phase.STREAMING) source.acceptGps(copy) }
+                }
+                override fun gpsUnavailable() = event { source.gpsUnavailable() }
                 override fun frame(bytes: ByteArray) {
                     val copy = bytes.copyOf()
                     event { if (phase == Phase.STREAMING) source.accept(copy) }

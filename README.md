@@ -1,6 +1,6 @@
 # Asistente Vial Inteligente
 
-Sistema académico con Android como interfaz del conductor, Laravel como API y administración de flota, y ESP32 como periférico BLE. Estado actualizado: **2026-10-03**.
+Sistema académico con Android como interfaz del conductor, Laravel como API y administración de flota, y ESP32 como periférico BLE. Resumen histórico: **2026-10-03**. Para los avances posteriores y el estado vigente, consultar [checkpoint del 10/10/2026](docs/CHECKPOINT_2026_10_10.md).
 
 **Etapa 3B: transmisión cruda IMU → I2C → ESP32 → BLE GATT/NOTIFY → Android validada físicamente**, según la prueba realizada y reportada por el responsable del proyecto con un teléfono Android real. El módulo mantiene la anomalía `WHO_AM_I = 0x75`: su identidad NO está confirmada y funciona mediante el modo experimental explícito. No hay detección de maniobras validada.
 

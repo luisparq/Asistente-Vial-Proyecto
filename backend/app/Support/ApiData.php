@@ -35,6 +35,9 @@ class ApiData
     {
         return ['client_event_id' => $event->client_event_id, 'client_trip_id' => $event->trip->client_trip_id,
             'type' => $event->type, 'origin' => $event->origin, 'occurred_at' => UtcTimestamp::format($event->occurred_at),
-            'first_received_at' => UtcTimestamp::format($event->first_received_at)];
+            'first_received_at' => UtcTimestamp::format($event->first_received_at),
+            'latitude' => $event->latitude, 'longitude' => $event->longitude,
+            'location_origin' => $event->location_origin, 'gps_utc_seconds' => $event->gps_utc_seconds,
+            'gps_received_at' => UtcTimestamp::format($event->gps_received_at), 'gps_age_ms' => $event->gps_age_ms];
     }
 }

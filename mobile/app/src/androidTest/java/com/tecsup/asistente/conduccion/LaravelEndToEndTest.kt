@@ -26,7 +26,7 @@ class LaravelEndToEndTest {
         assumeTrue("Run scripts/verify-laravel-e2e.ps1 for the real server test", args.getString("laravelE2E") == "true")
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "laravel-e2e-${UUID.randomUUID()}.db"
-        fun open() = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, name).addMigrations(MIGRATION_1_2).build()
+        fun open() = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
         var db = open()
         val session = MemorySessionStore()
         val scheduler = SyncScheduler {}

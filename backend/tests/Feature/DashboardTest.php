@@ -18,6 +18,61 @@ class DashboardTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_event_location_is_visible_in_trip_and_events_without_leaking_other_company(): void
+    {
+        $admin = $this->admin();
+        $trip = $this->trip($admin);
+        // Synthetic TEST GPS fixtures, not physical observations.
+        $located = $this->event($trip, ['latitude' => -16.1234567, 'longitude' => -71.1234567,
+            'location_origin' => 'GPS_NEO6M', 'gps_utc_seconds' => 8825,
+            'gps_received_at' => '2026-09-30 02:27:04.900', 'gps_age_ms' => 557]);
+        $this->event($trip); // Historical / unlocated event remains supported.
+        $foreign = $this->event($this->trip($this->admin()), ['latitude' => -17.9876543,
+            'longitude' => -72.9876543, 'location_origin' => 'GPS_NEO6M']);
+        $this->actingAs($admin);
+        foreach (['/dashboard/events', '/dashboard/trips/'.$trip->client_trip_id] as $path) {
+            $this->get($path)->assertOk()->assertSee('-16.1234567')->assertSee('-71.1234567')
+                ->assertSee('GPS_NEO6M')->assertSee('557 ms')->assertSee('02:27:05')
+                ->assertSee('29/09/2026 21:27:05')->assertSee('Ubicación no disponible')
+                ->assertSee('Simulado · dato de prueba')->assertSee($located->client_event_id)
+                ->assertDontSee($foreign->client_event_id)->assertDontSee('-17.9876543');
+        }
+        $this->assertSame('2026-09-30 02:27:04.900', $located->fresh()->getRawOriginal('gps_received_at'));
+    }
+
+    public function test_incident_map_is_scoped_filters_valid_coordinates_and_existing_vehicle_association(): void
+    {
+        $admin=$this->admin();
+        $vehicle=\App\Models\Vehicle::forceCreate(['company_id'=>$admin->company_id,'plate'=>'TEST-MAP','brand'=>'TEST','model'=>'TEST']);
+        $trip=$this->trip($admin,['vehicle_id'=>$vehicle->id]);
+        // TEST fixtures only in isolated SQLite; never inserted into application data.
+        $event=$this->event($trip,['latitude'=>-16.0,'longitude'=>-71.0,'location_origin'=>'GPS_NEO6M']);
+        $this->event($trip); $this->event($trip,['latitude'=>91,'longitude'=>0]);
+        $this->event($trip,['latitude'=>-16.1,'longitude'=>-71.1,'type'=>'SHARP_TURN']);
+        $foreignAdmin=$this->admin();
+        $foreign=$this->event($this->trip($foreignAdmin),['latitude'=>-18.0,'longitude'=>-72.0]);
+        $foreignVehicle=\App\Models\Vehicle::forceCreate(['company_id'=>$foreignAdmin->company_id,'plate'=>'TEST-FOREIGN','brand'=>'TEST','model'=>'TEST']);
+        $this->actingAs($admin);
+        $url='/dashboard/map?from=2026-09-29&to=2026-09-29&type=HARSH_BRAKING&vehicle_id='.$vehicle->id;
+        $this->get($url)->assertOk()->assertSee('Mapa de incidencias')->assertSee('Mapa de calor')
+            ->assertSee('1 evento con ubicación')->assertSee($event->client_event_id)->assertDontSee($foreign->client_event_id)
+            ->assertViewHas('geojson',fn ($data)=>count($data['features'])===1 && $data['features'][0]['geometry']['coordinates']===[-71.0,-16.0])
+            ->assertViewHas('vehicles',fn ($rows)=>$rows->pluck('id')->all()===[$vehicle->id]);
+        $this->get('/dashboard/map?vehicle_id='.$foreignVehicle->id)->assertSessionHasErrors('vehicle_id');
+        $this->get('/dashboard/map?from=2026-10-01')->assertOk()->assertSee('No hay eventos con ubicación para estos filtros.');
+    }
+
+    public function test_incident_map_requires_fleet_admin_and_has_page_specific_script_policy(): void
+    {
+        $this->get('/dashboard/map')->assertRedirect('/dashboard/login');
+        $this->actingAs(User::factory()->create(['role'=>'member']))->get('/dashboard/map')->assertForbidden();
+        $admin=$this->admin();
+        $response=$this->actingAs($admin)->get('/dashboard/map')->assertOk();
+        $this->assertStringContainsString("script-src 'self'",$response->headers->get('Content-Security-Policy'));
+        $this->assertStringContainsString('https://tiles.openfreemap.org',$response->headers->get('Content-Security-Policy'));
+        $this->assertStringContainsString("script-src 'none'",$this->get('/dashboard')->headers->get('Content-Security-Policy'));
+    }
+
     private function admin(?Company $company = null): User
     {
         return User::factory()->create(['role' => 'fleet_admin', 'company_id' => ($company ?? Company::factory()->create())->id]);
