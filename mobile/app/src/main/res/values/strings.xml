@@ -12,7 +12,7 @@
     <string name="ble_title">Dispositivo</string>
     <string name="ble_description">Busca y conecta tu dispositivo AsistenteVial-IMU.</string>
     <string name="diagnostic_title">Diagnóstico</string>
-    <string name="diagnostic_description">Lecturas crudas del MPU6050 recibidas por BLE. Mantén esta pantalla abierta durante la prueba física.</string>
+    <string name="diagnostic_description">Mediciones crudas de la IMU y procesamiento nominal. Mantén esta pantalla abierta para comparar las señales recibidas.</string>
     <string name="history_title">Historial</string>
     <string name="history_description">Recorridos guardados en este dispositivo, incluidos los activos. Sus eventos son simulados de prueba, no detecciones reales ni infracciones.</string>
     <string name="settings_title">Ajustes</string>

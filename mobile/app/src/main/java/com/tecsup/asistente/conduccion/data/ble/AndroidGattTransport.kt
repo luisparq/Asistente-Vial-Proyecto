@@ -32,6 +32,12 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
         var gatt: BluetoothGatt? = null
         private var closed = false
         private var characteristic: BluetoothGattCharacteristic? = null
+        private var gpsCharacteristic: BluetoothGattCharacteristic? = null
+        private var gpsSubscribed = false
+        private val handler = Handler(Looper.getMainLooper())
+        private val gpsTimeout = Runnable {
+            if (!closed && !gpsSubscribed) listener.gpsUnavailable()
+        }
         private val serviceUuid = UUID.fromString(TelemetryGattProfile.SERVICE)
         private val characteristicUuid = UUID.fromString(TelemetryGattProfile.IMU_RAW)
         private val cccdUuid = UUID.fromString(TelemetryGattProfile.CCCD)
@@ -54,35 +60,59 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
                 }
                 val service = gatt.getService(serviceUuid)
                 characteristic = service?.getCharacteristic(characteristicUuid)
+                gpsCharacteristic = service?.getCharacteristic(UUID.fromString(TelemetryGattProfile.GPS))
                 val target = characteristic
                 listener.services(GattProfileDescription(service != null, target != null,
                     target != null && (target.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0,
                     target?.getDescriptor(cccdUuid) != null))
             }
             override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-                if (!current(gatt) || descriptor.uuid != cccdUuid || descriptor.characteristic !== characteristic) return
-                if (status == BluetoothGatt.GATT_SUCCESS) listener.subscribed()
-                else listener.failed("Android rechazó la suscripción CCCD: $status.")
+                if (!current(gatt) || descriptor.uuid != cccdUuid) return
+                if (descriptor.characteristic === characteristic) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        listener.subscribed()
+                        // Android permits one outstanding GATT write: GPS follows IMU CCCD completion.
+                        val gps = gpsCharacteristic
+                        val requested = try {
+                            gps != null && gps.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 && enable(gps)
+                        } catch (_: SecurityException) { false }
+                          catch (_: IllegalStateException) { false }
+                        if (requested) {
+                            handler.postDelayed(gpsTimeout, 5000)
+                        } else listener.gpsUnavailable()
+                    } else listener.failed("Android rechazó la suscripción CCCD: $status.")
+                } else if (descriptor.characteristic === gpsCharacteristic) {
+                    handler.removeCallbacks(gpsTimeout)
+                    gpsSubscribed = status == BluetoothGatt.GATT_SUCCESS
+                    if (!gpsSubscribed) listener.gpsUnavailable()
+                }
             }
             // Android 13+ provides a memory-safe snapshot of the notification value.
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-                if (current(gatt) && characteristic === this@AndroidSession.characteristic) listener.frame(value.copyOf())
+                if (current(gatt)) {
+                    if (characteristic === this@AndroidSession.characteristic) listener.frame(value.copyOf())
+                    else if (gpsSubscribed && characteristic === gpsCharacteristic) listener.gpsFrame(value.copyOf())
+                }
             }
             @Deprecated("Legacy callback for Android 12 and earlier")
             @Suppress("DEPRECATION")
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-                if (Build.VERSION.SDK_INT < 33 && current(gatt) && characteristic === this@AndroidSession.characteristic) {
-                    characteristic.value?.let { listener.frame(it.copyOf()) }
+                if (Build.VERSION.SDK_INT < 33 && current(gatt)) {
+                    characteristic.value?.let {
+                        if (characteristic === this@AndroidSession.characteristic) listener.frame(it.copyOf())
+                        else if (gpsSubscribed && characteristic === gpsCharacteristic) listener.gpsFrame(it.copyOf())
+                    }
                 }
             }
         }
 
         override fun discover(): Boolean = !closed && gatt?.discoverServices() == true
 
+        override fun subscribe(): Boolean = characteristic?.let { enable(it) } ?: false
+
         @Suppress("DEPRECATION")
-        override fun subscribe(): Boolean {
+        private fun enable(target: BluetoothGattCharacteristic): Boolean {
             val active = gatt ?: return false
-            val target = characteristic ?: return false
             val descriptor = target.getDescriptor(cccdUuid) ?: return false
             if (closed || !active.setCharacteristicNotification(target, true)) return false
             return if (Build.VERSION.SDK_INT >= 33) {
@@ -96,6 +126,9 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
         override fun close() {
             if (closed) return
             closed = true
+            handler.removeCallbacks(gpsTimeout)
+            gpsSubscribed = false
+            gpsCharacteristic = null
             val previous = gatt
             gatt = null
             characteristic = null

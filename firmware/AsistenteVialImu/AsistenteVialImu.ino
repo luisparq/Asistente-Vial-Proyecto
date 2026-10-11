@@ -1,4 +1,4 @@
-/* Etapa 3B: MPU6050 -> BLE IMU_RAW. No eventos, GPS, buzzer ni detección.
+/* Etapa 3B: MPU6050 -> BLE IMU_RAW. GPS UART independiente; buzzer solo manual.
  * Arduino ESP32 Dev Module, core Espressif 3.3.12.
  * Protocolo permanente: ../../docs/ETAPA_3B_BLE.md
  */
@@ -9,10 +9,13 @@
 #include <BLEServer.h>
 #include <BLE2902.h>
 #include <atomic>
+#include "GpsTelemetry.h"
+#include "ManualBuzzer.h"
 
 constexpr char DEVICE_NAME[] = "AsistenteVial-IMU";
 constexpr char SERVICE_UUID[] = "73e8ca02-41d7-45bd-9d39-7187649746ca";
 constexpr char IMU_RAW_UUID[] = "e77a0a03-3641-40f2-87b7-f178622259cd";
+constexpr char GPS_UUID[] = "af1b5aad-b30b-47b2-a8a5-64f152f6510e";
 constexpr uint8_t MPU_ADDRESS = 0x68;
 constexpr int SDA_PIN = 21;
 constexpr int SCL_PIN = 22;
@@ -21,6 +24,9 @@ constexpr size_t FRAME_SIZE = 12;
 
 BLECharacteristic *imuRaw = nullptr;
 BLE2902 *cccd = nullptr;
+BLECharacteristic *gpsTelemetry = nullptr;
+BLE2902 *gpsCccd = nullptr;
+uint32_t lastGps = 0;
 std::atomic_bool connected{false};
 std::atomic_bool subscribed{false};
 std::atomic_bool restartAdvertising{false};
@@ -212,6 +218,8 @@ bool readFrame(uint8_t (&frame)[FRAME_SIZE]) {
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *) override {
     subscribed.store(false);
+    cccd->setNotifications(false);
+    gpsCccd->setNotifications(false);
     connected.store(true);
     Serial.println("BLE conectado; esperando suscripcion CCCD.");
   }
@@ -233,6 +241,7 @@ class SubscriptionCallbacks : public BLEDescriptorCallbacks {
 
 void setup() {
   Serial.begin(115200);
+  ManualBuzzer::begin();
   delay(300);
   Serial.println("Asistente Vial - Etapa 3B - solo mediciones crudas.");
   if (!initializeI2c()) {
@@ -245,6 +254,7 @@ void setup() {
   Serial.println(sensorIdentityConfirmed
       ? "MPU6050 listo: identidad confirmada, 0x68, SDA=21, SCL=22."
       : "Dispositivo I2C listo en modo experimental: identidad NO confirmada, 0x68, SDA=21, SCL=22.");
+  GpsTelemetry::begin();
   BLEDevice::init(DEVICE_NAME);
   BLEServer *server = BLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
@@ -253,6 +263,9 @@ void setup() {
   cccd = new BLE2902(); // Standard 0x2902, not a third custom UUID.
   cccd->setCallbacks(new SubscriptionCallbacks());
   imuRaw->addDescriptor(cccd);
+  gpsTelemetry = service->createCharacteristic(GPS_UUID, BLECharacteristic::PROPERTY_NOTIFY);
+  gpsCccd = new BLE2902();
+  gpsTelemetry->addDescriptor(gpsCccd);
   service->start();
   BLEAdvertising *advertising = BLEDevice::getAdvertising();
   advertising->addServiceUUID(SERVICE_UUID);
@@ -266,6 +279,8 @@ void setup() {
 }
 
 void loop() {
+  ManualBuzzer::poll();
+  GpsTelemetry::poll();
   if (restartAdvertising.exchange(false)) {
     delay(250); // Let the stack finish disconnecting before advertising again.
     BLEDevice::startAdvertising();
@@ -283,6 +298,19 @@ void loop() {
         Serial.printf("RAW ax=%d ay=%d az=%d gx=%d gy=%d gz=%d\n", raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
       }
     } else Serial.println("ERROR lectura MPU6050: muestra omitida, no se envian valores sustitutos.");
+  }
+  if (uint32_t(now - lastGps) >= 1000) {
+    lastGps = now;
+    uint8_t gpsFrame[20]; GpsTelemetry::frame(gpsFrame);
+    Serial.printf("GPS estado=%u sat=%s edad_ms=%lu\n", gpsFrame[1], (gpsFrame[2]&2) ? "disponibles" : "no disponibles",
+                  (unsigned long)(uint32_t(gpsFrame[16]) | uint32_t(gpsFrame[17])<<8 | uint32_t(gpsFrame[18])<<16 | uint32_t(gpsFrame[19])<<24));
+    if (gpsFrame[1] == 2) {
+      Serial.printf("GPS posicion lat=%.7f lon=%.7f UTC_seg=%lu UTC_disponible=%u\n",
+                    GpsTelemetry::latitude, GpsTelemetry::longitude, (unsigned long)GpsTelemetry::fixUtc, unsigned(gpsFrame[2]&1));
+    }
+    if (connected.load() && gpsCccd->getNotifications()) {
+      gpsTelemetry->setValue(gpsFrame,sizeof(gpsFrame)); gpsTelemetry->notify();
+    }
   }
   delay(1);
 }

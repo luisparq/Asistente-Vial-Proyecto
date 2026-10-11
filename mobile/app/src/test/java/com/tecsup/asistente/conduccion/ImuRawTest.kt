@@ -6,9 +6,18 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ImuRawTest {
+    @Test fun receptionTimestampComesFromAndroidClockNotTheBleFrame() = runTest {
+        val source = RawSensorDataSource(backgroundScope, Clock.fixed(Instant.ofEpochMilli(1234), ZoneOffset.UTC))
+        source.accept(ByteArray(12))
+        assertEquals(1234L, source.sample.value!!.receivedAtMillis)
+        source.reset(SensorDataStatus.DISCONNECTED)
+    }
     @Test fun exactLittleEndianAxisOrderAndSignedExtremes() {
         // Fixed TEST vector, not a physical reading: 4660, -4660, 32767, -32768, -1, 0.
         val bytes = byteArrayOf(0x34,0x12,0xcc.toByte(),0xed.toByte(),0xff.toByte(),0x7f,

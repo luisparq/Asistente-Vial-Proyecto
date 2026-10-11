@@ -13,7 +13,9 @@ object OutboxWriter {
     }
     suspend fun event(db: AsistenteVialDatabase, event: DrivingEventEntity, tripUuid: String, uuid: String) {
         check(event.origin == "SIMULATED") { "Solo se sincronizan eventos SIMULATED." }
-        val dto = EventDto(event.type, Contract.timestamp(event.occurredAt))
+        val dto = EventDto(event.type, Contract.timestamp(event.occurredAt), event.origin,
+            event.latitude, event.longitude, event.locationOrigin, event.gpsUtcSeconds,
+            event.gpsReceivedAt?.let(Contract::timestamp), event.gpsAgeMillis)
         db.syncDao().enqueue(OutboxEntity(uuid, event.tripId, uuid, 0,
             "api/v1/trips/$tripUuid/events/$uuid", Contract.json.encodeToString(dto)))
     }

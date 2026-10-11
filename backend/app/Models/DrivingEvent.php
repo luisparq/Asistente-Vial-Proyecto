@@ -15,7 +15,8 @@ class DrivingEvent extends Model
 
     protected function casts(): array
     {
-        return ['occurred_at' => 'immutable_datetime', 'first_received_at' => 'immutable_datetime'];
+        return ['occurred_at' => 'immutable_datetime', 'first_received_at' => 'immutable_datetime', 'gps_received_at' => 'immutable_datetime',
+            'latitude' => 'double', 'longitude' => 'double', 'gps_utc_seconds' => 'integer', 'gps_age_ms' => 'integer'];
     }
 
     public function company(): BelongsTo

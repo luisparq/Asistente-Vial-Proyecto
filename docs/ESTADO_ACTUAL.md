@@ -1,6 +1,6 @@
 # Estado actual del proyecto
 
-Última actualización: **2026-10-03**. Punto de entrada para integrantes y agentes de IA. Estado contrastado con el código existente; la evidencia física indicada abajo procede del reporte del responsable del proyecto.
+Resumen histórico: **2026-10-03**, con ampliación 3C posterior. La actualización vigente (GPS, Room 3, mapas, administración y buzzer) está en [CHECKPOINT_2026_10_10.md](CHECKPOINT_2026_10_10.md); prevalece sobre las funciones pendientes de este resumen. La evidencia física procede del reporte del responsable del proyecto.
 
 ## Arquitectura y flujos actuales
 
@@ -82,8 +82,10 @@ El frame no informa a Android del modo experimental: advertencia y limitación q
 
 ## Pendientes y reglas para cambios
 
+**Etapa 3C — software preparado, validación física pendiente:** pipeline nominal RAW → conversión → offsets/filtro opcionales → detector de candidatos en memoria. Detector, filtro y calibración deshabilitados por defecto; no se generan eventos SENSOR. Ver [preparación 3C](ETAPA_3C_PROCESAMIENTO.md). La conversión software no confirma la identidad del módulo ni valida maniobras. Etapa 4 mantiene su numeración original (backend desarrollado anticipadamente).
+
 - Resolver/identificar la anomalía del módulo; **jamás aceptar 0x75 como identidad válida** ni ocultar el modo experimental.
-- Calibración/conversión, criterios y validación de detección; productor de eventos SENSOR, asociación con viajes/Room y envío a Laravel mediante contrato revisado.
+- Calibración y validación física de conversión/criterios; productor de eventos SENSOR, asociación con viajes/Room y envío a Laravel mediante contrato revisado.
 - GPS, buzzer, Device y contexto conductor/vehículo de viajes; pruebas controladas posteriores.
 - Seguridad BLE y preparación/despliegue de producción.
 - No inventar datos, métricas, credenciales o evidencia. SIMULATED es prueba; SENSOR aún no representa detecciones físicas validadas.

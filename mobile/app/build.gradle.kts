@@ -18,6 +18,9 @@ android {
         versionCode = 4
         versionName = "0.4.0"
         buildConfigField("String", "API_BASE_URL", "\"\"")
+        val mapStyle = providers.gradleProperty("mapStyleUrl").orElse("https://tiles.openfreemap.org/styles/liberty").get()
+        require(mapStyle.matches(Regex("https://[A-Za-z0-9.\\-:/]+"))) { "mapStyleUrl must use HTTPS" }
+        buildConfigField("String", "MAP_STYLE_URL", "\"$mapStyle\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -44,6 +47,7 @@ ksp {
 }
 
 dependencies {
+    implementation("org.maplibre.gl:android-sdk:13.6.1")
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.activity:activity-compose:1.10.1")

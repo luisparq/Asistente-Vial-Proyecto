@@ -31,7 +31,14 @@ fun EventInfo(event: DrivingEvent) {
     Text(stringResource(
         if (event.origin == DataOrigin.SIMULATED) R.string.origin_simulated else R.string.origin_sensor,
     ))
-    Text(formatTimestamp(event.occurredAt))
+    Text("Fecha y hora del evento: " + formatTimestamp(event.occurredAt))
+    if (event.locationOrigin == com.tecsup.asistente.conduccion.domain.model.LocationOrigin.GPS_NEO6M && event.latitude != null && event.longitude != null) {
+        Text("Ubicación GPS real NEO-6M: ${event.latitude}, ${event.longitude}")
+        Text("El evento sigue siendo SIMULATED: dato de prueba, no detección física.")
+        event.gpsReceivedAt?.let { Text("Recepción GPS: " + formatTimestamp(it)) }
+        event.gpsUtcSeconds?.let { Text("Hora GPS UTC (sin fecha): " + java.time.LocalTime.ofSecondOfDay(it.toLong())) }
+        event.gpsAgeMillis?.let { Text("Antigüedad GPS al crear el evento: $it ms") }
+    } else Text("Sin ubicación GPS válida asociada")
 }
 
 @Composable

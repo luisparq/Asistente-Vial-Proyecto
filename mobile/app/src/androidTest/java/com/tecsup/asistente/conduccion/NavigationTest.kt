@@ -16,6 +16,17 @@ class NavigationTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     @Test
+    fun opensOptionalDriverMapAndReturnsWithoutGpsOrAnActiveTrip() {
+        compose.clickText(compose.activity.getString(R.string.explore))
+        compose.waitForText("Mi mapa")
+        compose.onNodeWithText("Mi mapa").performScrollTo().performClick()
+        compose.onNodeWithText("Mi mapa").assertIsDisplayed()
+        compose.onNodeWithText("Dispositivo BLE desconectado").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.back)).performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.home_title)).assertIsDisplayed()
+    }
+
+    @Test
     fun opensActivationFromLoginAndReturnsWithoutRequiringWeb() {
         compose.waitForText("Activar mi cuenta")
         compose.onNodeWithText("Activar mi cuenta").performScrollTo().performClick()

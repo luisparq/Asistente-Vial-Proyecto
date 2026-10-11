@@ -52,6 +52,9 @@ class TripSync
 
     public function event(User $user, string $tripUuid, string $eventUuid, array $data): array
     {
+        $data += array_fill_keys(['latitude', 'longitude', 'location_origin', 'gps_utc_seconds', 'gps_received_at', 'gps_age_ms'], null);
+        foreach (['latitude', 'longitude'] as $key) if ($data[$key] !== null) $data[$key] = (float) $data[$key];
+        foreach (['gps_utc_seconds', 'gps_age_ms'] as $key) if ($data[$key] !== null) $data[$key] = (int) $data[$key];
         return DB::transaction(function () use ($user, $tripUuid, $eventUuid, $data) {
             $this->lockCompany($user);
             $trip = $this->access->writable($user, $tripUuid);
@@ -64,7 +67,12 @@ class TripSync
                 if ((int) $event->trip->created_by_user_id !== (int) $user->id) {
                     $this->access->visible($user)->whereKey($event->trip_id)->firstOrFail();
                 }
-                if ((int) $event->trip_id !== (int) $trip->id || $event->type !== $data['type'] || $event->origin !== $data['origin'] || UtcTimestamp::format($event->occurred_at) !== $data['occurred_at']) {
+                $stored = \App\Support\ApiData::event($event);
+                $locationConflict = false;
+                foreach (['latitude', 'longitude', 'location_origin', 'gps_utc_seconds', 'gps_received_at', 'gps_age_ms'] as $key) {
+                    if ($stored[$key] !== $data[$key]) $locationConflict = true;
+                }
+                if ($locationConflict || (int) $event->trip_id !== (int) $trip->id || $event->type !== $data['type'] || $event->origin !== $data['origin'] || UtcTimestamp::format($event->occurred_at) !== $data['occurred_at']) {
                     throw new ApiProblem(409, 'event_conflict', 'El evento ya existe con otro contenido o recorrido.');
                 }
 

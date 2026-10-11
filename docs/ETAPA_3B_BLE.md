@@ -110,3 +110,9 @@ Comando ejecutado desde `mobile`, con JDK 17 y SDK local configurados:
 Los resultados finales fueron exitosos después de corregir el orden de los comandos de selección/conexión detectado por una prueba de ViewModel. Además se comprobó automáticamente que los dos UUID son v4 y coinciden en sketch, Android y este documento.
 
 Referencias técnicas utilizadas: [Android BluetoothGatt](https://developer.android.com/reference/android/bluetooth/BluetoothGatt), [Android BluetoothGattCallback](https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback), [BLE del core Espressif](https://github.com/espressif/arduino-esp32/tree/3.3.12/libraries/BLE), [mapa de registros MPU6050 del fabricante](https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf). Las API del firmware también se comprobaron en los encabezados del core 3.3.12 instalado.
+
+
+## Extensión GPS independiente (2026-10-09)
+El firmware conserva íntegro el contrato IMU_RAW y añade GPS opcional a 1 Hz en el mismo servicio y conexión GATT. Contrato, frescura, prueba exterior pendiente y arquitectura futura de mapas: [CONTRATO_GPS_BLE.md](CONTRATO_GPS_BLE.md). NMEA sin fix fue reportado por el usuario; esta ampliación GPS todavía no se declara validada físicamente.
+
+Actualización 10/10: el usuario confirmó posteriormente GPS válido junto con IMU en Android y persistencia de ubicación de un evento SIMULATED en Laravel. Buzzer independiente físicamente audible; prueba manual integrada en firmware principal pendiente. Estado vigente: [checkpoint](CHECKPOINT_2026_10_10.md).

@@ -20,6 +20,7 @@ class RoomTripRepository @Inject constructor(
     private val clock: Clock,
     private val session: SessionStore = MemorySessionStore(),
     private val scheduler: SyncScheduler = SyncScheduler {},
+    private val sensors: com.tecsup.asistente.conduccion.domain.diagnostic.SensorDataSource? = null,
 ) : TripRepository {
     private val dao = database.tripDao()
     private val sync = database.syncDao()
@@ -63,7 +64,12 @@ class RoomTripRepository @Inject constructor(
             checkAccess(tripId)
             val trip = checkNotNull(dao.findTrip(tripId)) { "El recorrido no existe." }
             check(trip.status == TripStatus.ACTIVE.name) { "El recorrido ya finalizó." }
-            val initial = DrivingEventEntity(tripId = tripId, type = type.name, occurredAt = clock.millis(), origin = DataOrigin.SIMULATED.name)
+            val occurredAt = clock.millis()
+            val location = EventLocationPolicy.capture(sensors?.gps?.value, occurredAt, System.nanoTime() / 1_000_000)
+            val initial = DrivingEventEntity(tripId = tripId, type = type.name, occurredAt = occurredAt, origin = DataOrigin.SIMULATED.name,
+                latitude = location?.latitude, longitude = location?.longitude,
+                locationOrigin = location?.let { LocationOrigin.GPS_NEO6M.name }, gpsUtcSeconds = location?.utcSeconds,
+                gpsReceivedAt = location?.receivedAtMillis, gpsAgeMillis = location?.ageMillis)
             val event = initial.copy(id = dao.insertEvent(initial))
             val uuid = UUID.randomUUID().toString()
             sync.insertEvent(EventSyncEntity(event.id, uuid))
@@ -89,4 +95,4 @@ class RoomTripRepository @Inject constructor(
 }
 
 private fun TripEntity.toDomain() = Trip(id, Instant.ofEpochMilli(startedAt), endedAt?.let(Instant::ofEpochMilli), TripStatus.valueOf(status))
-private fun DrivingEventEntity.toDomain() = DrivingEvent(id, tripId, DrivingEventType.valueOf(type), Instant.ofEpochMilli(occurredAt), DataOrigin.valueOf(origin))
+private fun DrivingEventEntity.toDomain() = DrivingEvent(id, tripId, DrivingEventType.valueOf(type), Instant.ofEpochMilli(occurredAt), DataOrigin.valueOf(origin), latitude, longitude, locationOrigin?.let(LocationOrigin::valueOf), gpsUtcSeconds, gpsReceivedAt?.let(Instant::ofEpochMilli), gpsAgeMillis)
