@@ -19,10 +19,10 @@
     const p = feature.properties, c = feature.geometry.coordinates;
     for (const text of [p.label, p.origin_label, 'Fecha · Lima: '+p.date,
       'Latitud: '+c[1], 'Longitud: '+c[0], 'Origen GPS: '+(p.location_origin || 'No informado'),
-      p.vehicle ? 'Vehículo: '+p.vehicle : 'Sin vehículo asociado', 'UUID: '+p.uuid]) {
+      ...(container.dataset.global === 'true' ? ['Empresa: '+p.company] : [p.vehicle ? 'Vehículo: '+p.vehicle : 'Sin vehículo asociado', 'UUID: '+p.uuid])]) {
       const line = document.createElement('p'); line.textContent = text; node.append(line);
     }
-    const link = document.createElement('a'); link.href = p.trip_url; link.textContent = 'Ver recorrido'; node.append(link);
+    if (p.trip_url) { const link = document.createElement('a'); link.href = p.trip_url; link.textContent = 'Ver recorrido'; node.append(link); }
     const index = data.features.findIndex(f => f.properties.uuid === p.uuid); select.value = String(index);
   }
   select.addEventListener('change', () => { const f = data.features[Number(select.value)]; if (select.value !== '' && f) { detail(f); map.flyTo({center:f.geometry.coordinates, zoom:Math.max(map.getZoom(),15)}); } });

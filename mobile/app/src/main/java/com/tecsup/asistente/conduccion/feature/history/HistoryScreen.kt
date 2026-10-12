@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,10 +46,10 @@ fun HistoryScreen(
                 LazyColumn(modifier = Modifier.weight(1f).testTag("history_list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(visible, key = { it.trip.id }) { summary ->
                         Card(onClick = { onTripSelected(summary.trip.id) }, modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 TripInfo(summary.trip)
                                 Text(stringResource(R.string.event_count, summary.eventCount))
-                                Text(stringResource(R.string.view_events))
+                                Text(stringResource(R.string.view_events), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }

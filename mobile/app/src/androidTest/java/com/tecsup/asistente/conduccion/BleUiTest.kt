@@ -30,6 +30,22 @@ class BleUiTest {
         }
         compose.activityRule.scenario.onActivity { it.viewModelStore.put("ble-test", repository.viewModel) }
     }
+    @Test fun reconnectingShowsStateAndManualDisconnectSuspendsUntilEnabled() {
+        val repository = RecordingBleRepository()
+        show(repository)
+        compose.clickText(text(R.string.ble_start))
+        compose.onNodeWithTag("ble_list").performScrollToNode(hasText(text(R.string.ble_select)))
+        compose.clickText(text(R.string.ble_select))
+        compose.onNodeWithTag("ble_list").performScrollToNode(hasText("Habilitar reconexión"))
+        compose.clickText("Habilitar reconexión")
+        compose.waitForText("Reconectando")
+        compose.onNodeWithText("Habilitar reconexión").assertIsNotEnabled()
+        compose.clickText("Desconectar")
+        compose.waitForText("Desconectado")
+        compose.onNodeWithText("Habilitar reconexión").assertIsEnabled()
+        assertEquals(1, repository.disconnectCalls)
+        assertFalse(repository.reconnection.value.enabled)
+    }
 
     @Test fun fixtureSelectionStartsConnectingUntilSubscriptionConfirmed() {
         val repository = RecordingBleRepository()
@@ -78,6 +94,15 @@ class BleUiTest {
 }
 
 private class RecordingBleRepository(availability: BleAvailability = BleAvailability.READY) : BleRepository {
+    private val mutableReconnect = MutableStateFlow(BleReconnectState())
+    override val reconnection = mutableReconnect.asStateFlow()
+    var disconnectCalls = 0
+    override fun enableReconnection() { mutableReconnect.value = BleReconnectState(enabled = true, running = true, attempt = 1) }
+    override fun disconnectManual() {
+        disconnectCalls++
+        mutableConnection.value = connection.value.copy(status = ConnectionStatus.SELECTED)
+        mutableReconnect.value = BleReconnectState(message = "Desconectado. Reconexión automática suspendida.")
+    }
     private val mutableScan = MutableStateFlow(BleScanState(availability = availability))
     private val mutableConnection = MutableStateFlow(BleConnectionState())
     override val scan = mutableScan.asStateFlow()

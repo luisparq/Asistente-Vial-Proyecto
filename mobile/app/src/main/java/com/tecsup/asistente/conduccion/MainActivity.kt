@@ -10,6 +10,10 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @javax.inject.Inject lateinit var ble: com.tecsup.asistente.conduccion.domain.ble.BleRepository
+    @javax.inject.Inject lateinit var deviceMonitor: com.tecsup.asistente.conduccion.data.devices.DeviceMonitor
+    override fun onStart() { super.onStart(); ble.setForeground(true); ble.refresh(); deviceMonitor.setForeground(true) }
+    override fun onStop() { deviceMonitor.setForeground(false); ble.setForeground(false); super.onStop() }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

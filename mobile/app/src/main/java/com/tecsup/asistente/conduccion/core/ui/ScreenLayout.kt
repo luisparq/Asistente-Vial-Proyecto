@@ -36,7 +36,7 @@ fun ScreenLayout(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = { Text(title, style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     if (onBack != null) {
                         TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
@@ -49,7 +49,7 @@ fun ScreenLayout(
             modifier = Modifier.fillMaxSize().padding(padding)
                 .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
                 .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             if (LocalDemoMode.current) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
@@ -60,7 +60,7 @@ fun ScreenLayout(
                     }
                 }
             }
-            if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodyLarge)
+            if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             content()
         }
     }

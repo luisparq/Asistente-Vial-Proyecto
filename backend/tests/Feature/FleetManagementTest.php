@@ -112,8 +112,11 @@ class FleetManagementTest extends TestCase
         $d = $this->driver($other);
         $v = $this->vehicle($other);
         $this->actingAs($p)->get('/admin/companies/'.$other->company_id)->assertOk()->assertSee($d->full_name)->assertSee($v->plate)->assertSee($other->email);
-        $token = $this->get('/admin/companies')->viewData('submissionToken');
-        $this->post('/admin/companies', ['name' => 'TEST additional company', 'submission_token' => $token])->assertRedirect();
+        $location = $this->get('/admin/companies/create')->headers->get('Location');
+        parse_str(parse_url($location, PHP_URL_QUERY), $query); $token = $query['submission_token'];
+        foreach ([1=>['name'=>'TEST additional company'],2=>['admin_name'=>'TEST responsible','admin_email'=>'additional@example.invalid'],3=>['status'=>'ACTIVE']] as $step=>$data)
+            $this->post('/admin/companies/registration',$data+['step'=>$step,'submission_token'=>$token])->assertSessionHasNoErrors();
+        $this->post('/admin/companies', ['submission_token' => $token])->assertRedirect();
         $this->assertDatabaseHas('administrative_audits', ['action' => 'company.created', 'actor_id' => $p->id]);
     }
 

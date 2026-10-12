@@ -29,7 +29,7 @@ fun DriverMapScreen(onBack:()->Unit,viewModel:DriverMapViewModel=hiltViewModel()
     var center by remember { mutableIntStateOf(0) }
     var mapError by remember { mutableStateOf<String?>(null) }
     ScreenLayout("Mi mapa","Mapa opcional · GPS del dispositivo BLE, no del teléfono",onBack) {
-        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(when(state.gpsStatus) {
                 GpsStatus.VALID -> if(state.position!=null) "Posición GPS válida" else "Posición GPS no disponible"
                 GpsStatus.STALE -> "Posición GPS caducada"
@@ -40,10 +40,10 @@ fun DriverMapScreen(onBack:()->Unit,viewModel:DriverMapViewModel=hiltViewModel()
                 GpsStatus.INVALID_FRAME -> "Datos GPS inválidos"
                 GpsStatus.WAITING -> "Esperando posición GPS"
             },style=MaterialTheme.typography.titleMedium)
-            state.position?.let { Text("Latitud: ${it.latitude} · Longitud: ${it.longitude}") }
+            state.position?.let { Text("Latitud: ${it.latitude} · Longitud: ${it.longitude}", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant) }
             Button(onClick={center++},enabled=state.position!=null) { Text("Centrar mi posición") }
         } }
-        Text("Turquesa: posición actual · Ámbar: eventos SIMULATED del recorrido activo")
+        Text("Turquesa: posición actual · Ámbar: eventos SIMULATED del recorrido activo", style=MaterialTheme.typography.labelLarge)
         Text("${state.events.size} eventos de prueba con ubicación. No son detecciones físicas ni zonas de riesgo comprobadas.")
         mapError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
         NativeDriverMap(state,center,{mapError=it})

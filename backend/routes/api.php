@@ -14,6 +14,7 @@ Route::prefix('v1')->middleware(ApiBoundary::class)->group(function () {
     Route::post('auth/token', [AuthController::class, 'issue'])->middleware('throttle:login');
     Route::post('auth/activate', [AccessController::class, 'activateDriver'])->middleware('throttle:activation');
     Route::middleware(['auth:sanctum', TenantContext::class, 'throttle:api', ResourceIds::class])->group(function () {
+        Route::put('devices/{client_device_id}/status', [\App\Http\Controllers\DeviceController::class, 'report']);
         Route::get('me', [AuthController::class, 'me']);
         Route::get('me/driver', [DriverProfileController::class, 'show']);
         Route::delete('auth/token', [AuthController::class, 'revoke']);

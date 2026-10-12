@@ -7,6 +7,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SecureSessionTest {
+    @Test fun rememberedBleDeviceIsEncryptedScopedAndSurvivesSessionLogout() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val session = SecureSessionStore(context)
+        val previous = session.state.value
+        val owner = "https://ble-test.invalid/#987654/987654"
+        val other = "$owner-other"
+        val prefs = com.tecsup.asistente.conduccion.data.ble.SecureBleDeviceStore(context, session)
+        val original = prefs.read(owner)
+        val fixture = com.tecsup.asistente.conduccion.domain.ble.RememberedBleDevice("AA:BB:CC:DD:EE:01", "TEST-only BLE", false)
+        try {
+            prefs.save(owner, fixture)
+            val raw = context.getSharedPreferences("encrypted_ble_devices", 0).all.values.joinToString()
+            assertFalse(raw.contains(fixture.address)); assertFalse(raw.contains(fixture.name!!))
+            assertEquals(fixture, com.tecsup.asistente.conduccion.data.ble.SecureBleDeviceStore(context, SecureSessionStore(context)).read(owner))
+            assertNull(prefs.read(other))
+            session.save(null)
+            assertEquals(fixture, prefs.read(owner))
+            prefs.save(owner, null); assertNull(prefs.read(owner))
+        } finally { prefs.save(owner, original); session.save(previous) }
+    }
     @Test fun tokenIsEncryptedAndRestoredWithoutPlaintextPreferences() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val store = SecureSessionStore(context)

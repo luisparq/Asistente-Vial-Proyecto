@@ -23,10 +23,15 @@ class DefaultBleRepository @Inject constructor(
     private val platform: BlePlatform,
     private val connector: BleConnection,
     @BleScope private val scope: CoroutineScope,
+    private val reconnect: BleReconnectController? = null,
 ) : BleRepository {
     private val mutableScan = MutableStateFlow(BleScanState())
     override val scan = mutableScan.asStateFlow()
     override val connection = connector.state
+    override val reconnection = reconnect?.state ?: com.tecsup.asistente.conduccion.domain.ble.noBleReconnect
+    override fun setForeground(value: Boolean) { reconnect?.foreground(value) }
+    override fun enableReconnection() { reconnect?.enable() }
+    override fun disconnectManual() { if (reconnect != null) reconnect.disconnect() else connector.clear() }
     private var session: ScanSession? = null
     private var timeout: Job? = null
     private var generation = 0L
@@ -38,7 +43,7 @@ class DefaultBleRepository @Inject constructor(
         }
     }
 
-    override fun refresh() { scope.launch { updateAvailability(platform.availability()) } }
+    override fun refresh() { scope.launch { updateAvailability(platform.availability()); reconnect?.refresh() } }
 
     private fun updateAvailability(value: BleAvailability) {
         mutableScan.value = scan.value.copy(availability = value)
@@ -109,7 +114,7 @@ class DefaultBleRepository @Inject constructor(
         scope.launch {
             val device = scan.value.devices.firstOrNull { it.address == address } ?: return@launch
             if (scan.value.status == ScanStatus.SCANNING) endScan(ScanStatus.STOPPED)
-            connector.select(device)
+            if (reconnect != null) reconnect.select(device) else connector.select(device)
         }
     }
 
@@ -117,10 +122,10 @@ class DefaultBleRepository @Inject constructor(
         scope.launch {
             if (scan.value.status == ScanStatus.SCANNING) endScan(ScanStatus.STOPPED)
             // The connector checks selection after previously queued selection commands.
-            connector.prepare()
+            if (reconnect != null) reconnect.connectSelected() else connector.prepare()
         }
     }
-    override fun clearSelection() { scope.launch { connector.clear() } }
+    override fun clearSelection() { scope.launch { if (reconnect != null) reconnect.forget() else connector.clear() } }
 
     companion object { const val SCAN_DURATION_MILLIS = 10_000L }
 }

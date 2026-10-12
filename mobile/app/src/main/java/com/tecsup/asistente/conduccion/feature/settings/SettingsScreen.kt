@@ -33,11 +33,12 @@ fun SettingsScreen(onBack: () -> Unit, onReturnToLogin: () -> Unit, viewModel: S
     var adoption by remember { mutableStateOf<Long?>(null) }
     var configurationMessage by remember { mutableStateOf<String?>(null) }
     ScreenLayout(stringResource(R.string.settings_title), stringResource(R.string.settings_description), onBack) {
-        Text("Mi cuenta", style = MaterialTheme.typography.titleLarge)
+        com.tecsup.asistente.conduccion.core.ui.PresentationSection("Mi cuenta") {
         session?.let { Text("${it.email}\n${it.companyName}") } ?: Text("Sin cuenta iniciada.")
         if (session != null) OutlinedButton(onClick = viewModel::logout, enabled = !busy) { Text("Cerrar sesión") }
+        }
         Card(Modifier.fillMaxWidth()) {
-          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+          Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Configuración avanzada", style = MaterialTheme.typography.titleLarge)
         Text("Configuración del servidor", style = MaterialTheme.typography.titleMedium)
         Text("Los recorridos funcionan sin Internet. Solo se envían eventos SIMULATED de prueba; no son detecciones físicas.")
@@ -61,7 +62,7 @@ fun SettingsScreen(onBack: () -> Unit, onReturnToLogin: () -> Unit, viewModel: S
             Text("Sincronización", style = MaterialTheme.typography.titleMedium)
             Button(onClick = viewModel::sync, enabled = !busy && session?.token != null) { Text(if (syncing) "Sincronizando…" else "Sincronizar") }
             statuses.forEach { Text("${it.state}: ${it.count} operaciones") }
-            Text("ACKED: recibido. RETRY_WAIT: reintento diferido. BLOCKED_AUTH: renovar sesión/permisos. BLOCKED_CONFLICT o BLOCKED_VALIDATION: requiere revisión; no se descartan datos.")
+            Text("ACKED: recibido. RETRY_WAIT: reintento diferido. BLOCKED_AUTH: renovar sesión/permisos. BLOCKED_CONFLICT o BLOCKED_VALIDATION: requiere revisión; no se descartan datos.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         message?.let { Text(it) }
         if (busy) CircularProgressIndicator()

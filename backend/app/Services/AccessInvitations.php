@@ -47,10 +47,11 @@ class AccessInvitations
             if ($user->access_status === 'DISABLED' || $user->company->status !== 'ACTIVE') {
                 throw ValidationException::withMessages(['activation_code' => 'Acceso no disponible.']);
             }
+            $previous=$user->access_status;
             $user->forceFill(['password' => $password, 'access_status' => 'ACTIVE', 'remember_token' => Str::random(60)])->save();
             $user->tokens()->delete();
             // File sessions are invalidated by AuthenticateSession's password-hash check.
-            AdministrativeAudit::record($user, $user->company_id, 'access.activated', $user, ['password_reset', 'access_status']);
+            AdministrativeAudit::record($user, $user->company_id, 'access.activated', $user, ['password_reset', 'access_status'], ['access_status'=>['from'=>$previous,'to'=>$user->access_status]]);
         }, 5);
     }
 }

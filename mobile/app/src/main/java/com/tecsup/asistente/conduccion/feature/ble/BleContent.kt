@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.tecsup.asistente.conduccion.R
 import com.tecsup.asistente.conduccion.core.ui.ScreenLayout
+import com.tecsup.asistente.conduccion.core.ui.PresentationSection
 import com.tecsup.asistente.conduccion.core.ui.labelResource
 import com.tecsup.asistente.conduccion.domain.ble.BleAvailability
 import com.tecsup.asistente.conduccion.domain.ble.ConnectionStatus
@@ -41,17 +42,43 @@ fun BleContent(
     onPrepare: () -> Unit,
     onClear: () -> Unit,
     onDiagnostic: () -> Unit = {},
+    onDisconnect: () -> Unit = {},
+    onReconnect: () -> Unit = {},
 ) {
     ScreenLayout(stringResource(R.string.ble_title), stringResource(R.string.ble_description),
         onBack, scrollable = false) {
         LazyColumn(modifier = Modifier.weight(1f).testTag("ble_list"),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
+                PresentationSection("Conexión del asistente") {
+                    Text(if (state.scan.availability == BleAvailability.PERMISSION_REQUIRED) "Permisos requeridos"
+                        else if (state.reconnection.running) "Reconectando"
+                        else if (state.connection.status == ConnectionStatus.SELECTED && state.reconnection.message?.startsWith("Desconectado") == true) "Desconectado"
+                        else stringResource(state.connection.status.labelResource()), style = MaterialTheme.typography.titleMedium)
+                    state.connection.device?.let { device ->
+                        Text(device.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.ble_unnamed))
+                        Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Button(onClick = onPrepare, enabled = state.connection.status in listOf(
+                            ConnectionStatus.SELECTED, ConnectionStatus.DISCONNECTED, ConnectionStatus.FAILED)) {
+                            Text(stringResource(R.string.ble_prepare))
+                        }
+                        OutlinedButton(onClick = onDisconnect) { Text("Desconectar") }
+                        OutlinedButton(onClick = onReconnect, enabled = !state.reconnection.running) { Text("Habilitar reconexión") }
+                        OutlinedButton(onClick = onClear) { Text("Olvidar dispositivo / cambiar") }
+                    }
+                    state.reconnection.message?.let { Text(it) }
+                    Text(if (state.reconnection.enabled) "Reconexión automática habilitada para esta cuenta." else "Reconexión automática suspendida.")
+                    state.connection.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    Text(stringResource(R.string.ble_not_verified))
+                }
+            }
+            item {
+                Text("Herramientas técnicas", style = MaterialTheme.typography.titleSmall)
                 TextButton(onClick = onDiagnostic) { Text(stringResource(R.string.diagnostic_title)) }
                 Text("Consulta técnica de las mediciones del dispositivo.", style = MaterialTheme.typography.bodySmall)
             }
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                PresentationSection("Buscar dispositivos") {
                     val availabilityText = when (state.scan.availability) {
                         BleAvailability.CHECKING -> R.string.ble_checking
                         BleAvailability.UNSUPPORTED -> R.string.ble_unsupported
@@ -93,22 +120,6 @@ fun BleContent(
                     }
                 }
             }
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(state.connection.status.labelResource()), style = MaterialTheme.typography.titleMedium)
-                    state.connection.device?.let { device ->
-                        Text(device.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.ble_unnamed))
-                        Text(device.address)
-                        Button(onClick = onPrepare, enabled = state.connection.status in listOf(
-                            ConnectionStatus.SELECTED, ConnectionStatus.DISCONNECTED, ConnectionStatus.FAILED)) {
-                            Text(stringResource(R.string.ble_prepare))
-                        }
-                        OutlinedButton(onClick = onClear) { Text(stringResource(R.string.ble_clear_selection)) }
-                    }
-                    state.connection.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    Text(stringResource(R.string.ble_not_verified))
-                }
-            }
             if (state.scan.devices.isEmpty()) item {
                 Text(stringResource(if (state.scan.status == ScanStatus.IDLE) R.string.ble_no_scan else R.string.ble_no_devices))
             }
@@ -116,7 +127,7 @@ fun BleContent(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(device.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.ble_unnamed))
-                        Text(device.address)
+                        Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         OutlinedButton(onClick = { onSelect(device.address) }) {
                             Text(stringResource(R.string.ble_select))
                         }

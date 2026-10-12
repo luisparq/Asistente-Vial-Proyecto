@@ -10,7 +10,12 @@ class Company extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'trade_name'];
+
+    public function administrators(): HasMany
+    {
+        return $this->hasMany(User::class)->where('role', 'fleet_admin')->orderBy('id');
+    }
 
     public function users(): HasMany
     {

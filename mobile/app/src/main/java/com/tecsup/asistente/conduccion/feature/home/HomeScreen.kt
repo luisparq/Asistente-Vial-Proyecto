@@ -28,6 +28,7 @@ import com.tecsup.asistente.conduccion.R
 import com.tecsup.asistente.conduccion.core.ui.LoadState
 import com.tecsup.asistente.conduccion.core.ui.ReadError
 import com.tecsup.asistente.conduccion.core.ui.ScreenLayout
+import com.tecsup.asistente.conduccion.core.ui.StatusBadge
 
 @Composable
 fun HomeScreen(
@@ -74,7 +75,7 @@ fun HomeScreen(
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Estado del asistente", style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(connection.status.labelResource()))
+                StatusBadge(stringResource(connection.status.labelResource()))
                 connection.device?.name?.takeIf { it.isNotBlank() }?.let { Text(it) }
             }
         }

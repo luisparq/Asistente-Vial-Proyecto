@@ -28,6 +28,8 @@ annotation class BleScope
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class BleModule {
+    @Binds @Singleton abstract fun deviceReports(value: com.tecsup.asistente.conduccion.data.devices.SecureDeviceReportStore): com.tecsup.asistente.conduccion.data.devices.DeviceReportStore
+    @Binds @Singleton abstract fun remembered(value: com.tecsup.asistente.conduccion.data.ble.SecureBleDeviceStore): com.tecsup.asistente.conduccion.domain.ble.RememberedBleStore
     @Binds @Singleton abstract fun platform(value: AndroidBlePlatform): BlePlatform
     @Binds @Singleton abstract fun repository(value: DefaultBleRepository): BleRepository
     @Binds @Singleton abstract fun connection(value: GattBleConnection): BleConnection

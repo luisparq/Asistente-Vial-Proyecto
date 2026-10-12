@@ -61,5 +61,6 @@ fun BleScreen(onBack: () -> Unit, viewModel: BleViewModel = hiltViewModel(), onD
         onRefresh = viewModel::refresh, onStart = viewModel::startScan, onStop = viewModel::stopScan,
         onSelect = viewModel::select, onPrepare = viewModel::prepareConnection, onClear = viewModel::clearSelection,
         onDiagnostic = onDiagnostic,
+        onDisconnect = viewModel::disconnect, onReconnect = viewModel::enableReconnection,
     )
 }

@@ -14,11 +14,12 @@ import kotlinx.coroutines.flow.stateIn
 data class BleUiState(
     val scan: BleScanState = BleScanState(),
     val connection: BleConnectionState = BleConnectionState(),
+    val reconnection: com.tecsup.asistente.conduccion.domain.ble.BleReconnectState = com.tecsup.asistente.conduccion.domain.ble.BleReconnectState(),
 )
 
 @HiltViewModel
 class BleViewModel @Inject constructor(private val repository: BleRepository) : ViewModel() {
-    val state = combine(repository.scan, repository.connection, ::BleUiState)
+    val state = combine(repository.scan, repository.connection, repository.reconnection, ::BleUiState)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BleUiState())
 
     fun refresh() = repository.refresh()
@@ -27,6 +28,8 @@ class BleViewModel @Inject constructor(private val repository: BleRepository) : 
     fun select(address: String) = repository.selectDevice(address)
     fun prepareConnection() = repository.prepareConnection()
     fun clearSelection() = repository.clearSelection()
+    fun disconnect() = repository.disconnectManual()
+    fun enableReconnection() = repository.enableReconnection()
 
     override fun onCleared() {
         repository.stopScan()

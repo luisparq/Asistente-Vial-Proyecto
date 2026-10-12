@@ -15,6 +15,8 @@ class AdministrativeAudit extends Model
         return ['changes' => 'array', 'occurred_at' => 'immutable_datetime'];
     }
 
+    public function company() { return $this->belongsTo(Company::class); }
+
     public function actor()
     {
         return $this->belongsTo(User::class, 'actor_id');

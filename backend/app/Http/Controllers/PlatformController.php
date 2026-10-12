@@ -22,46 +22,14 @@ class PlatformController extends Controller
 {
     public function companies(Request $r)
     {
-        $token = (string) Str::uuid();
-        $submissions = $r->session()->get('company_submissions', []);
-        $submissions[$token] = null;
-        $r->session()->put('company_submissions', array_slice($submissions, -20, null, true));
-
-        return view('platform.companies', ['submissionToken' => $token, 'companies' => Company::withCount(['users', 'trips', 'events'])->orderBy('name')->paginate(20)]);
-    }
-
-    public function storeCompany(Request $r)
-    {
-        $data = $r->validate(['name' => 'required|string|max:255', 'submission_token' => 'required|uuid']);
-        $submissions = $r->session()->get('company_submissions', []);
-        $token = $data['submission_token'];
-        if (! array_key_exists($token, $submissions)) {
-            throw ValidationException::withMessages(['name' => 'El formulario venció. Recarga Empresas antes de registrar.']);
-        }
-        if ($submissions[$token] !== null) {
-            if ($submissions[$token]['name'] !== $data['name']) {
-                throw ValidationException::withMessages(['name' => 'Este formulario ya fue utilizado. Recarga Empresas.']);
-            }
-
-            return back()->with('success', 'Empresa ya registrada; no se creó un duplicado.');
-        }
-        $company = DB::transaction(function () use ($r, $data) {
-            $c = Company::create(['name' => $data['name']]);
-            AdministrativeAudit::record($r->user(), $c->id, 'company.created', $c, ['name']);
-
-            return $c;
-        });
-        $submissions[$token] = ['id' => $company->id, 'name' => $company->name];
-        $r->session()->put('company_submissions', $submissions);
-
-        return back()->with('success', 'Empresa registrada.');
+        return view('platform.companies', ['companies' => Company::with('administrators')->withCount(['users', 'trips', 'events'])->orderBy('name')->paginate(20)]);
     }
 
     public function company(Request $r, int $id)
     {
         $company = Company::findOrFail($id);
 
-        return view('platform.company', ['company' => $company, 'users' => $company->users()->orderBy('name')->paginate(15, ['*'], 'users_page'), 'drivers' => Driver::where('company_id', $id)->with('user')->paginate(15, ['*'], 'drivers_page'), 'vehicles' => Vehicle::where('company_id', $id)->paginate(15, ['*'], 'vehicles_page'), 'trips' => $company->trips()->latest('started_at')->paginate(15, ['*'], 'trips_page'), 'events' => $company->events()->latest('occurred_at')->paginate(15, ['*'], 'events_page')]);
+        return view('platform.company', ['company' => $company, 'users' => $company->users()->where('role', 'fleet_admin')->orderBy('name')->paginate(15, ['*'], 'users_page'), 'drivers' => Driver::where('company_id', $id)->with('user')->paginate(15, ['*'], 'drivers_page'), 'vehicles' => Vehicle::where('company_id', $id)->paginate(15, ['*'], 'vehicles_page'), 'trips' => $company->trips()->latest('started_at')->paginate(15, ['*'], 'trips_page'), 'events' => $company->events()->latest('occurred_at')->paginate(15, ['*'], 'events_page')]);
     }
 
     public function companyState(Request $r, int $id)
@@ -69,8 +37,9 @@ class PlatformController extends Controller
         $company = Company::findOrFail($id);
         $data = $r->validate(['status' => ['required', Rule::in(['ACTIVE', 'INACTIVE'])]]);
         DB::transaction(function () use ($r, $company, $data) {
+            $previous=$company->status;
             $company->forceFill($data)->save();
-            AdministrativeAudit::record($r->user(), $company->id, 'company.state_changed', $company, ['status']);
+            AdministrativeAudit::record($r->user(), $company->id, 'company.state_changed', $company, ['status'], ['status'=>['from'=>$previous,'to'=>$company->status]]);
         });
 
         return back()->with('success', 'Estado de empresa actualizado. Los accesos de flota y API se comprueban en cada petición.');
@@ -78,7 +47,21 @@ class PlatformController extends Controller
 
     public function users()
     {
-        return view('platform.users', ['users' => User::with('company')->orderBy('name')->paginate(20), 'companies' => Company::where('status', 'ACTIVE')->orderBy('name')->get()]);
+        return view('platform.users', ['users' => User::where('role','fleet_admin')->with('company')->orderBy('name')->paginate(20)]);
+    }
+    public function profile(Request $r) { return view('platform.profile',['user'=>$r->user()]); }
+    public function companyAccounts(int $id) {
+        $company=Company::findOrFail($id);
+        return view('platform.company-accounts',['company'=>$company,'users'=>$company->administrators()->paginate(20)]);
+    }
+    public function storeCompanyAdmin(Request $r,int $id,AccessInvitations $invitations) {
+        Company::findOrFail($id);
+        $r->merge(['company_id'=>$id]);
+        return $this->storeAdmin($r,$invitations);
+    }
+    public function companyAccountAccess(Request $r,int $id,int $user,AccessInvitations $invitations) {
+        User::where('company_id',$id)->where('role','fleet_admin')->findOrFail($user);
+        return $this->userAccess($r,$user,$invitations);
     }
 
     public function storeAdmin(Request $r, AccessInvitations $invitations)
@@ -100,8 +83,10 @@ class PlatformController extends Controller
     {
         $user = User::findOrFail($id);
         // Platform accounts are provisioned/recovered by an operator, never through another web account.
-        abort_if($user->role === 'platform_admin', 403);
+        abort_unless($user->role === 'fleet_admin', 403);
         $data = $r->validate(['action' => ['required', Rule::in(['invite', 'enable', 'disable'])]]);
+        $allowed = match ($user->access_status) { 'PENDING' => 'invite', 'ACTIVE' => 'disable', 'DISABLED' => 'enable', default => null };
+        if ($allowed !== $data['action']) throw ValidationException::withMessages(['access'=>'La acción no corresponde al estado actual de la cuenta.']);
         if ($data['action'] === 'invite') {
             return back()->with('activation_code', $invitations->issue($r->user(), $user));
         }
@@ -109,9 +94,10 @@ class PlatformController extends Controller
             throw ValidationException::withMessages(['access' => 'El perfil del conductor está inactivo.']);
         }
         DB::transaction(function () use ($r, $user, $data) {
+            $previous=$user->access_status;
             $user->forceFill(['access_status' => $data['action'] === 'enable' ? 'PENDING' : 'DISABLED'])->save();
             AccessInvitation::where('user_id', $user->id)->whereNull('consumed_at')->update(['consumed_at' => now()]);
-            AdministrativeAudit::record($r->user(), $user->company_id, 'user.access_changed', $user, ['access_status']);
+            AdministrativeAudit::record($r->user(), $user->company_id, 'user.access_changed', $user, ['access_status'], ['access_status'=>['from'=>$previous,'to'=>$user->access_status]]);
         });
 
         return back()->with('success', 'Estado de acceso actualizado. Habilitar requiere un nuevo código y contraseña.');

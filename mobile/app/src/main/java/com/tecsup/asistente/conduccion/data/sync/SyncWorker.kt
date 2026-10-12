@@ -12,8 +12,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @HiltWorker
-class SyncWorker @AssistedInject constructor(@Assisted context: Context, @Assisted params: WorkerParameters, private val engine: SyncEngine) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result = if (engine.drain()) Result.retry() else Result.success()
+class SyncWorker @AssistedInject constructor(@Assisted context: Context, @Assisted params: WorkerParameters, private val engine: SyncEngine, private val deviceReports: com.tecsup.asistente.conduccion.data.devices.DeviceReportSync) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        val tripsRetry = engine.drain()
+        val devicesRetry = deviceReports.flush()
+        return if (tripsRetry || devicesRetry) Result.retry() else Result.success()
+    }
 }
 
 @Singleton

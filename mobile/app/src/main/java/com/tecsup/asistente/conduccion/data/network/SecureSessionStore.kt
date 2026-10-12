@@ -31,6 +31,18 @@ class SecureSessionStore @Inject constructor(@ApplicationContext context: Contex
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
         }.generateKey()
     }
+    // Same Keystore AES-GCM mechanism, separate BLE preferences; session format is unchanged.
+    internal fun encryptLocal(value: String): String {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        return Base64.encodeToString(cipher.iv + cipher.doFinal(value.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+    }
+    internal fun decryptLocal(value: String): String {
+        val bytes = Base64.decode(value, Base64.NO_WRAP)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
+        return String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8)
+    }
     private fun read(): Session? = try {
         prefs.getString("session", null)?.let {
             val bytes = Base64.decode(it, Base64.NO_WRAP)

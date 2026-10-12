@@ -14,6 +14,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.Lifecycle
 import com.tecsup.asistente.conduccion.R
 import com.tecsup.asistente.conduccion.core.ui.ScreenLayout
+import com.tecsup.asistente.conduccion.core.ui.PresentationSection
+import com.tecsup.asistente.conduccion.core.ui.StatusBadge
 import com.tecsup.asistente.conduccion.domain.diagnostic.SensorDataStatus
 import com.tecsup.asistente.conduccion.domain.ble.ConnectionStatus
 import java.util.Locale
@@ -33,7 +35,8 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
     calibration: CalibrationUiState = CalibrationUiState(), onStartMeasurement: () -> Unit = {},
     onCancelMeasurement: () -> Unit = {}) {
     ScreenLayout(stringResource(R.string.diagnostic_title), stringResource(R.string.diagnostic_description), onBack) {
-        Text(stringResource(state.connection.status.labelResource()))
+        PresentationSection("Conexión del dispositivo") {
+        StatusBadge(stringResource(state.connection.status.labelResource()))
         state.connection.device?.let {
             Text(it.name?.takeIf(String::isNotBlank) ?: stringResource(R.string.ble_unnamed))
             Text(it.address)
@@ -44,8 +47,9 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
             SensorDataStatus.RECEIVING -> R.string.diagnostic_receiving
             SensorDataStatus.FAILED -> R.string.diagnostic_failed
         }))
-        state.connection.error?.let { Text(it) }
-        Text("GPS NEO-6M", style = MaterialTheme.typography.titleLarge)
+        state.connection.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
+        PresentationSection("GPS NEO-6M") {
         val gps = state.gps
         Text(when (gps.status) {
             com.tecsup.asistente.conduccion.domain.diagnostic.GpsStatus.DISCONNECTED -> "GPS desconectado"
@@ -63,6 +67,8 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
             gps.ageMillis?.let { Text("Antigüedad al recibir: $it ms") }
         }
         gps.satellites?.let { Text("Satélites usados: $it") }
+        }
+        PresentationSection("Mediciones del IMU · uso técnico") {
         val sample = state.sample
         if (state.connection.status == ConnectionStatus.CONNECTED && state.sensorStatus == SensorDataStatus.RECEIVING && sample != null) {
             Text("RAW · cuentas int16", style = MaterialTheme.typography.titleMedium)
@@ -87,7 +93,8 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         } else Text(stringResource(R.string.diagnostic_no_measurements))
         Text("Identidad del sensor no confirmada: WHO_AM_I = 0x75 observado en el módulo de prueba. La conversión es nominal, no una medición físicamente validada.")
         Text("Filtro y detector deshabilitados por defecto. No se crean eventos SENSOR. La aceleración incluye gravedad; no se ha definido la orientación respecto al vehículo.")
-        Text("Calibración experimental", style = MaterialTheme.typography.titleLarge)
+        }
+        PresentationSection("Calibración experimental") {
         Text("Solo desarrollo y mantenimiento. Mantén la IMU inmóvil durante 30 segundos. La inmovilidad no se comprueba automáticamente.")
         Text("Promedios y offsets estimados experimentales: no se aplican ni se guardan permanentemente. WHO_AM_I = 0x75; identidad no confirmada.")
         if (calibration.measuring) {
@@ -113,6 +120,7 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
             Text("Offsets gyro estimados (°/s): X ${value(offsets.x)} · Y ${value(offsets.y)} · Z ${value(offsets.z)}")
             Text("Estiman el sesgo solo bajo la suposición de inmovilidad. No validan el sensor ni la calibración. No se estiman offsets del acelerómetro: sus medidas incluyen gravedad.")
             OutlinedButton(onClick = onCancelMeasurement) { Text("Descartar resultados") }
+        }
         }
     }
 }

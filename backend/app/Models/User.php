@@ -35,6 +35,8 @@ class User extends Authenticatable
         return $this->belongsTo(Company::class);
     }
 
+    public function auditRecords(): HasMany { return $this->hasMany(AdministrativeAudit::class, 'actor_id'); }
+
     public function trips(): HasMany
     {
         return $this->hasMany(Trip::class, 'created_by_user_id');
