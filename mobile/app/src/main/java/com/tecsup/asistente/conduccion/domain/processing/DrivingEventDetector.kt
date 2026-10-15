@@ -44,6 +44,19 @@ class DrivingEventDetector(private val configuration: DetectorConfiguration? = n
     private var previousTimestamp: Long? = null
     fun reset() { windows.clear(); previousTimestamp = null }
 
+    /** Read-only temporal evidence for the experimental UI; does not change detector decisions. */
+    fun evidence(type: DrivingEventType, now: Long): String {
+        val window = windows[type] ?: return "Sin evidencia"
+        val criteria = configuration?.let { when(type) {
+            DrivingEventType.HARSH_ACCELERATION -> it.acceleration
+            DrivingEventType.HARSH_BRAKING -> it.braking
+            DrivingEventType.SHARP_TURN -> it.turn
+        } }
+        val cooldown = window.lastEvent?.let { (criteria?.cooldownMillis ?: 0) - (now - it) }?.coerceAtLeast(0) ?: 0
+        return "${window.triggerCount} muestras sobre umbral · ${window.start?.let { now - it } ?: 0} ms · " +
+            if (window.latched) "candidato retenido hasta liberación" else if(cooldown > 0) "cooldown: $cooldown ms" else "evaluando duración / liberación"
+    }
+
     fun detect(sample: ProcessedImuSample): List<CandidateEvent> {
         val config = configuration ?: return emptyList()
         val rest = config.restAccelerationG ?: return emptyList()

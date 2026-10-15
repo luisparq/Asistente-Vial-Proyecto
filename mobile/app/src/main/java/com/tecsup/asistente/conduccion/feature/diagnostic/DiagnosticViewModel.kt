@@ -13,6 +13,8 @@ import com.tecsup.asistente.conduccion.domain.processing.ImuPipeline
 import com.tecsup.asistente.conduccion.domain.processing.ImuProcessingResult
 import com.tecsup.asistente.conduccion.domain.processing.ExperimentalCalibrationAccumulator
 import com.tecsup.asistente.conduccion.domain.processing.ExperimentalCalibrationResult
+import com.tecsup.asistente.conduccion.domain.processing.*
+import com.tecsup.asistente.conduccion.domain.model.DrivingEventType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -40,8 +42,86 @@ data class DiagnosticUiState(
     val gps: com.tecsup.asistente.conduccion.domain.diagnostic.GpsTelemetry = com.tecsup.asistente.conduccion.domain.diagnostic.GpsTelemetry(),
 )
 
+data class LaboratoryUiState(val history: List<PhysicalImuSample> = emptyList(),
+    val observing: Boolean = false, val corrected: Boolean = false,
+    val message: String = "Detector BLE deshabilitado. Ejecuta primero patrones sintéticos TEST_ONLY.",
+    val evaluations: List<String> = emptyList(), val candidates: Int = 0, val candidateDetails: List<String> = emptyList())
+
 @HiltViewModel
 class DiagnosticViewModel @Inject constructor(private val repository: BleRepository, private val source: SensorDataSource) : ViewModel() {
+    private val mutableLab = MutableStateFlow(LaboratoryUiState())
+    val laboratory = mutableLab.asStateFlow()
+    private val chartBuffer = ImuChartBuffer()
+    private var chartJob: Job? = null
+    private var chartAddress: String? = null
+    private var labConfiguration: DetectorConfiguration? = null
+    private var labDetector = DrivingEventDetector()
+    private var labProcessor = ImuProcessor()
+
+    fun startCharts() {
+        if (chartJob?.isActive == true) return
+        chartJob = viewModelScope.launch {
+            source.frames.collect { bytes ->
+                if (bytes.size != ImuRawDecoder.FRAME_SIZE || repository.connection.value.status != ConnectionStatus.CONNECTED ||
+                    source.status.value != SensorDataStatus.RECEIVING) return@collect
+                val address = repository.connection.value.device?.address
+                if (chartAddress != address) {
+                    chartBuffer.clear(); stopObservation(); chartAddress = address
+                }
+                // Monotonic clock for laboratory windows; does not change persisted event timestamps.
+                val sample = ImuConverter().convert(ImuRawDecoder.decode(bytes, android.os.SystemClock.elapsedRealtime()))
+                mutableLab.value = laboratory.value.copy(history = chartBuffer.add(sample))
+                if (laboratory.value.observing) evaluate(sample)
+            }
+        }
+    }
+    fun stopCharts() {
+        chartJob?.cancel(); chartJob = null; chartBuffer.clear(); chartAddress = null
+        labConfiguration = null; labDetector.reset(); labProcessor = ImuProcessor()
+        mutableLab.value = LaboratoryUiState()
+    }
+    fun stopObservation() {
+        labConfiguration = null; labDetector.reset(); labProcessor = ImuProcessor()
+        mutableLab.value = laboratory.value.copy(observing = false, corrected = false, evaluations = emptyList(), candidates = 0, candidateDetails = emptyList(),
+            message = "Observación detenida. No se guardaron eventos.")
+    }
+    fun observeBle(axis: ImuAxis, sign: Int, turn: ImuAxis, useGyroOffsets: Boolean) {
+        val current = laboratory.value.history.lastOrNull() ?: return
+        if (repository.connection.value.status != ConnectionStatus.CONNECTED || source.status.value != SensorDataStatus.RECEIVING) return
+        val result = calibration.value.result
+        if (useGyroOffsets && result?.isStableForLab() != true) return
+        labProcessor = ImuProcessor(if (useGyroOffsets) ImuCalibration(Vector3(0.0, 0.0, 0.0), result!!.estimatedGyroOffsetsDps) else null)
+        labConfiguration = TestOnlyLaboratory.configuration(axis, sign, turn, current.accelerationG)
+        labDetector = DrivingEventDetector(labConfiguration)
+        mutableLab.value = laboratory.value.copy(observing = true, corrected = useGyroOffsets, candidates = 0, candidateDetails = emptyList(), evaluations = emptyList(),
+            message = "BLE experimental TEST_ONLY: referencia de reposo capturada por petición explícita. No son eventos confirmados.")
+    }
+    private fun evaluate(sample: PhysicalImuSample) {
+        val config = labConfiguration ?: return
+        val processed = labProcessor.process(sample)
+        val candidates = labDetector.detect(processed)
+        val types = listOf(DrivingEventType.HARSH_ACCELERATION, DrivingEventType.HARSH_BRAKING, DrivingEventType.SHARP_TURN)
+        val criteria = listOf(config.acceleration, config.braking, config.turn)
+        val signals = TestOnlyLaboratory.signals(processed, config)
+        mutableLab.value = laboratory.value.copy(candidates = laboratory.value.candidates + candidates.size,
+            candidateDetails = (laboratory.value.candidateDetails + candidates.map {
+                "${it.type}: pico %.3f, ${it.sampleCount} muestras, ${it.occurredAtMillis - it.startedAtMillis} ms · candidato TEST_ONLY".format(java.util.Locale.ROOT, it.peak)
+            }).takeLast(10),
+            evaluations = types.mapIndexed { index, type ->
+                val c = criteria[index]
+                "$type: %.3f / entrada %.2f / salida %.2f · %s\n%s".format(java.util.Locale.ROOT,
+                    signals[index], c.trigger, c.release, if (signals[index] >= c.trigger) "umbral cumplido" else "bajo umbral",
+                    labDetector.evidence(type, processed.receivedAtMillis))
+            })
+    }
+    fun runSynthetic(type: DrivingEventType?) {
+        stopObservation()
+        labConfiguration = TestOnlyLaboratory.configuration(); labDetector = DrivingEventDetector(labConfiguration); labProcessor = ImuProcessor()
+        TestOnlyLaboratory.synthetic(type).forEach(::evaluate)
+        mutableLab.value = laboratory.value.copy(message = "Ensayo sintético reproducible TEST_ONLY: ${type ?: "REPOSO"}. No usa ni sustituye datos BLE.")
+        labConfiguration = null
+    }
+
     private val mutableCalibration = MutableStateFlow(CalibrationUiState())
     val calibration = mutableCalibration.asStateFlow()
     private var measurementJob: Job? = null
@@ -51,6 +131,10 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
         viewModelScope.launch {
             combine(repository.connection, source.status) { connection, status -> connection to status }
                 .collect { (connection, status) ->
+                    if (connection.status != ConnectionStatus.CONNECTED || status != SensorDataStatus.RECEIVING) {
+                        chartBuffer.clear(); stopObservation()
+                        mutableLab.value = laboratory.value.copy(history = emptyList())
+                    }
                     val active = calibration.value
                     if ((active.measuring || active.result != null) &&
                         (connection.status != ConnectionStatus.CONNECTED || connection.device?.address != measurementAddress)) {
@@ -69,6 +153,7 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
             mutableCalibration.value = CalibrationUiState(message = "Conecta el dispositivo y espera muestras reales antes de iniciar.")
             return
         }
+        if (laboratory.value.corrected) stopObservation()
         measurementAddress = repository.connection.value.device?.address
         mutableCalibration.value = CalibrationUiState(measuring = true)
         measurementJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -109,6 +194,7 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
 
     private fun discardMeasurement(message: String) {
         measurementJob?.cancel(); measurementJob = null
+        if (laboratory.value.corrected) stopObservation()
         mutableCalibration.value = CalibrationUiState(message = message)
     }
     fun cancelMeasurement() = discardMeasurement("Medición y resultados descartados.")

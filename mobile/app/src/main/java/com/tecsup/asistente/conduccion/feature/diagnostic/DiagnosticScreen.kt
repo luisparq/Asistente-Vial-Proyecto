@@ -19,21 +19,27 @@ import com.tecsup.asistente.conduccion.core.ui.StatusBadge
 import com.tecsup.asistente.conduccion.domain.diagnostic.SensorDataStatus
 import com.tecsup.asistente.conduccion.domain.ble.ConnectionStatus
 import java.util.Locale
+import com.tecsup.asistente.conduccion.domain.processing.isStableForLab
 import com.tecsup.asistente.conduccion.core.ui.labelResource
 
 @Composable
 fun DiagnosticScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val laboratory by viewModel.laboratory.collectAsStateWithLifecycle()
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.startCharts() }
     val calibration by viewModel.calibration.collectAsStateWithLifecycle()
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.cancelIfMeasuring() }
-    DisposableEffect(viewModel) { onDispose { viewModel.cancelIfMeasuring() } }
-    DiagnosticContent(state, onBack, calibration, viewModel::startMeasurement, viewModel::cancelMeasurement)
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.cancelIfMeasuring(); viewModel.stopCharts() }
+    DisposableEffect(viewModel) { onDispose { viewModel.cancelIfMeasuring(); viewModel.stopCharts() } }
+    DiagnosticContent(state, onBack, calibration, viewModel::startMeasurement, viewModel::cancelMeasurement, laboratory, viewModel::runSynthetic, viewModel::observeBle, viewModel::stopObservation)
 }
 
 @Composable
 fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
     calibration: CalibrationUiState = CalibrationUiState(), onStartMeasurement: () -> Unit = {},
-    onCancelMeasurement: () -> Unit = {}) {
+    onCancelMeasurement: () -> Unit = {}, laboratory: LaboratoryUiState = LaboratoryUiState(),
+    onSynthetic: (com.tecsup.asistente.conduccion.domain.model.DrivingEventType?) -> Unit = {},
+    onObserve: (com.tecsup.asistente.conduccion.domain.processing.ImuAxis, Int, com.tecsup.asistente.conduccion.domain.processing.ImuAxis, Boolean) -> Unit = { _, _, _, _ -> },
+    onStopObservation: () -> Unit = {}) {
     ScreenLayout(stringResource(R.string.diagnostic_title), stringResource(R.string.diagnostic_description), onBack) {
         PresentationSection("Conexión del dispositivo") {
         StatusBadge(stringResource(state.connection.status.labelResource()))
@@ -84,6 +90,8 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
                 val converted = result.converted
                 Text("Accel (g) · " + axes(converted.accelerationG.x, converted.accelerationG.y, converted.accelerationG.z))
                 Text("Gyro (°/s) · " + axes(converted.angularVelocityDps.x, converted.angularVelocityDps.y, converted.angularVelocityDps.z))
+                val a = converted.accelerationG
+                Text(String.format(Locale.ROOT, "Magnitud de aceleración: %.4f g (incluye gravedad)", kotlin.math.sqrt(a.x*a.x + a.y*a.y + a.z*a.z)))
                 Text("PROCESADO", style = MaterialTheme.typography.titleMedium)
                 val processed = result.processed
                 Text("Accel (g) · " + axes(processed.accelerationG.x, processed.accelerationG.y, processed.accelerationG.z))
@@ -94,6 +102,9 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         Text("Identidad del sensor no confirmada: WHO_AM_I = 0x75 observado en el módulo de prueba. La conversión es nominal, no una medición físicamente validada.")
         Text("Filtro y detector deshabilitados por defecto. No se crean eventos SENSOR. La aceleración incluye gravedad; no se ha definido la orientación respecto al vehículo.")
         }
+        val visibleLab = if (state.connection.status == ConnectionStatus.CONNECTED && state.sensorStatus == SensorDataStatus.RECEIVING)
+            laboratory else laboratory.copy(history = emptyList(), observing = false, corrected = false)
+        ImuLaboratoryContent(visibleLab, calibration, onSynthetic, onObserve, onStopObservation)
         PresentationSection("Calibración experimental") {
         Text("Solo desarrollo y mantenimiento. Mantén la IMU inmóvil durante 30 segundos. La inmovilidad no se comprueba automáticamente.")
         Text("Promedios y offsets estimados experimentales: no se aplican ni se guardan permanentemente. WHO_AM_I = 0x75; identidad no confirmada.")
@@ -116,6 +127,9 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
                 Text("$label · media ${value(raw.mean)} · DE ${value(raw.sampleStandardDeviation)} cuentas\n" +
                     "Nominal: media ${value(nominal.mean)} · DE ${value(nominal.sampleStandardDeviation)} $unit")
             }
+            Text(if (result.isStableForLab()) "Variabilidad compatible con ensayo en reposo (criterio TEST_ONLY)."
+                else "Medición inestable o insuficiente: no usar offsets para comparar.")
+            Text("Cribado TEST_ONLY: al menos 100 muestras; DE por eje ≤0.02 g y ≤1 °/s. No es validación física.")
             val offsets = result.estimatedGyroOffsetsDps
             Text("Offsets gyro estimados (°/s): X ${value(offsets.x)} · Y ${value(offsets.y)} · Z ${value(offsets.z)}")
             Text("Estiman el sesgo solo bajo la suposición de inmovilidad. No validan el sensor ni la calibración. No se estiman offsets del acelerómetro: sus medidas incluyen gravedad.")

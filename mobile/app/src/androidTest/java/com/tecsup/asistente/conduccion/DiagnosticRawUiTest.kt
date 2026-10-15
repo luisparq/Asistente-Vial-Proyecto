@@ -15,6 +15,34 @@ import org.junit.Test
 /** Explicit TEST fixtures: validates UI only, not an ESP32 radio connection. */
 class DiagnosticRawUiTest {
     @get:Rule val compose = createComposeRule()
+    @Test fun chartRendersTestSamplesAndDoesNotPresentHistoryAsCurrentAfterDisconnect() {
+        val state = mutableStateOf(DiagnosticUiState(connection = BleConnectionState(ConnectionStatus.CONNECTED),
+            sensorStatus = SensorDataStatus.RECEIVING))
+        val lab = LaboratoryUiState(history = (0..4).map {
+            com.tecsup.asistente.conduccion.domain.processing.PhysicalImuSample(
+                com.tecsup.asistente.conduccion.domain.processing.Vector3(0.0, 0.0, 1.0),
+                com.tecsup.asistente.conduccion.domain.processing.Vector3(0.0, 0.0, 0.0), it * 250L)
+        })
+        compose.setContent { AsistenteVialTheme { DiagnosticContent(state.value, {}, laboratory = lab) } }
+        compose.onNodeWithContentDescription("Gráfica aceleración, X Y Z, últimos 30 segundos").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Gráfica giroscopio, X Y Z, últimos 30 segundos").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { state.value = state.value.copy(connection = BleConnectionState(ConnectionStatus.DISCONNECTED)) }
+        compose.onNodeWithContentDescription("Gráfica aceleración, X Y Z, últimos 30 segundos").assertDoesNotExist()
+        compose.onNodeWithText("Sin muestras actuales. Conecta BLE y espera recepción IMU.").performScrollTo().assertIsDisplayed()
+    }
+    @Test fun experimentalLabIsExplicitAndSyntheticActionWorksWithoutBle() {
+        var requested = false
+        compose.setContent {
+            AsistenteVialTheme {
+                DiagnosticContent(DiagnosticUiState(), {}, onSynthetic = { requested = it == com.tecsup.asistente.conduccion.domain.model.DrivingEventType.HARSH_BRAKING })
+            }
+        }
+        compose.onNodeWithText("Laboratorio del detector · TEST_ONLY").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Ensayar frenada").performScrollTo().performClick()
+        compose.runOnIdle { org.junit.Assert.assertTrue(requested) }
+        compose.onNodeWithText("Capturar reposo y observar BLE").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Iniciar medición").performScrollTo().assertIsNotEnabled()
+    }
     @Test fun gpsSectionRemainsVisibleWithoutFixAndHidesCoordinatesAfterDisconnect() {
         // TEST state only; not a physical GPS position.
         val state = mutableStateOf(DiagnosticUiState(

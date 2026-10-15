@@ -15,6 +15,20 @@ import org.junit.Test
 /** Synthetic TEST streams and virtual time; never a real BLE or physical calibration test. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CalibrationFlowTest {
+    @Test fun syntheticLabIsRepeatableAndDoesNotEnableBleDetector() = flowTest { f ->
+        val type = com.tecsup.asistente.conduccion.domain.model.DrivingEventType.HARSH_BRAKING
+        repeat(3) {
+            f.model.runSynthetic(type)
+            assertEquals(1, f.model.laboratory.value.candidates)
+            assertFalse(f.model.laboratory.value.observing)
+            assertTrue(f.model.laboratory.value.history.isEmpty())
+        }
+        f.model.runSynthetic(null)
+        assertEquals(0, f.model.laboratory.value.candidates)
+        f.model.observeBle(com.tecsup.asistente.conduccion.domain.processing.ImuAxis.X, 1,
+            com.tecsup.asistente.conduccion.domain.processing.ImuAxis.Z, true)
+        assertFalse(f.model.laboratory.value.observing)
+    }
     private class TestSource : SensorDataSource {
             override val status = MutableStateFlow(SensorDataStatus.RECEIVING)
             override val sample = MutableStateFlow<RawImuSample?>(RawImuSample(0, 0, 0, 0, 0, 0))
