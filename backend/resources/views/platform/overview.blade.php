@@ -3,7 +3,7 @@
 @section('content')
 <link rel="stylesheet" href="{{ asset('css/platform-overview.css') }}">
 <div class="global-toolbar"><div><p class="eyebrow">SUPERVISIÓN · TECSUP</p><p>Datos disponibles al {{ \App\Support\DashboardDisplay::date($now) }} · America/Lima</p></div><form method="get" class="actions"><label>Actividad del periodo<select name="days"><option value="7" @selected($days===7)>Últimos 7 días</option><option value="30" @selected($days===30)>Últimos 30 días</option></select></label><button class="button quiet">Actualizar</button></form></div>
-<div class="actions"><a class="button" href="{{ route('platform.companies') }}">Empresas</a><a class="button quiet" href="{{ route('platform.devices') }}">Dispositivos</a><a class="button quiet" href="{{ route('platform.audits') }}">Auditoría</a></div>
+<section class="operation-banner" aria-label="Gestión de plataforma"><div><p class="eyebrow">CENTRO DE CONTROL</p><h2>Una plataforma.<br>Cada empresa, su espacio.</h2><p>Consulta la actividad registrada y accede a las herramientas de gestión.</p></div><div class="banner-actions"><a class="button" href="{{ route('platform.companies') }}"><x-nav-icon name="companies"/>Empresas</a><div class="actions"><a class="banner-link" href="{{ route('platform.devices') }}">Dispositivos ↗</a><a class="banner-link" href="{{ route('platform.audits') }}">Auditoría ↗</a></div></div></section>
 <h2>Inventario y registros acumulados</h2><p>Totales históricos disponibles. El filtro de periodo se aplica a los gráficos y a la actividad empresarial.</p>
 <section class="global-metrics" aria-label="Indicadores globales">
 @foreach([

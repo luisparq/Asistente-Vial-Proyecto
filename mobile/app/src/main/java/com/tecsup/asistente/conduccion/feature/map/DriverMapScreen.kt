@@ -2,6 +2,7 @@ package com.tecsup.asistente.conduccion.feature.map
 
 import android.graphics.Color
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -29,7 +30,7 @@ fun DriverMapScreen(onBack:()->Unit,viewModel:DriverMapViewModel=hiltViewModel()
     var center by remember { mutableIntStateOf(0) }
     var mapError by remember { mutableStateOf<String?>(null) }
     ScreenLayout("Mi mapa","Mapa opcional · GPS del dispositivo BLE, no del teléfono",onBack) {
-        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Card(Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Text(when(state.gpsStatus) {
                 GpsStatus.VALID -> if(state.position!=null) "Posición GPS válida" else "Posición GPS no disponible"
                 GpsStatus.STALE -> "Posición GPS caducada"

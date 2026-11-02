@@ -1,23 +1,22 @@
 package com.tecsup.asistente.conduccion.feature.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.tecsup.asistente.conduccion.domain.ble.BleConnectionState
@@ -52,46 +51,76 @@ fun HomeScreen(
         }
     }
     ScreenLayout(stringResource(R.string.home_title), "") {
-        Text(name?.takeIf { it.isNotBlank() }?.let { "Hola, $it" } ?: "Hola", style = MaterialTheme.typography.headlineMedium)
-        company?.takeIf { it.isNotBlank() }?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-          Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Tu recorrido", style = MaterialTheme.typography.titleLarge)
-        when (val current = active) {
-            LoadState.Loading -> CircularProgressIndicator()
-            LoadState.Error -> ReadError()
-            is LoadState.Ready -> {
-                Text(stringResource(if (current.value == null) R.string.no_active_trip else R.string.trip_active))
-                Button(onClick = viewModel::startOrResume, enabled = !action.busy && !action.openTrip,
-                    modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(if (current.value == null) R.string.start_trip else R.string.resume_trip))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("TU ESPACIO DE CONDUCCIÓN", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(name?.takeIf { it.isNotBlank() }?.let { "Hola, $it" } ?: "Hola", style = MaterialTheme.typography.headlineLarge)
+            company?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF252822), contentColor = Color(0xFFF7F4EB))) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("TU RECORRIDO", style = MaterialTheme.typography.labelMedium, color = Color(0xFFCFD0C3))
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = Color(0xFFF5B18C))
                 }
+                Text("Cada recorrido,\nun nuevo comienzo.", style = MaterialTheme.typography.headlineMedium)
+                when (val current = active) {
+                    LoadState.Loading -> CircularProgressIndicator(color = Color(0xFFF5B18C))
+                    LoadState.Error -> ReadError()
+                    is LoadState.Ready -> {
+                        Text(stringResource(if (current.value == null) R.string.no_active_trip else R.string.trip_active), color = Color(0xFFCFD0C3), style = MaterialTheme.typography.bodyMedium)
+                        Button(onClick = viewModel::startOrResume, enabled = !action.busy && !action.openTrip,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                            shape = MaterialTheme.shapes.small,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5B18C), contentColor = Color(0xFF382719))) {
+                            Text(stringResource(if (current.value == null) R.string.start_trip else R.string.resume_trip))
+                            Spacer(Modifier.width(12.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(19.dp))
+                        }
+                    }
+                }
+                if (action.failed) Text(stringResource(R.string.write_error), color = Color(0xFFFFB4AB))
+                if (action.busy) CircularProgressIndicator(color = Color(0xFFF5B18C))
             }
         }
-        if (action.failed) Text(stringResource(R.string.write_error), color = MaterialTheme.colorScheme.error)
-        if (action.busy) CircularProgressIndicator()
-          }
-        }
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Estado del asistente", style = MaterialTheme.typography.titleMedium)
+        Card(Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Default.Phone, null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Estado del asistente", style = MaterialTheme.typography.titleMedium)
+                }
                 StatusBadge(stringResource(connection.status.labelResource()))
-                connection.device?.name?.takeIf { it.isNotBlank() }?.let { Text(it) }
+                connection.device?.name?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             }
         }
-        OutlinedButton(onClick = onMap, modifier = Modifier.fillMaxWidth()) { Text("Mi mapa") }
-        Text("Accesos rápidos", style = MaterialTheme.typography.titleMedium)
-        listOf(
-            Triple(R.string.profile_title, Icons.Default.Person, onProfile),
-            Triple(R.string.history_title, Icons.Default.DateRange, onHistory),
-            Triple(R.string.ble_title, Icons.Default.Phone, onBle),
-            Triple(R.string.settings_title, Icons.Default.Settings, onSettings),
-        ).forEach { (label, icon, action) ->
-            OutlinedButton(onClick = action, modifier = Modifier.fillMaxWidth()) {
-                Icon(icon, contentDescription = null)
-                Spacer(Modifier.width(12.dp))
-                Text(stringResource(label))
+        Card(onClick = onMap, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+            Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Icon(Icons.Default.Place, null)
+                Text("Mi mapa", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(20.dp))
             }
+        }
+        Text("Accesos rápidos", style = MaterialTheme.typography.titleMedium)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HomeShortcut(stringResource(R.string.profile_title), Icons.Default.Person, onProfile, Modifier.weight(1f))
+                HomeShortcut(stringResource(R.string.history_title), Icons.Default.DateRange, onHistory, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HomeShortcut(stringResource(R.string.ble_title), Icons.Default.Phone, onBle, Modifier.weight(1f))
+                HomeShortcut(stringResource(R.string.settings_title), Icons.Default.Settings, onSettings, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeShortcut(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Card(onClick = onClick, modifier = modifier.heightIn(min = 116.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge)
         }
     }
 }

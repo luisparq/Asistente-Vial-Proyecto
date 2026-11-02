@@ -1,6 +1,15 @@
 package com.tecsup.asistente.conduccion.feature.history
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -45,11 +54,17 @@ fun HistoryScreen(
                 else if (visible.isEmpty()) Text(stringResource(R.string.empty_history))
                 LazyColumn(modifier = Modifier.weight(1f).testTag("history_list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(visible, key = { it.trip.id }) { summary ->
-                        Card(onClick = { onTripSelected(summary.trip.id) }, modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Card(onClick = { onTripSelected(summary.trip.id) }, modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                            Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 TripInfo(summary.trip)
                                 Text(stringResource(R.string.event_count, summary.eventCount))
-                                Text(stringResource(R.string.view_events), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(stringResource(R.string.view_events), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(8.dp))
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
                     }

@@ -1,6 +1,7 @@
 package com.tecsup.asistente.conduccion.feature.login
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,15 +23,22 @@ fun LoginScreen(onExplore: () -> Unit, onActivate: () -> Unit, onLogin: (String,
     var password by remember { mutableStateOf("") }
     var help by remember { mutableStateOf(false) }
     ScreenLayout(stringResource(R.string.login_title), stringResource(R.string.login_description)) {
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Inicia sesión", style = MaterialTheme.typography.headlineSmall)
+        Surface(color = MaterialTheme.colorScheme.onBackground, shape = MaterialTheme.shapes.medium) {
+            Text("AV", Modifier.padding(horizontal = 18.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.background, style = MaterialTheme.typography.titleLarge)
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("TU PRÓXIMO RECORRIDO EMPIEZA AQUÍ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Text("Conduce informado.\nConduce seguro.", style = MaterialTheme.typography.headlineLarge)
+        }
+        Card(Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Inicia sesión", style = MaterialTheme.typography.titleLarge)
                 OutlinedTextField(email, { email = it }, label = { Text("Correo") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth())
                 PasswordField(password, { password = it }, "Contraseña", enabled = !state.busy)
                 Button(onClick = { onLogin(email, password); password = "" },
-                    enabled = !state.busy && email.isNotBlank() && password.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+                    enabled = !state.busy && email.isNotBlank() && password.isNotBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = MaterialTheme.shapes.small) {
                     Text(if (state.busy) "Iniciando sesión…" else "Iniciar sesión")
                 }
                 TextButton(onClick = { help = true }, enabled = !state.busy) { Text("¿Olvidaste tu contraseña?") }
@@ -41,7 +49,7 @@ fun LoginScreen(onExplore: () -> Unit, onActivate: () -> Unit, onLogin: (String,
             }
         }
         Text("¿Primera vez?", style = MaterialTheme.typography.titleMedium)
-        OutlinedButton(onClick = onActivate, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Activar mi cuenta") }
+        OutlinedButton(onClick = onActivate, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = MaterialTheme.shapes.small) { Text("Activar mi cuenta") }
         Text("¿Quieres conocer la aplicación?", style = MaterialTheme.typography.bodyMedium)
         TextButton(onClick = onExplore, enabled = !state.busy) { Text(stringResource(R.string.explore)) }
         TextButton(onClick = onSettings, enabled = !state.busy) { Text("Ajustes") }

@@ -4,6 +4,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.DisposableEffect
@@ -45,7 +50,7 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         StatusBadge(stringResource(state.connection.status.labelResource()))
         state.connection.device?.let {
             Text(it.name?.takeIf(String::isNotBlank) ?: stringResource(R.string.ble_unnamed))
-            Text(it.address)
+            Text(it.address, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(stringResource(when (state.sensorStatus) {
             SensorDataStatus.DISCONNECTED -> R.string.connection_disconnected
@@ -78,12 +83,16 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         val sample = state.sample
         if (state.connection.status == ConnectionStatus.CONNECTED && state.sensorStatus == SensorDataStatus.RECEIVING && sample != null) {
             Text("RAW · cuentas int16", style = MaterialTheme.typography.titleMedium)
-            Text("ax: ${sample.ax}")
-            Text("ay: ${sample.ay}")
-            Text("az: ${sample.az}")
-            Text("gx: ${sample.gx}")
-            Text("gy: ${sample.gy}")
-            Text("gz: ${sample.gz}")
+            listOf(listOf("ax: ${sample.ax}", "ay: ${sample.ay}", "az: ${sample.az}"),
+                listOf("gx: ${sample.gx}", "gy: ${sample.gy}", "gz: ${sample.gz}")).forEach { axes ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    axes.forEach { reading ->
+                        Surface(Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.small) {
+                            Text(reading, Modifier.padding(horizontal = 8.dp, vertical = 14.dp), style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+            }
             state.processing?.takeIf { it.raw == sample }?.let { result ->
                 fun axes(x: Double, y: Double, z: Double) = String.format(Locale.ROOT, "X: %.4f · Y: %.4f · Z: %.4f", x, y, z)
                 Text("CONVERTIDO · escala nominal", style = MaterialTheme.typography.titleMedium)

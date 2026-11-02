@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tecsup.asistente.conduccion.BuildConfig
 import java.time.Instant
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tecsup.asistente.conduccion.core.ui.formatTimestamp
@@ -37,7 +38,7 @@ fun SettingsScreen(onBack: () -> Unit, onReturnToLogin: () -> Unit, viewModel: S
         session?.let { Text("${it.email}\n${it.companyName}") } ?: Text("Sin cuenta iniciada.")
         if (session != null) OutlinedButton(onClick = viewModel::logout, enabled = !busy) { Text("Cerrar sesión") }
         }
-        Card(Modifier.fillMaxWidth()) {
+        Card(Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
           Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Configuración avanzada", style = MaterialTheme.typography.titleLarge)
         Text("Configuración del servidor", style = MaterialTheme.typography.titleMedium)

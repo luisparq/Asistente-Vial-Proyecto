@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import com.tecsup.asistente.conduccion.R
 import com.tecsup.asistente.conduccion.core.ui.ScreenLayout
 import com.tecsup.asistente.conduccion.core.ui.PresentationSection
+import com.tecsup.asistente.conduccion.core.ui.StatusBadge
+import androidx.compose.foundation.layout.heightIn
 import com.tecsup.asistente.conduccion.core.ui.labelResource
 import com.tecsup.asistente.conduccion.domain.ble.BleAvailability
 import com.tecsup.asistente.conduccion.domain.ble.ConnectionStatus
@@ -51,20 +53,20 @@ fun BleContent(
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 PresentationSection("Conexión del asistente") {
-                    Text(if (state.scan.availability == BleAvailability.PERMISSION_REQUIRED) "Permisos requeridos"
+                    StatusBadge(if (state.scan.availability == BleAvailability.PERMISSION_REQUIRED) "Permisos requeridos"
                         else if (state.reconnection.running) "Reconectando"
                         else if (state.connection.status == ConnectionStatus.SELECTED && state.reconnection.message?.startsWith("Desconectado") == true) "Desconectado"
-                        else stringResource(state.connection.status.labelResource()), style = MaterialTheme.typography.titleMedium)
+                        else stringResource(state.connection.status.labelResource()))
                     state.connection.device?.let { device ->
                         Text(device.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.ble_unnamed))
                         Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Button(onClick = onPrepare, enabled = state.connection.status in listOf(
+                        Button(onClick = onPrepare, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = MaterialTheme.shapes.small, enabled = state.connection.status in listOf(
                             ConnectionStatus.SELECTED, ConnectionStatus.DISCONNECTED, ConnectionStatus.FAILED)) {
                             Text(stringResource(R.string.ble_prepare))
                         }
-                        OutlinedButton(onClick = onDisconnect) { Text("Desconectar") }
-                        OutlinedButton(onClick = onReconnect, enabled = !state.reconnection.running) { Text("Habilitar reconexión") }
-                        OutlinedButton(onClick = onClear) { Text("Olvidar dispositivo / cambiar") }
+                        OutlinedButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) { Text("Desconectar") }
+                        OutlinedButton(onClick = onReconnect, enabled = !state.reconnection.running, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) { Text("Habilitar reconexión") }
+                        TextButton(onClick = onClear, modifier = Modifier.fillMaxWidth()) { Text("Olvidar dispositivo / cambiar") }
                     }
                     state.reconnection.message?.let { Text(it) }
                     Text(if (state.reconnection.enabled) "Reconexión automática habilitada para esta cuenta." else "Reconexión automática suspendida.")
@@ -73,7 +75,7 @@ fun BleContent(
                 }
             }
             item {
-                Text("Herramientas técnicas", style = MaterialTheme.typography.titleSmall)
+                Text("Herramientas técnicas", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = onDiagnostic) { Text(stringResource(R.string.diagnostic_title)) }
                 Text("Consulta técnica de las mediciones del dispositivo.", style = MaterialTheme.typography.bodySmall)
             }
