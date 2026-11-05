@@ -21,14 +21,17 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    baseline-on-migrate: true
+    baseline-on-migrate: false
+    clean-disabled: true
 
 server:
-  port: 8085
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8085}
+  shutdown: graceful
   servlet:
     context-path: /
 
 logging:
   level:
-    com.avigem: DEBUG
+    com.avigem: INFO
     org.flywaydb: INFO

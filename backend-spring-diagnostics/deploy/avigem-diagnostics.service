@@ -1,0 +1,25 @@
+[Unit]
+Description=AVIGEM Diagnostics (TEST_DATA)
+Wants=network-online.target
+After=network-online.target mariadb.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+EnvironmentFile=/etc/avigem-diagnostics.env
+WorkingDirectory=/var/www/asistente-vial/backend-spring-diagnostics
+ExecStart=/usr/bin/java -Xms64m -Xmx256m -jar /var/www/asistente-vial/backend-spring-diagnostics/target/diagnostics-0.1.0-SNAPSHOT.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictSUIDSGID=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

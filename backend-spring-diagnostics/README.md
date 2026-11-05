@@ -12,9 +12,9 @@ MVP del módulo de diagnóstico IMU con **Java 17 · Spring Boot 3.3 · Maven ·
 
 | Herramienta | Versión mínima |
 |-------------|---------------|
-| Java JDK    | 17            |
+| Java JDK    | 17 o superior |
 | Maven       | 3.9+          |
-| MySQL       | 8.0+          |
+| MySQL/MariaDB | MySQL 8.0+ o MariaDB compatible |
 
 ---
 
@@ -47,7 +47,8 @@ spring:
     username: ${DB_USERNAME:}
     password: ${DB_PASSWORD:}
 server:
-  port: 8085
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8085}
 ```
 
 Define las credenciales por entorno. Ejemplo en PowerShell:
@@ -81,6 +82,95 @@ mvn spring-boot:run
 ```
 
 La API queda disponible en `http://localhost:8085`.
+
+Por seguridad, la aplicación escucha en `127.0.0.1` de forma predeterminada. No se
+debe abrir el puerto 8085 a Internet: esta etapa no implementa autenticación.
+
+---
+
+## Despliegue interno en VPS (systemd)
+
+Las plantillas están en `deploy/`. El procedimiento está pensado para
+`/var/www/asistente-vial` y mantiene Diagnostics accesible únicamente desde el VPS.
+
+### 1. Actualizar, probar y compilar
+
+```bash
+cd /var/www/asistente-vial
+git status --short
+git pull --ff-only origin main
+
+cd backend-spring-diagnostics
+mvn clean verify
+```
+
+Si `git status --short` muestra cambios, detente antes del `pull` para no mezclar
+archivos modificados manualmente en el servidor.
+
+Debe finalizar con `BUILD SUCCESS`. Java 17 es la versión objetivo; un JDK posterior
+también puede ejecutar el artefacto compilado para Java 17.
+
+### 2. Crear la base y las credenciales
+
+Ejecuta como `root`. No copies el contenido final de `/etc/avigem-diagnostics.env`
+en chats ni capturas.
+
+```bash
+DBPASS2=$(openssl rand -hex 16)
+mariadb <<SQL
+CREATE DATABASE IF NOT EXISTS avigem_diagnostics CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'avigem'@'localhost' IDENTIFIED BY '${DBPASS2}';
+ALTER USER 'avigem'@'localhost' IDENTIFIED BY '${DBPASS2}';
+GRANT ALL PRIVILEGES ON avigem_diagnostics.* TO 'avigem'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+
+install -m 600 deploy/avigem-diagnostics.env.example /etc/avigem-diagnostics.env
+sed -i "s/REEMPLAZAR_PASSWORD/${DBPASS2}/" /etc/avigem-diagnostics.env
+unset DBPASS2
+```
+
+La base es independiente de Laravel. Flyway aplica automáticamente V1, V2 y V3 al
+primer arranque y se detiene si encuentra un esquema inesperado.
+
+### 3. Instalar y arrancar el servicio
+
+```bash
+install -m 644 deploy/avigem-diagnostics.service /etc/systemd/system/avigem-diagnostics.service
+systemctl daemon-reload
+systemctl enable --now avigem-diagnostics
+```
+
+### 4. Verificar el resultado
+
+```bash
+systemctl status avigem-diagnostics --no-pager
+journalctl -u avigem-diagnostics -n 60 --no-pager
+curl -fsS http://127.0.0.1:8085/ | grep -F "AVIGEM Diagnostics"
+curl -fsS "http://127.0.0.1:8085/api/v1/diagnostics/devices?page=0&size=1"
+```
+
+Las dos llamadas deben responder sin error. Si Flyway o MariaDB fallan, conserva el
+servicio sin exposición pública y revisa el `journalctl` antes de continuar.
+
+Para abrir la interfaz desde otra PC sin publicar el puerto:
+
+```bash
+ssh -L 8085:127.0.0.1:8085 root@IP_DEL_VPS
+```
+
+Luego abre `http://localhost:8085` en el navegador local.
+
+### Actualizaciones posteriores
+
+```bash
+cd /var/www/asistente-vial
+git pull --ff-only origin main
+cd backend-spring-diagnostics
+mvn clean verify
+systemctl restart avigem-diagnostics
+systemctl status avigem-diagnostics --no-pager
+```
 
 ---
 
