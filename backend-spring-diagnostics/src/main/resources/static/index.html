@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AVIGEM Diagnostics — herramienta técnica</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <p class="product-name">AVIGEM Diagnostics</p>
+      <p class="product-stage">Herramienta técnica en desarrollo</p>
+    </div>
+    <p class="permanent-banner" role="status">
+      Solo TEST_DATA · No representa mediciones físicas reales · Escala nominal, no calibrada · Identidad del sensor no confirmada
+    </p>
+  </header>
+
+  <main id="contenido" class="layout">
+    <section class="diagnostic-workspace" aria-labelledby="diagnostico-titulo">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Fuente actual: TEST_DATA determinista local</p>
+          <h1 id="diagnostico-titulo">Diagnóstico IMU</h1>
+        </div>
+        <div id="test-state" class="test-state" role="status">Vista previa TEST_DATA · no enviada</div>
+      </div>
+      <p class="diagnostic-notice">No representa mediciones físicas reales. La fuente BLE real no llega al navegador ni a la API actual; esta vista solo prepara la lectura técnica futura.</p>
+
+      <div class="diagnostic-toolbar" role="group" aria-label="Unidad de visualización">
+        <span class="toolbar-label">Mostrar:</span>
+        <label class="choice"><input type="radio" name="units" value="nominal" checked> Conversión nominal (<code>g</code> / <code>°/s</code>)</label>
+        <label class="choice"><input type="radio" name="units" value="raw"> Cuentas crudas (<code>int16</code>)</label>
+        <span id="source-note" class="muted">Búfer visual limitado a ~30 s.</span>
+      </div>
+
+      <div class="metrics-grid" aria-live="polite">
+        <section class="metrics-group" aria-labelledby="acc-title">
+          <h2 id="acc-title">Aceleración actual</h2>
+          <div class="axis-metrics">
+            <div class="axis-card axis-x"><span>ACC X</span><strong id="metric-ax">—</strong></div>
+            <div class="axis-card axis-y"><span>ACC Y</span><strong id="metric-ay">—</strong></div>
+            <div class="axis-card axis-z"><span>ACC Z</span><strong id="metric-az">—</strong></div>
+          </div>
+        </section>
+        <section class="metrics-group" aria-labelledby="gyro-title">
+          <h2 id="gyro-title">Giroscopio actual</h2>
+          <div class="axis-metrics">
+            <div class="axis-card axis-x"><span>GYRO X</span><strong id="metric-gx">—</strong></div>
+            <div class="axis-card axis-y"><span>GYRO Y</span><strong id="metric-gy">—</strong></div>
+            <div class="axis-card axis-z"><span>GYRO Z</span><strong id="metric-gz">—</strong></div>
+          </div>
+        </section>
+        <section class="metrics-group reception-group" aria-labelledby="reception-title">
+          <h2 id="reception-title">Recepción simulada</h2>
+          <div class="reception-metrics">
+            <div><span>Frecuencia aprox.</span><strong id="metric-frequency">—</strong></div>
+            <div><span>Muestras en búfer</span><strong id="metric-samples">—</strong></div>
+            <div><span>Huecos detectados</span><strong id="metric-gaps">—</strong></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="charts-grid">
+        <section class="chart-card" aria-labelledby="acc-chart-title">
+          <div class="chart-head"><h2 id="acc-chart-title">Aceleración X / Y / Z</h2><span id="acc-chart-unit" class="muted">g nominal</span></div>
+          <canvas id="acc-chart" class="imu-chart" width="760" height="260" role="img" aria-label="Gráfica temporal TEST_DATA de aceleración X, Y y Z"></canvas>
+          <p class="chart-caption">Ventana de ~30 s. Las líneas se interrumpen en intervalos sin muestras.</p>
+        </section>
+        <section class="chart-card" aria-labelledby="gyro-chart-title">
+          <div class="chart-head"><h2 id="gyro-chart-title">Giroscopio X / Y / Z</h2><span id="gyro-chart-unit" class="muted">°/s nominal</span></div>
+          <canvas id="gyro-chart" class="imu-chart" width="760" height="260" role="img" aria-label="Gráfica temporal TEST_DATA de giroscopio X, Y y Z"></canvas>
+          <p class="chart-caption">Escala nominal, no calibrada. No interpreta maniobras ni valida el sensor.</p>
+        </section>
+      </div>
+    </section>
+
+    <details class="glossary">
+      <summary>Términos de esta etapa</summary>
+      <h2 id="glosario-titulo">Términos de esta etapa</h2>
+      <dl>
+        <div>
+          <dt><code>TEST_DATA</code></dt>
+          <dd>Origen asignado por el backend. Los valores RAW son de prueba de software; no son mediciones físicas reales.</dd>
+        </div>
+        <div>
+          <dt><code>OBSERVED</code></dt>
+          <dd>Sesión <code>TEST_DATA</code> completada con una o más muestras. Solo se verificó el flujo de software; nunca equivale a <code>PASSED</code>.</dd>
+        </div>
+        <div>
+          <dt><code>NOT_EVALUATED</code></dt>
+          <dd>Sesión cancelada, o completada sin muestras. No hay datos suficientes para evaluar.</dd>
+        </div>
+      </dl>
+    </details>
+
+    <div class="panels secondary-panels">
+      <section class="panel" aria-labelledby="dispositivos-titulo">
+        <div class="panel-head">
+          <h2 id="dispositivos-titulo">Dispositivos</h2>
+          <button type="button" id="btn-reload-devices" class="btn btn-secondary">Recargar listado</button>
+        </div>
+
+        <form id="form-device" class="form-stack" novalidate>
+          <div class="field">
+            <label for="device-code">Código del dispositivo</label>
+            <input id="device-code" name="deviceCode" type="text" maxlength="64" required
+                   autocomplete="off" aria-describedby="device-code-hint">
+            <p id="device-code-hint" class="hint">Obligatorio. Máximo 64 caracteres.</p>
+          </div>
+          <div class="field">
+            <label for="device-description">Descripción</label>
+            <input id="device-description" name="description" type="text" maxlength="255"
+                   autocomplete="off" aria-describedby="device-description-hint">
+            <p id="device-description-hint" class="hint">Opcional. Máximo 255 caracteres.</p>
+          </div>
+          <p id="device-form-error" class="msg error" role="alert" hidden></p>
+          <button type="submit" class="btn btn-primary" id="btn-register-device">Registrar dispositivo</button>
+        </form>
+
+        <div id="devices-status" class="status-line" aria-live="polite"></div>
+        <div id="devices-list" class="list" role="list"></div>
+        <nav id="devices-pager" class="pager" aria-label="Paginación de dispositivos"></nav>
+      </section>
+
+      <section class="panel" aria-labelledby="sesiones-titulo">
+        <div class="panel-head">
+          <h2 id="sesiones-titulo">Pruebas realizadas</h2>
+          <button type="button" id="btn-reload-sessions" class="btn btn-secondary" disabled>Actualizar pruebas</button>
+        </div>
+        <p id="selected-device-label" class="muted">Seleccione un dispositivo para consultar su historial.</p>
+
+        <form id="form-session" class="form-stack" novalidate>
+          <div class="field">
+            <label for="session-notes">Observaciones de la prueba</label>
+            <textarea id="session-notes" name="notes" maxlength="500" rows="3"
+                      aria-describedby="session-notes-hint"></textarea>
+            <p id="session-notes-hint" class="hint">Opcional. Máximo 500 caracteres. El origen será <code>TEST_DATA</code>.</p>
+          </div>
+          <p id="session-form-error" class="msg error" role="alert" hidden></p>
+          <button type="submit" class="btn btn-primary" id="btn-start-session" disabled>Iniciar prueba técnica</button>
+        </form>
+
+        <div id="sessions-status" class="status-line" aria-live="polite"></div>
+        <div id="sessions-list" class="list" role="list"></div>
+        <nav id="sessions-pager" class="pager" aria-label="Paginación de sesiones"></nav>
+      </section>
+    </div>
+
+    <details class="panel panel-wide" aria-labelledby="detalle-titulo">
+      <summary id="detalle-titulo">Administración de pruebas</summary>
+      <h2>Detalle de prueba</h2>
+      <p id="selected-session-label" class="muted">Seleccione una sesión para ver el resumen técnico.</p>
+
+      <div class="actions-row">
+        <button type="button" id="btn-complete" class="btn btn-primary" disabled>Completar sesión</button>
+        <button type="button" id="btn-cancel" class="btn btn-danger" disabled>Cancelar sesión</button>
+      </div>
+      <p id="session-action-msg" class="status-line" aria-live="polite"></p>
+
+      <div id="synthetic-block" class="synthetic" hidden>
+        <h3>Datos sintéticos generados por la interfaz</h3>
+        <p class="warning">
+          Este lote es <strong>TEST_DATA</strong> determinista, en RAW int16.
+          No son mediciones físicas reales. El backend asigna el origen; esta interfaz no envía otro valor.
+        </p>
+        <fieldset>
+          <legend>Cantidad de muestras</legend>
+          <label class="choice"><input type="radio" name="sample-count" value="10" checked> 10</label>
+          <label class="choice"><input type="radio" name="sample-count" value="30"> 30</label>
+          <label class="choice"><input type="radio" name="sample-count" value="120"> 120</label>
+        </fieldset>
+        <button type="button" id="btn-send-samples" class="btn btn-secondary">Preparar lote sintético</button>
+        <p id="samples-msg" class="status-line" aria-live="polite"></p>
+      </div>
+
+      <div id="session-detail" class="detail"></div>
+    </details>
+  </main>
+
+  <div id="dialog-root" class="dialog-root" hidden>
+    <div class="dialog-backdrop" data-dialog-dismiss></div>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+      <h2 id="dialog-title"></h2>
+      <div id="dialog-body" class="dialog-body"></div>
+      <div class="dialog-actions">
+        <button type="button" id="dialog-cancel" class="btn btn-secondary">Volver</button>
+        <button type="button" id="dialog-confirm" class="btn btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
