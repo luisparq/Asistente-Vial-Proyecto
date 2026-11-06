@@ -36,6 +36,11 @@ public class SessionRepositoryAdapter implements SessionRepository {
     }
 
     @Override
+    public Optional<DiagnosticSession> findByClientSessionId(String clientSessionId) {
+        return jpa.findByClientSessionId(clientSessionId).map(mapper::toDomain);
+    }
+
+    @Override
     public PageResult<DiagnosticSession> findByDeviceId(Long deviceId, PageQuery query) {
         Page<DiagnosticSession> page = jpa.findByDeviceId(deviceId, toPageable(query))
             .map(mapper::toDomain);

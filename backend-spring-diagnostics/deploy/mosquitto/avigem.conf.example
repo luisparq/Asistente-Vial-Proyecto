@@ -1,0 +1,11 @@
+# Plantilla para /etc/mosquitto/conf.d/avigem.conf
+# Requiere certificados existentes para mqtt.DOMINIO.
+listener 8883
+protocol mqtt
+allow_anonymous false
+password_file /etc/mosquitto/passwd
+acl_file /etc/mosquitto/avigem.acl
+persistence true
+persistence_location /var/lib/mosquitto/
+certfile /etc/letsencrypt/live/mqtt.REEMPLAZAR_DOMINIO/fullchain.pem
+keyfile /etc/letsencrypt/live/mqtt.REEMPLAZAR_DOMINIO/privkey.pem

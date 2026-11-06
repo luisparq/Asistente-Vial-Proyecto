@@ -8,18 +8,21 @@ import org.springframework.stereotype.Component;
 public class ImuSampleMapper {
 
     public ImuSample toDomain(ImuSampleEntity e) {
-        return new ImuSample(
+        ImuSample sample = new ImuSample(
             e.getId(), e.getSessionId(),
             e.getAxRaw(), e.getAyRaw(), e.getAzRaw(),
             e.getGxRaw(), e.getGyRaw(), e.getGzRaw(),
             e.getSampledAt()
         );
+        sample.setSequenceNumber(e.getSequenceNumber());
+        return sample;
     }
 
     public ImuSampleEntity toEntity(ImuSample d) {
         ImuSampleEntity e = new ImuSampleEntity();
         e.setId(d.getId());
         e.setSessionId(d.getSessionId());
+        e.setSequenceNumber(d.getSequenceNumber());
         e.setAxRaw(d.getAxRaw());
         e.setAyRaw(d.getAyRaw());
         e.setAzRaw(d.getAzRaw());

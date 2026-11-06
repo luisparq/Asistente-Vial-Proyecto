@@ -7,6 +7,7 @@ import com.avigem.diagnostics.application.dto.SessionDetailResponse;
 import com.avigem.diagnostics.application.dto.SessionResponse;
 import com.avigem.diagnostics.application.dto.StartSessionRequest;
 import com.avigem.diagnostics.application.port.in.DiagnosticsUseCase;
+import com.avigem.diagnostics.application.usecase.RealBleIngestService;
 import com.avigem.diagnostics.config.WebConfig;
 import com.avigem.diagnostics.domain.model.DataOrigin;
 import com.avigem.diagnostics.domain.model.Device;
@@ -46,6 +47,7 @@ class DiagnosticsControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockBean DiagnosticsUseCase useCase;
+    @MockBean RealBleIngestService realBleIngestService;
 
     private static final String BASE = "/api/v1/diagnostics";
 

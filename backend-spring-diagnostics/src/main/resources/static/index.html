@@ -15,7 +15,7 @@
       <p class="product-stage">Herramienta técnica en desarrollo</p>
     </div>
     <p class="permanent-banner" role="status">
-      Solo TEST_DATA · No representa mediciones físicas reales · Escala nominal, no calibrada · Identidad del sensor no confirmada
+      TEST_DATA permanece separado · REAL_BLE/REAL_MQTT no implican validación física · Escala nominal, no calibrada · Identidad del sensor no confirmada
     </p>
   </header>
 
@@ -23,12 +23,12 @@
     <section class="diagnostic-workspace" aria-labelledby="diagnostico-titulo">
       <div class="panel-head">
         <div>
-          <p class="eyebrow">Fuente actual: TEST_DATA determinista local</p>
+          <p class="eyebrow">Fuentes separadas: TEST_DATA / REAL_BLE / REAL_MQTT</p>
           <h1 id="diagnostico-titulo">Diagnóstico IMU</h1>
         </div>
         <div id="test-state" class="test-state" role="status">Vista previa TEST_DATA · no enviada</div>
       </div>
-      <p class="diagnostic-notice">No representa mediciones físicas reales. La fuente BLE real no llega al navegador ni a la API actual; esta vista solo prepara la lectura técnica futura.</p>
+      <p class="diagnostic-notice">Selecciona una prueba REAL_BLE o REAL_MQTT para ver sus muestras. Los datos observados siguen sin acreditar identidad, escala o calibración física.</p>
 
       <div class="diagnostic-toolbar" role="group" aria-label="Unidad de visualización">
         <span class="toolbar-label">Mostrar:</span>
@@ -55,7 +55,7 @@
           </div>
         </section>
         <section class="metrics-group reception-group" aria-labelledby="reception-title">
-          <h2 id="reception-title">Recepción simulada</h2>
+          <h2 id="reception-title">Recepción de la fuente seleccionada</h2>
           <div class="reception-metrics">
             <div><span>Frecuencia aprox.</span><strong id="metric-frequency">—</strong></div>
             <div><span>Muestras en búfer</span><strong id="metric-samples">—</strong></div>
@@ -67,12 +67,12 @@
       <div class="charts-grid">
         <section class="chart-card" aria-labelledby="acc-chart-title">
           <div class="chart-head"><h2 id="acc-chart-title">Aceleración X / Y / Z</h2><span id="acc-chart-unit" class="muted">g nominal</span></div>
-          <canvas id="acc-chart" class="imu-chart" width="760" height="260" role="img" aria-label="Gráfica temporal TEST_DATA de aceleración X, Y y Z"></canvas>
+          <canvas id="acc-chart" class="imu-chart" width="760" height="260" role="img" aria-label="Gráfica temporal de aceleración X, Y y Z"></canvas>
           <p class="chart-caption">Ventana de ~30 s. Las líneas se interrumpen en intervalos sin muestras.</p>
         </section>
         <section class="chart-card" aria-labelledby="gyro-chart-title">
           <div class="chart-head"><h2 id="gyro-chart-title">Giroscopio X / Y / Z</h2><span id="gyro-chart-unit" class="muted">°/s nominal</span></div>
-          <canvas id="gyro-chart" class="imu-chart" width="760" height="260" role="img" aria-label="Gráfica temporal TEST_DATA de giroscopio X, Y y Z"></canvas>
+          <canvas id="gyro-chart" class="imu-chart" width="760" height="260" role="img" aria-label="Gráfica temporal de giroscopio X, Y y Z"></canvas>
           <p class="chart-caption">Escala nominal, no calibrada. No interpreta maniobras ni valida el sensor.</p>
         </section>
       </div>

@@ -35,3 +35,15 @@ logging:
   level:
     com.avigem: INFO
     org.flywaydb: INFO
+
+diagnostics:
+  auth:
+    validation-url: ${LARAVEL_AUTH_VALIDATION_URL:}
+  mqtt:
+    enabled: ${MQTT_ENABLED:false}
+    broker-uri: ${MQTT_BROKER_URI:tcp://127.0.0.1:1883}
+    client-id: ${MQTT_CLIENT_ID:avigem-diagnostics}
+    topic: ${MQTT_TOPIC:avigem/devices/+/imu}
+    username: ${MQTT_USERNAME:}
+    password: ${MQTT_PASSWORD:}
+    qos: ${MQTT_QOS:1}

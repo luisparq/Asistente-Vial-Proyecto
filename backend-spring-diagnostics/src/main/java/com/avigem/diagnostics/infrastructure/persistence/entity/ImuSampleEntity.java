@@ -14,6 +14,9 @@ public class ImuSampleEntity {
     @Column(name = "session_id", nullable = false)
     private Long sessionId;
 
+    @Column(name = "sequence_number")
+    private Long sequenceNumber;
+
     @Column(name = "ax_raw", nullable = false)
     private short axRaw;
 
@@ -42,6 +45,9 @@ public class ImuSampleEntity {
 
     public Long getSessionId() { return sessionId; }
     public void setSessionId(Long sessionId) { this.sessionId = sessionId; }
+
+    public Long getSequenceNumber() { return sequenceNumber; }
+    public void setSequenceNumber(Long sequenceNumber) { this.sequenceNumber = sequenceNumber; }
 
     public short getAxRaw() { return axRaw; }
     public void setAxRaw(short axRaw) { this.axRaw = axRaw; }

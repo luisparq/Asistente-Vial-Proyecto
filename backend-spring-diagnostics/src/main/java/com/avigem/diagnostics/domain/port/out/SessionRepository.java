@@ -12,5 +12,6 @@ import java.util.Optional;
 public interface SessionRepository {
     DiagnosticSession save(DiagnosticSession session);
     Optional<DiagnosticSession> findById(Long id);
+    Optional<DiagnosticSession> findByClientSessionId(String clientSessionId);
     PageResult<DiagnosticSession> findByDeviceId(Long deviceId, PageQuery query);
 }

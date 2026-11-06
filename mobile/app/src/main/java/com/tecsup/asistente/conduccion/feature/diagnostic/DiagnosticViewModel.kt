@@ -48,7 +48,9 @@ data class LaboratoryUiState(val history: List<PhysicalImuSample> = emptyList(),
     val evaluations: List<String> = emptyList(), val candidates: Int = 0, val candidateDetails: List<String> = emptyList())
 
 @HiltViewModel
-class DiagnosticViewModel @Inject constructor(private val repository: BleRepository, private val source: SensorDataSource) : ViewModel() {
+class DiagnosticViewModel @Inject constructor(private val repository: BleRepository, private val source: SensorDataSource,
+    private val diagnosticsCapture: com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureRepository) : ViewModel() {
+    val realBleUpload = diagnosticsCapture.state
     private val mutableLab = MutableStateFlow(LaboratoryUiState())
     val laboratory = mutableLab.asStateFlow()
     private val chartBuffer = ImuChartBuffer()
@@ -71,15 +73,23 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
                 // Monotonic clock for laboratory windows; does not change persisted event timestamps.
                 val sample = ImuConverter().convert(ImuRawDecoder.decode(bytes, android.os.SystemClock.elapsedRealtime()))
                 mutableLab.value = laboratory.value.copy(history = chartBuffer.add(sample))
+                diagnosticsCapture.record(bytes)
                 if (laboratory.value.observing) evaluate(sample)
             }
         }
     }
     fun stopCharts() {
         chartJob?.cancel(); chartJob = null; chartBuffer.clear(); chartAddress = null
+        viewModelScope.launch { diagnosticsCapture.stop() }
         labConfiguration = null; labDetector.reset(); labProcessor = ImuProcessor()
         mutableLab.value = LaboratoryUiState()
     }
+    fun startRealBleUpload() {
+        val connection = repository.connection.value
+        if (connection.status != ConnectionStatus.CONNECTED || source.status.value != SensorDataStatus.RECEIVING || connection.device == null) return
+        viewModelScope.launch { diagnosticsCapture.start(connection.device) }
+    }
+    fun stopRealBleUpload() { viewModelScope.launch { diagnosticsCapture.stop() } }
     fun stopObservation() {
         labConfiguration = null; labDetector.reset(); labProcessor = ImuProcessor()
         mutableLab.value = laboratory.value.copy(observing = false, corrected = false, evaluations = emptyList(), candidates = 0, candidateDetails = emptyList(),
@@ -133,6 +143,7 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
                 .collect { (connection, status) ->
                     if (connection.status != ConnectionStatus.CONNECTED || status != SensorDataStatus.RECEIVING) {
                         chartBuffer.clear(); stopObservation()
+                        diagnosticsCapture.stop()
                         mutableLab.value = laboratory.value.copy(history = emptyList())
                     }
                     val active = calibration.value

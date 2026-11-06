@@ -13,6 +13,7 @@ import java.time.Instant;
 public class ImuSample {
     private Long id;
     private Long sessionId;
+    private Long sequenceNumber;
 
     // Acelerómetro RAW (int16)
     private short axRaw;
@@ -50,6 +51,9 @@ public class ImuSample {
 
     public Long getSessionId() { return sessionId; }
     public void setSessionId(Long sessionId) { this.sessionId = sessionId; }
+
+    public Long getSequenceNumber() { return sequenceNumber; }
+    public void setSequenceNumber(Long sequenceNumber) { this.sequenceNumber = sequenceNumber; }
 
     public short getAxRaw() { return axRaw; }
     public void setAxRaw(short axRaw) { this.axRaw = axRaw; }

@@ -14,6 +14,7 @@ public class SessionMapper {
         );
         d.setCancellationReason(e.getCancellationReason());
         d.setDataOrigin(e.getDataOrigin());
+        d.setClientSessionId(e.getClientSessionId());
         return d;
     }
 
@@ -26,6 +27,7 @@ public class SessionMapper {
         e.setNotes(d.getNotes());
         e.setCancellationReason(d.getCancellationReason());
         e.setDataOrigin(d.getDataOrigin());
+        e.setClientSessionId(d.getClientSessionId());
         e.setStartedAt(d.getStartedAt());
         e.setFinishedAt(d.getFinishedAt());
         return e;

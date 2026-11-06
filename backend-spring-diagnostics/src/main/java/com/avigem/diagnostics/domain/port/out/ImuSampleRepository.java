@@ -10,4 +10,6 @@ public interface ImuSampleRepository {
     List<ImuSample> saveAll(List<ImuSample> samples);
     List<ImuSample> findBySessionId(Long sessionId);
     long countBySessionId(Long sessionId);
+    List<Long> findSequenceNumbers(Long sessionId, List<Long> sequenceNumbers);
+    List<ImuSample> findRecentBySessionId(Long sessionId, Long afterSequence, int limit);
 }

@@ -1,0 +1,6 @@
+# Reemplazar códigos y crear ambos usuarios con mosquitto_passwd.
+user avigem-one-001
+topic write avigem/devices/AVIGEM-ONE-001/imu
+
+user avigem-diagnostics
+topic read avigem/devices/+/imu

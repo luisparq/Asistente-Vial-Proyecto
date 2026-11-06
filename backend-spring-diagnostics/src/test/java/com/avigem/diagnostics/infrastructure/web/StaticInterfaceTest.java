@@ -36,7 +36,7 @@ class StaticInterfaceTest {
             .andExpect(status().isOk())
             .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
             .andExpect(content().string(containsString("AVIGEM Diagnostics")))
-            .andExpect(content().string(containsString("Solo TEST_DATA")))
+            .andExpect(content().string(containsString("TEST_DATA permanece separado")))
             .andExpect(content().string(containsString("Diagn")))
             .andExpect(content().string(containsString("Iniciar prueba")));
     }

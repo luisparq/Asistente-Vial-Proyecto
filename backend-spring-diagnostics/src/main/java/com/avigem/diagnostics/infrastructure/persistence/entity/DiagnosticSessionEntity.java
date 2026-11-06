@@ -35,6 +35,9 @@ public class DiagnosticSessionEntity {
     @Column(name = "data_origin", nullable = false, length = 20)
     private DataOrigin dataOrigin = DataOrigin.TEST_DATA;
 
+    @Column(name = "client_session_id", length = 36, unique = true)
+    private String clientSessionId;
+
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
 
@@ -63,6 +66,9 @@ public class DiagnosticSessionEntity {
 
     public DataOrigin getDataOrigin() { return dataOrigin; }
     public void setDataOrigin(DataOrigin dataOrigin) { this.dataOrigin = dataOrigin; }
+
+    public String getClientSessionId() { return clientSessionId; }
+    public void setClientSessionId(String clientSessionId) { this.clientSessionId = clientSessionId; }
 
     public Instant getStartedAt() { return startedAt; }
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }

@@ -2,9 +2,8 @@
 
 MVP del módulo de diagnóstico IMU con **Java 17 · Spring Boot 3.3 · Maven · Arquitectura Hexagonal · JPA · MySQL · Flyway**.
 
-> **NOTA DE ETAPA**: En esta versión únicamente se aceptan `TEST_DATA`.  
-> El backend asigna ese origen; el cliente no puede elegirlo.  
-> Los valores RAW registrados **no representan mediciones físicas reales**.
+> **NOTA DE ETAPA**: `TEST_DATA`, `REAL_BLE` y `REAL_MQTT` permanecen separados.
+> Los datos observados no confirman identidad, escala ni calibración física del sensor.
 
 ---
 
@@ -85,6 +84,24 @@ La API queda disponible en `http://localhost:8085`.
 
 Por seguridad, la aplicación escucha en `127.0.0.1` de forma predeterminada. No se
 debe abrir el puerto 8085 a Internet: esta etapa no implementa autenticación.
+
+## Entrada MQTT experimental
+
+El ESP32 puede publicar directamente en `avigem/devices/{deviceCode}/imu`. Diagnostics
+se suscribe y registra las muestras como `REAL_MQTT`; nunca las presenta como sensor validado.
+MQTT está deshabilitado por defecto.
+
+```powershell
+$env:MQTT_ENABLED="true"
+$env:MQTT_BROKER_URI="tcp://127.0.0.1:1883"
+$env:MQTT_USERNAME="avigem-diagnostics"
+$env:MQTT_PASSWORD="<PASSWORD_LOCAL>"
+mvn.cmd spring-boot:run
+```
+
+Para VPS debe utilizarse `ssl://HOST:8883`, credenciales y permisos de tópicos. No se
+debe exponer un broker anónimo. El sketch aislado está en
+`firmware/DiagnosticoMqttImu/`; no modifica BLE, Android ni el firmware principal.
 
 ---
 
@@ -463,7 +480,7 @@ backend-spring-diagnostics/
 ## Pendientes / Próxima etapa
 
 - [ ] Autenticación (JWT o API Key) cuando se requiera
-- [ ] Integración BLE real (firmware AVIGEM One)
+- [ ] Validación física integral de las entradas REAL_BLE y REAL_MQTT
 - [ ] Umbrales configurables para clasificar resultados técnicos
 - [ ] Paginación de muestras individuales
 - [ ] Exportación de sesiones (CSV / JSON)

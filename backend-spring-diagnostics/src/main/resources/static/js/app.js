@@ -18,7 +18,9 @@
     sessionDetail: null,
     busy: false,
     diagnosticSamples: [],
-    units: "nominal"
+    units: "nominal",
+    diagnosticSource: "TEST_DATA",
+    realPollTimer: null
   };
 
   var els = {};
@@ -338,6 +340,7 @@
   }
 
   function setDiagnosticSamples(samples, label) {
+    state.diagnosticSource = "TEST_DATA";
     var cursor = 0;
     var telemetry = samples.map(function (sample, index) {
       if (index > 0) {
@@ -365,6 +368,46 @@
     renderDiagnostics();
   }
 
+  function setRealSamples(samples, sessionId, origin) {
+    state.diagnosticSource = origin;
+    var telemetry = samples.map(function (sample) {
+      return {
+        timestamp: new Date(sample.sampledAt).getTime(),
+        sequence: sample.sequence,
+        axRaw: sample.axRaw, ayRaw: sample.ayRaw, azRaw: sample.azRaw,
+        gxRaw: sample.gxRaw, gyRaw: sample.gyRaw, gzRaw: sample.gzRaw
+      };
+    }).filter(function (sample) { return !isNaN(sample.timestamp); });
+    var newest = telemetry.length ? telemetry[telemetry.length - 1].timestamp : 0;
+    state.diagnosticSamples = telemetry.filter(function (sample) {
+      return newest - sample.timestamp <= DIAGNOSTIC_WINDOW_MS;
+    });
+    els.testState.textContent = origin + " · prueba " + sessionId + " · sin validación física";
+    renderDiagnostics();
+  }
+
+  function stopRealPolling() {
+    if (state.realPollTimer) window.clearInterval(state.realPollTimer);
+    state.realPollTimer = null;
+  }
+
+  function loadRealSamples(sessionId) {
+    return api("GET", "/sessions/" + sessionId + "/samples?afterSequence=-1&limit=500")
+      .then(function (samples) {
+        if (state.selectedSession && state.selectedSession.id === sessionId && state.selectedSession.dataOrigin !== "TEST_DATA") {
+          setRealSamples(samples || [], sessionId, state.selectedSession.dataOrigin);
+        }
+      }).catch(function (err) {
+        setStatus(els.sessionActionMsg, formatError(err), "error");
+      });
+  }
+
+  function startRealPolling(sessionId) {
+    stopRealPolling();
+    loadRealSamples(sessionId);
+    state.realPollTimer = window.setInterval(function () { loadRealSamples(sessionId); }, 2000);
+  }
+
   function renderDiagnostics() {
     var samples = state.diagnosticSamples;
     var last = samples.length ? samples[samples.length - 1] : null;
@@ -373,7 +416,7 @@
     els.metricFrequency.textContent = reception.frequency + " Hz";
     els.metricSamples.textContent = String(samples.length);
     els.metricGaps.textContent = String(reception.gaps);
-    els.sourceNote.textContent = samples.length + " muestras TEST_DATA en ventana visual de ~30 s · " + reception.gaps + " hueco(s).";
+    els.sourceNote.textContent = samples.length + " muestras " + state.diagnosticSource + " en ventana visual de ~30 s · " + reception.gaps + " hueco(s).";
     var raw = state.units === "raw";
     els.accChartUnit.textContent = raw ? "int16 crudo" : "g nominal";
     els.gyroChartUnit.textContent = raw ? "int16 crudo" : "°/s nominal";
@@ -518,6 +561,7 @@
   }
 
   function selectDevice(device) {
+    stopRealPolling();
     state.selectedDevice = device;
     state.selectedSession = null;
     state.sessionDetail = null;
@@ -587,6 +631,7 @@
   }
 
   function selectSession(sessionId) {
+    stopRealPolling();
     setStatus(els.sessionActionMsg, "Consultando sesión…");
     return api("GET", "/sessions/" + sessionId)
       .then(function (detail) {
@@ -597,6 +642,7 @@
         updateSessionActions();
         highlightSelected("sessions-list", detail.id);
         setStatus(els.sessionActionMsg, "");
+        if (detail.dataOrigin !== "TEST_DATA") startRealPolling(detail.id);
       })
       .catch(function (err) {
         setStatus(els.sessionActionMsg, formatError(err), "error");
@@ -628,9 +674,14 @@
       card("Motivo de cancelación", detail.cancellationReason || "—") +
       "</dl>";
 
-    if (detail.result === "OBSERVED") {
-      html += "<p class=\"warning\">OBSERVED: solo se verificó el flujo de software con TEST_DATA. " +
-        "No representa una medición física real y no es PASSED.</p>";
+    if (detail.result === "OBSERVED" && detail.dataOrigin === "TEST_DATA") {
+      html += "<p class=\"warning\">OBSERVED: solo se verificó el flujo de software con TEST_DATA. No representa una medición física real y no es PASSED.</p>";
+    }
+    if (detail.result === "OBSERVED" && detail.dataOrigin === "REAL_BLE") {
+      html += "<p class=\"warning\">REAL_BLE recibido desde Android. No confirma identidad, escala, calibración ni aprobación física del sensor.</p>";
+    }
+    if (detail.dataOrigin === "REAL_MQTT") {
+      html += "<p class=\"warning\">REAL_MQTT recibido directamente desde ESP32. Es telemetría experimental y no confirma identidad, escala, calibración ni aprobación física del sensor.</p>";
     }
     if (detail.result === "NOT_EVALUATED") {
       html += "<p>NOT_EVALUATED: no hay evaluación técnica (sesión cancelada o sin muestras suficientes).</p>";
@@ -648,8 +699,7 @@
         axisRow("GY", summary.gy) +
         axisRow("GZ", summary.gz) +
         "</tbody></table></div>";
-      html += "<p class=\"hint\">Barras simples de amplitud relativa (máximo absoluto del eje frente a 32767). " +
-        "La API no devuelve muestras individuales: las gráficas principales usan solo el búfer local TEST_DATA.</p>";
+      html += "<p class=\"hint\">Barras simples de amplitud relativa (máximo absoluto del eje frente a 32767). Las pruebas REAL_BLE permiten consultar sus muestras para la ventana gráfica de 30 segundos.</p>";
       html += axisBars("AX", summary.ax) +
         axisBars("AY", summary.ay) +
         axisBars("AZ", summary.az) +
@@ -698,10 +748,11 @@
   }
 
   function canMutateSelectedSession() {
-    return !!(state.selectedSession && state.selectedSession.status === "IN_PROGRESS");
+    return !!(state.selectedSession && state.selectedSession.status === "IN_PROGRESS" && state.selectedSession.dataOrigin === "TEST_DATA");
   }
 
   function clearSessionDetail() {
+    stopRealPolling();
     els.selectedSessionLabel.textContent = "Seleccione una sesión para ver el resumen técnico.";
     els.sessionDetail.innerHTML = "";
     els.syntheticBlock.hidden = true;

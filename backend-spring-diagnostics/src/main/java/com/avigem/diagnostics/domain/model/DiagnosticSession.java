@@ -13,6 +13,7 @@ public class DiagnosticSession {
     private String notes;
     private String cancellationReason;
     private DataOrigin dataOrigin = DataOrigin.TEST_DATA;
+    private String clientSessionId;
     private Instant startedAt;
     private Instant finishedAt;
 
@@ -65,6 +66,9 @@ public class DiagnosticSession {
 
     public DataOrigin getDataOrigin() { return dataOrigin; }
     public void setDataOrigin(DataOrigin dataOrigin) { this.dataOrigin = dataOrigin; }
+
+    public String getClientSessionId() { return clientSessionId; }
+    public void setClientSessionId(String clientSessionId) { this.clientSessionId = clientSessionId; }
 
     public Instant getStartedAt() { return startedAt; }
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
