@@ -1,4 +1,4 @@
-/* Etapa 3B: MPU6050 -> BLE IMU_RAW. GPS UART independiente; buzzer solo manual.
+/* Etapa 3B: MPU6050 -> BLE IMU_RAW. GPS UART independiente; buzzer manual y control BLE.
  * Arduino ESP32 Dev Module, core Espressif 3.3.12.
  * Protocolo permanente: ../../docs/ETAPA_3B_BLE.md
  */
@@ -16,6 +16,7 @@ constexpr char DEVICE_NAME[] = "AsistenteVial-IMU";
 constexpr char SERVICE_UUID[] = "73e8ca02-41d7-45bd-9d39-7187649746ca";
 constexpr char IMU_RAW_UUID[] = "e77a0a03-3641-40f2-87b7-f178622259cd";
 constexpr char GPS_UUID[] = "af1b5aad-b30b-47b2-a8a5-64f152f6510e";
+constexpr char BUZZER_UUID[] = "b84c0001-5120-4a8f-b98a-2415d86121a9";
 constexpr uint8_t MPU_ADDRESS = 0x68;
 constexpr int SDA_PIN = 21;
 constexpr int SCL_PIN = 22;
@@ -26,6 +27,9 @@ BLECharacteristic *imuRaw = nullptr;
 BLE2902 *cccd = nullptr;
 BLECharacteristic *gpsTelemetry = nullptr;
 BLE2902 *gpsCccd = nullptr;
+BLECharacteristic *buzzerCharacteristic = nullptr;
+BLE2902 *buzzerCccd = nullptr;
+std::atomic_bool pendingBuzzerDone{false};
 uint32_t lastGps = 0;
 std::atomic_bool connected{false};
 std::atomic_bool subscribed{false};
@@ -220,14 +224,35 @@ class ServerCallbacks : public BLEServerCallbacks {
     subscribed.store(false);
     cccd->setNotifications(false);
     gpsCccd->setNotifications(false);
+    if (buzzerCccd) buzzerCccd->setNotifications(false);
+    pendingBuzzerDone.store(false);
     connected.store(true);
     Serial.println("BLE conectado; esperando suscripcion CCCD.");
   }
   void onDisconnect(BLEServer *) override {
     connected.store(false);
     subscribed.store(false);
+    pendingBuzzerDone.store(false);
     restartAdvertising.store(true);
     Serial.println("BLE desconectado; se reanudara el anuncio.");
+  }
+};
+
+class BuzzerCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *characteristic) override {
+    Serial.println("BLE WRITE: orden de activacion de buzzer recibida de Android.");
+    if (ManualBuzzer::trigger()) {
+      pendingBuzzerDone.store(true);
+    } else {
+      Serial.println("BLE WRITE: buzzer ocupado o en cooldown; no activado.");
+    }
+  }
+};
+
+class BuzzerCccdCallbacks : public BLEDescriptorCallbacks {
+  void onWrite(BLEDescriptor *) override {
+    const bool enabled = buzzerCccd != nullptr && buzzerCccd->getNotifications();
+    Serial.println(enabled ? "NOTIFY habilitado: BUZZER control/confirmacion." : "NOTIFY deshabilitado: BUZZER.");
   }
 };
 
@@ -266,6 +291,13 @@ void setup() {
   gpsTelemetry = service->createCharacteristic(GPS_UUID, BLECharacteristic::PROPERTY_NOTIFY);
   gpsCccd = new BLE2902();
   gpsTelemetry->addDescriptor(gpsCccd);
+  buzzerCharacteristic = service->createCharacteristic(
+      BUZZER_UUID,
+      BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR | BLECharacteristic::PROPERTY_NOTIFY);
+  buzzerCharacteristic->setCallbacks(new BuzzerCallbacks());
+  buzzerCccd = new BLE2902();
+  buzzerCccd->setCallbacks(new BuzzerCccdCallbacks());
+  buzzerCharacteristic->addDescriptor(buzzerCccd);
   service->start();
   BLEAdvertising *advertising = BLEDevice::getAdvertising();
   advertising->addServiceUUID(SERVICE_UUID);
@@ -280,6 +312,17 @@ void setup() {
 
 void loop() {
   ManualBuzzer::poll();
+  if (ManualBuzzer::checkCompleted()) {
+    Serial.println("Pulso terminado: GPIO4 LOW.");
+    if (pendingBuzzerDone.exchange(false)) {
+      if (connected.load() && buzzerCharacteristic != nullptr && buzzerCccd != nullptr && buzzerCccd->getNotifications()) {
+        const char confirmation[] = "BUZZER_DONE";
+        buzzerCharacteristic->setValue((uint8_t *)confirmation, strlen(confirmation));
+        buzzerCharacteristic->notify();
+        Serial.println("BLE NOTIFY: BUZZER_DONE enviado a Android.");
+      }
+    }
+  }
   GpsTelemetry::poll();
   if (restartAdvertising.exchange(false)) {
     delay(250); // Let the stack finish disconnecting before advertising again.

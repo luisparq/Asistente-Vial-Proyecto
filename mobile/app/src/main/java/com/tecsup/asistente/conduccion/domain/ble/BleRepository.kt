@@ -15,4 +15,6 @@ interface BleRepository {
     fun selectDevice(address: String)
     fun prepareConnection()
     fun clearSelection()
+    fun triggerBuzzer(): Boolean = false
+    val buzzerDone: kotlinx.coroutines.flow.SharedFlow<Unit> get() = kotlinx.coroutines.flow.MutableSharedFlow()
 }

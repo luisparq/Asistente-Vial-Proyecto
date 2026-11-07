@@ -34,6 +34,8 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
         private var characteristic: BluetoothGattCharacteristic? = null
         private var gpsCharacteristic: BluetoothGattCharacteristic? = null
         private var gpsSubscribed = false
+        private var buzzerCharacteristic: BluetoothGattCharacteristic? = null
+        private var buzzerSubscribed = false
         private val handler = Handler(Looper.getMainLooper())
         private val gpsTimeout = Runnable {
             if (!closed && !gpsSubscribed) listener.gpsUnavailable()
@@ -61,6 +63,7 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
                 val service = gatt.getService(serviceUuid)
                 characteristic = service?.getCharacteristic(characteristicUuid)
                 gpsCharacteristic = service?.getCharacteristic(UUID.fromString(TelemetryGattProfile.GPS))
+                buzzerCharacteristic = service?.getCharacteristic(UUID.fromString(TelemetryGattProfile.BUZZER))
                 val target = characteristic
                 listener.services(GattProfileDescription(service != null, target != null,
                     target != null && (target.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0,
@@ -71,16 +74,12 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
                 if (descriptor.characteristic === characteristic) {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         listener.subscribed()
-                        // Android permits one outstanding GATT write: GPS follows IMU CCCD completion.
-                        val gps = gpsCharacteristic
-                        val requested = try {
-                            gps != null && gps.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 && enable(gps)
-                        } catch (_: SecurityException) { false }
-                          catch (_: IllegalStateException) { false }
-                        if (requested) {
-                            handler.postDelayed(gpsTimeout, 5000)
-                        } else listener.gpsUnavailable()
+                        // One outstanding GATT write: buzzer CCCD before GPS so BUZZER_DONE is not missed.
+                        if (!subscribeBuzzer()) subscribeGps()
                     } else listener.failed("Android rechazó la suscripción CCCD: $status.")
+                } else if (descriptor.characteristic === buzzerCharacteristic) {
+                    buzzerSubscribed = status == BluetoothGatt.GATT_SUCCESS
+                    subscribeGps()
                 } else if (descriptor.characteristic === gpsCharacteristic) {
                     handler.removeCallbacks(gpsTimeout)
                     gpsSubscribed = status == BluetoothGatt.GATT_SUCCESS
@@ -92,6 +91,12 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
                 if (current(gatt)) {
                     if (characteristic === this@AndroidSession.characteristic) listener.frame(value.copyOf())
                     else if (gpsSubscribed && characteristic === gpsCharacteristic) listener.gpsFrame(value.copyOf())
+                    else if (buzzerSubscribed && characteristic === buzzerCharacteristic) {
+                        val text = String(value, Charsets.UTF_8).trim()
+                        if (text == "BUZZER_DONE" || value.contentEquals(byteArrayOf(0x02))) {
+                            listener.buzzerDone()
+                        }
+                    }
                 }
             }
             @Deprecated("Legacy callback for Android 12 and earlier")
@@ -101,6 +106,12 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
                     characteristic.value?.let {
                         if (characteristic === this@AndroidSession.characteristic) listener.frame(it.copyOf())
                         else if (gpsSubscribed && characteristic === gpsCharacteristic) listener.gpsFrame(it.copyOf())
+                        else if (buzzerSubscribed && characteristic === buzzerCharacteristic) {
+                            val text = String(it, Charsets.UTF_8).trim()
+                            if (text == "BUZZER_DONE" || it.contentEquals(byteArrayOf(0x02))) {
+                                listener.buzzerDone()
+                            }
+                        }
                     }
                 }
             }
@@ -109,6 +120,40 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
         override fun discover(): Boolean = !closed && gatt?.discoverServices() == true
 
         override fun subscribe(): Boolean = characteristic?.let { enable(it) } ?: false
+
+        private fun subscribeBuzzer(): Boolean {
+            val buzzer = buzzerCharacteristic ?: return false
+            return try {
+                buzzer.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 && enable(buzzer)
+            } catch (_: SecurityException) { false }
+              catch (_: IllegalStateException) { false }
+        }
+
+        private fun subscribeGps() {
+            val gps = gpsCharacteristic
+            val requested = try {
+                gps != null && gps.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 && enable(gps)
+            } catch (_: SecurityException) { false }
+              catch (_: IllegalStateException) { false }
+            if (requested) handler.postDelayed(gpsTimeout, 5000)
+            else listener.gpsUnavailable()
+        }
+
+        override fun writeBuzzer(command: ByteArray): Boolean {
+            val active = gatt ?: return false
+            val buzzer = buzzerCharacteristic ?: return false
+            if (closed || !buzzerSubscribed) return false
+            return try {
+                if (Build.VERSION.SDK_INT >= 33) {
+                    active.writeCharacteristic(buzzer, command, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    buzzer.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                    buzzer.value = command
+                    active.writeCharacteristic(buzzer)
+                }
+            } catch (_: SecurityException) { false }
+              catch (_: IllegalStateException) { false }
+        }
 
         @Suppress("DEPRECATION")
         private fun enable(target: BluetoothGattCharacteristic): Boolean {
@@ -129,6 +174,8 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
             handler.removeCallbacks(gpsTimeout)
             gpsSubscribed = false
             gpsCharacteristic = null
+            buzzerSubscribed = false
+            buzzerCharacteristic = null
             val previous = gatt
             gatt = null
             characteristic = null

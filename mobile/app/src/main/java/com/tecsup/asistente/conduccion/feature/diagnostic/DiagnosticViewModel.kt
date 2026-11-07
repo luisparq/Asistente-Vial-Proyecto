@@ -30,9 +30,23 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.cancelAndJoin
+import java.time.Clock
+
+private const val DEMO_CONFIRMATION_TIMEOUT_MILLIS = 2_000L
 
 data class CalibrationUiState(val measuring: Boolean = false, val remainingSeconds: Int = 30,
     val validSamples: Int = 0, val result: ExperimentalCalibrationResult? = null, val message: String? = null)
+
+data class DemoTestUiState(
+    val active: Boolean = false,
+    val remainingSeconds: Int = 60,
+    val alertVisible: Boolean = false,
+    val alertMessage: String = "Ey, noté un giro brusco. Vamos con calma",
+    val triggerTimestampMillis: Long? = null,
+    val statusText: String = "Inactiva",
+    val buzzerPending: Boolean = false,
+    val candidates: Int = 0
+)
 
 data class DiagnosticUiState(
     val connection: BleConnectionState = BleConnectionState(),
@@ -49,10 +63,18 @@ data class LaboratoryUiState(val history: List<PhysicalImuSample> = emptyList(),
 
 @HiltViewModel
 class DiagnosticViewModel @Inject constructor(private val repository: BleRepository, private val source: SensorDataSource,
-    private val diagnosticsCapture: com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureRepository) : ViewModel() {
-    val realBleUpload = diagnosticsCapture.state
+    private val diagnosticsCapture: com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureRepository? = null,
+    private val clock: Clock = Clock.systemUTC()) : ViewModel() {
+    val realBleUpload = diagnosticsCapture?.state ?: MutableStateFlow(com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureState()).asStateFlow()
     private val mutableLab = MutableStateFlow(LaboratoryUiState())
     val laboratory = mutableLab.asStateFlow()
+    private val mutableDemo = MutableStateFlow(DemoTestUiState())
+    val demo = mutableDemo.asStateFlow()
+    private var demoJob: Job? = null
+    private var demoConfirmationJob: Job? = null
+    private var demoDetector = DrivingEventDetector()
+    private var demoProcessor = ImuProcessor()
+    private var lastDemoTriggerMillis: Long? = null
     private val chartBuffer = ImuChartBuffer()
     private var chartJob: Job? = null
     private var chartAddress: String? = null
@@ -70,26 +92,28 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
                 if (chartAddress != address) {
                     chartBuffer.clear(); stopObservation(); chartAddress = address
                 }
-                // Monotonic clock for laboratory windows; does not change persisted event timestamps.
-                val sample = ImuConverter().convert(ImuRawDecoder.decode(bytes, android.os.SystemClock.elapsedRealtime()))
+                // Reception clock for laboratory windows; does not change persisted event timestamps.
+                val sample = ImuConverter().convert(ImuRawDecoder.decode(bytes, clock.millis()))
                 mutableLab.value = laboratory.value.copy(history = chartBuffer.add(sample))
-                diagnosticsCapture.record(bytes)
+                diagnosticsCapture?.record(bytes)
                 if (laboratory.value.observing) evaluate(sample)
+                if (mutableDemo.value.active) evaluateDemo(sample)
             }
         }
     }
     fun stopCharts() {
         chartJob?.cancel(); chartJob = null; chartBuffer.clear(); chartAddress = null
-        viewModelScope.launch { diagnosticsCapture.stop() }
+        viewModelScope.launch { diagnosticsCapture?.stop() }
         labConfiguration = null; labDetector.reset(); labProcessor = ImuProcessor()
+        if (mutableDemo.value.active) stopDemoTest("Prueba finalizada al salir.")
         mutableLab.value = LaboratoryUiState()
     }
     fun startRealBleUpload() {
         val connection = repository.connection.value
         if (connection.status != ConnectionStatus.CONNECTED || source.status.value != SensorDataStatus.RECEIVING || connection.device == null) return
-        viewModelScope.launch { diagnosticsCapture.start(connection.device) }
+        viewModelScope.launch { diagnosticsCapture?.start(connection.device) }
     }
-    fun stopRealBleUpload() { viewModelScope.launch { diagnosticsCapture.stop() } }
+    fun stopRealBleUpload() { viewModelScope.launch { diagnosticsCapture?.stop() } }
     fun stopObservation() {
         labConfiguration = null; labDetector.reset(); labProcessor = ImuProcessor()
         mutableLab.value = laboratory.value.copy(observing = false, corrected = false, evaluations = emptyList(), candidates = 0, candidateDetails = emptyList(),
@@ -139,12 +163,30 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
 
     init {
         viewModelScope.launch {
+            repository.buzzerDone.collect {
+                val current = mutableDemo.value
+                if (current.active && current.buzzerPending) {
+                    demoConfirmationJob?.cancel()
+                    demoConfirmationJob = null
+                    mutableDemo.value = current.copy(
+                        buzzerPending = false,
+                        alertVisible = true,
+                        statusText = "Confirmación BUZZER_DONE recibida de ESP32."
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
             combine(repository.connection, source.status) { connection, status -> connection to status }
                 .collect { (connection, status) ->
                     if (connection.status != ConnectionStatus.CONNECTED || status != SensorDataStatus.RECEIVING) {
                         chartBuffer.clear(); stopObservation()
-                        diagnosticsCapture.stop()
+                        diagnosticsCapture?.stop()
                         mutableLab.value = laboratory.value.copy(history = emptyList())
+                        if (mutableDemo.value.active || mutableDemo.value.alertVisible) {
+                            stopDemoTest("Conexión BLE perdida. Prueba demostrativa cancelada.")
+                            dismissDemoAlert()
+                        }
                     }
                     val active = calibration.value
                     if ((active.measuring || active.result != null) &&
@@ -198,6 +240,102 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
                     val result = accumulator.result()
                     mutableCalibration.value = CalibrationUiState(remainingSeconds = 0, validSamples = accumulator.validSamples,
                         result = result, message = if (result == null) "No se recibieron muestras válidas. No se estimaron offsets." else null)
+                }
+            }
+        }
+    }
+
+    fun startDemoTest() {
+        if (mutableDemo.value.active) return
+        val conn = repository.connection.value
+        val sensStatus = source.status.value
+        if (conn.status != ConnectionStatus.CONNECTED || sensStatus != SensorDataStatus.RECEIVING) {
+            mutableDemo.value = DemoTestUiState(statusText = "Conecta el dispositivo y espera recepción IMU antes de iniciar.")
+            return
+        }
+        val current = laboratory.value.history.lastOrNull()
+        val rest = current?.accelerationG ?: Vector3(0.0, 0.0, 1.0)
+        val config = DetectorConfiguration(
+            longitudinalAxis = ImuAxis.X,
+            forwardSign = 1,
+            turnAxis = ImuAxis.Z,
+            acceleration = CandidateCriteria(0.35, 0.1, 250, 2, 600, 3000, 2000),
+            braking = CandidateCriteria(0.35, 0.1, 250, 2, 600, 3000, 2000),
+            turn = CandidateCriteria(30.0, 10.0, 250, 2, 600, 3000, 2000),
+            status = CriteriaStatus.TEST_ONLY,
+            restAccelerationG = rest
+        )
+        demoDetector = DrivingEventDetector(config)
+        demoProcessor = ImuProcessor()
+        lastDemoTriggerMillis = null
+        mutableDemo.value = DemoTestUiState(
+            active = true,
+            remainingSeconds = 60,
+            statusText = "Prueba demostrativa activa · Esperando giro/movimiento brusco..."
+        )
+        demoJob?.cancel()
+        demoJob = viewModelScope.launch {
+            for (remaining in 59 downTo 1) {
+                delay(1000)
+                if (!mutableDemo.value.active) return@launch
+                mutableDemo.value = mutableDemo.value.copy(remainingSeconds = remaining)
+            }
+            delay(1000)
+            if (mutableDemo.value.active) {
+                stopDemoTest("Límite de 60 segundos alcanzado.")
+            }
+        }
+    }
+
+    fun stopDemoTest(reason: String = "Prueba demostrativa detenida.") {
+        demoJob?.cancel()
+        demoJob = null
+        demoConfirmationJob?.cancel()
+        demoConfirmationJob = null
+        demoDetector.reset()
+        mutableDemo.value = mutableDemo.value.copy(
+            active = false,
+            buzzerPending = false,
+            statusText = reason
+        )
+    }
+
+    fun dismissDemoAlert() {
+        mutableDemo.value = mutableDemo.value.copy(alertVisible = false)
+    }
+
+    private fun evaluateDemo(sample: PhysicalImuSample) {
+        val current = mutableDemo.value
+        if (!current.active) return
+        val processed = demoProcessor.process(sample)
+        val candidates = demoDetector.detect(processed)
+        val now = sample.receivedAtMillis
+        if (candidates.isNotEmpty()) {
+            val lastTrigger = lastDemoTriggerMillis
+            if (!current.buzzerPending && !current.alertVisible && (lastTrigger == null || now - lastTrigger >= 3000L)) {
+                if (!repository.triggerBuzzer()) {
+                    mutableDemo.value = current.copy(
+                        statusText = "Umbral TEST_ONLY superado, pero no se pudo enviar la orden BLE del buzzer."
+                    )
+                    return
+                }
+                lastDemoTriggerMillis = now
+                mutableDemo.value = current.copy(
+                    buzzerPending = true,
+                    triggerTimestampMillis = now,
+                    candidates = current.candidates + candidates.size,
+                    statusText = "Umbral TEST_ONLY superado. Ordenando buzzer por BLE..."
+                )
+                demoConfirmationJob?.cancel()
+                demoConfirmationJob = viewModelScope.launch {
+                    delay(DEMO_CONFIRMATION_TIMEOUT_MILLIS)
+                    val pending = mutableDemo.value
+                    if (pending.active && pending.buzzerPending) {
+                        mutableDemo.value = pending.copy(
+                            buzzerPending = false,
+                            statusText = "Sin confirmación BUZZER_DONE. Alerta no mostrada."
+                        )
+                    }
                 }
             }
         }

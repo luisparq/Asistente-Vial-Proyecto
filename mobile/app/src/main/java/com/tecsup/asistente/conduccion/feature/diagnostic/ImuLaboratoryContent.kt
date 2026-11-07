@@ -20,13 +20,13 @@ import kotlin.math.abs
 @Composable
 fun ImuLaboratoryContent(lab: LaboratoryUiState, calibration: CalibrationUiState,
     onSynthetic: (DrivingEventType?) -> Unit, onObserve: (ImuAxis, Int, ImuAxis, Boolean) -> Unit,
-    onStop: () -> Unit) {
+    onStop: () -> Unit, thresholdMarkerMillis: Long? = null) {
     PresentationSection("Señales en tiempo real · últimos 30 s") {
         Text("Escalas nominales. X azul · Y verde · Z naranja. No acreditan precisión física.")
         if (lab.history.isEmpty()) Text("Sin muestras actuales. Conecta BLE y espera recepción IMU.")
         else {
-            SignalChart(lab.history, false, null)
-            SignalChart(lab.history, true, if(lab.corrected) calibration.result?.estimatedGyroOffsetsDps else null)
+            SignalChart(lab.history, false, null, thresholdMarkerMillis)
+            SignalChart(lab.history, true, if(lab.corrected) calibration.result?.estimatedGyroOffsetsDps else null, thresholdMarkerMillis)
             Text("${lab.history.size} muestras en búfer · tiempo de recepción Android")
         }
     }
@@ -62,7 +62,7 @@ fun ImuLaboratoryContent(lab: LaboratoryUiState, calibration: CalibrationUiState
 }
 
 @Composable
-private fun SignalChart(samples: List<PhysicalImuSample>, gyro: Boolean, offsets: Vector3?) {
+private fun SignalChart(samples: List<PhysicalImuSample>, gyro: Boolean, offsets: Vector3?, thresholdMarkerMillis: Long? = null) {
     fun vector(s: PhysicalImuSample) = if(gyro) s.angularVelocityDps else s.accelerationG
     val values = samples.flatMap { val v = vector(it); listOf(v.x, v.y, v.z) +
         (offsets?.let { o -> val c = v - o; listOf(c.x, c.y, c.z) } ?: emptyList()) }
@@ -80,6 +80,21 @@ private fun SignalChart(samples: List<PhysicalImuSample>, gyro: Boolean, offsets
                 size.height / 2 - (value / range).toFloat() * size.height / 2)
         }
         drawLine(grid, Offset(0f, size.height / 2), Offset(size.width, size.height / 2))
+        if (gyro && range >= 30.0) {
+            val yPos = size.height / 2 - (30.0 / range).toFloat() * size.height / 2
+            val yNeg = size.height / 2 - (-30.0 / range).toFloat() * size.height / 2
+            drawLine(Color(0xFFE53935).copy(alpha = 0.5f), Offset(0f, yPos), Offset(size.width, yPos), 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f)))
+            drawLine(Color(0xFFE53935).copy(alpha = 0.5f), Offset(0f, yNeg), Offset(size.width, yNeg), 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f)))
+        }
+        thresholdMarkerMillis?.let { marker ->
+            if (marker in (end - 30_000)..end) {
+                val markerX = ((marker - (end - 30_000)).toFloat() / 30_000).coerceIn(0f, 1f) * size.width
+                drawLine(Color(0xFFE53935), Offset(markerX, 0f), Offset(markerX, size.height), 2.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f)))
+            }
+        }
         samples.zipWithNext().forEach { (a, b) ->
             // Never bridge a missing reception interval as a continuous measured signal.
             if (b.receivedAtMillis - a.receivedAtMillis <= 500) repeat(3) { axis ->

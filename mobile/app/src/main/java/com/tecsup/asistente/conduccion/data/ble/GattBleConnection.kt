@@ -17,6 +17,8 @@ class GattBleConnection @Inject constructor(
 ) : BleConnection {
     private val mutableState = MutableStateFlow(BleConnectionState())
     override val state = mutableState.asStateFlow()
+    private val mutableBuzzerDone = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val buzzerDone: SharedFlow<Unit> = mutableBuzzerDone.asSharedFlow()
     private var session: GattTransport.Session? = null
     private var generation = 0L
     private var timeout: Job? = null
@@ -99,6 +101,9 @@ class GattBleConnection @Inject constructor(
                     val copy = bytes.copyOf()
                     event { if (phase == Phase.STREAMING) source.accept(copy) }
                 }
+                override fun buzzerDone() = event {
+                    if (phase == Phase.STREAMING) mutableBuzzerDone.tryEmit(Unit)
+                }
                 override fun disconnected() = event {
                     release()
                     source.reset(SensorDataStatus.DISCONNECTED)
@@ -110,6 +115,12 @@ class GattBleConnection @Inject constructor(
         catch (_: IllegalArgumentException) { fail("La dirección del dispositivo BLE no es válida.") }
         catch (_: IllegalStateException) { fail("No se pudo abrir GATT. Comprueba Bluetooth y vuelve a conectar.") }
     } }
+
+    override fun triggerBuzzer(): Boolean {
+        val s = session ?: return false
+        if (phase != Phase.STREAMING) return false
+        return s.writeBuzzer(byteArrayOf(0x01))
+    }
 
     private fun fail(message: String) {
         release()

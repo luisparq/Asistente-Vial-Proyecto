@@ -107,7 +107,7 @@ public class DiagnosticsService implements DiagnosticsUseCase {
 
     @Override
     public SessionResponse addSamples(Long sessionId, AddSamplesRequest request) {
-        DiagnosticSession session = findActiveSession(sessionId);
+        DiagnosticSession session = findActiveTestDataSession(sessionId);
 
         if (request == null || request.getSamples() == null || request.getSamples().isEmpty()) {
             throw new BusinessRuleException("El lote debe contener al menos una muestra");
@@ -140,12 +140,11 @@ public class DiagnosticsService implements DiagnosticsUseCase {
 
     @Override
     public SessionResponse completeSession(Long sessionId) {
-        DiagnosticSession session = findActiveSession(sessionId);
+        DiagnosticSession session = findActiveTestDataSession(sessionId);
 
         List<ImuSample> samples = sampleRepo.findBySessionId(sessionId);
 
         session.setStatus(SessionStatus.COMPLETED);
-        session.setDataOrigin(DataOrigin.TEST_DATA);
 
         if (samples.isEmpty()) {
             // Sin muestras no hay datos suficientes para evaluar la sesión:
@@ -232,6 +231,20 @@ public class DiagnosticsService implements DiagnosticsUseCase {
             throw new BusinessRuleException(
                 "La sesión " + sessionId + " no está EN PROGRESO (estado actual: " +
                 session.getStatus() + ")");
+        }
+        return session;
+    }
+
+    /**
+     * Los endpoints internos de TEST_DATA no deben leer ni escribir sesiones
+     * cuyo origen haya sido asignado por otra vía (REAL_BLE/REAL_MQTT).
+     */
+    private DiagnosticSession findActiveTestDataSession(Long sessionId) {
+        DiagnosticSession session = findActiveSession(sessionId);
+        if (!DataOrigin.TEST_DATA.equals(session.getDataOrigin())) {
+            throw new BusinessRuleException(
+                "La sesión " + sessionId + " no es TEST_DATA (origen actual: " +
+                session.getDataOrigin() + ")");
         }
         return session;
     }

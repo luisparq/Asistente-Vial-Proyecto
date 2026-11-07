@@ -11,6 +11,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -32,12 +33,42 @@ fun DiagnosticScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hiltVi
     val state by viewModel.state.collectAsStateWithLifecycle()
     val laboratory by viewModel.laboratory.collectAsStateWithLifecycle()
     val realBleUpload by viewModel.realBleUpload.collectAsStateWithLifecycle()
+    val demo by viewModel.demo.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.startCharts() }
     val calibration by viewModel.calibration.collectAsStateWithLifecycle()
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.cancelIfMeasuring(); viewModel.stopCharts() }
     DisposableEffect(viewModel) { onDispose { viewModel.cancelIfMeasuring(); viewModel.stopCharts() } }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var tts by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.speech.tts.TextToSpeech?>(null) }
+    androidx.compose.runtime.DisposableEffect(context) {
+        var instance: android.speech.tts.TextToSpeech? = null
+        instance = android.speech.tts.TextToSpeech(context) { status ->
+            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                val res = instance?.setLanguage(java.util.Locale("es", "ES"))
+                if (res == android.speech.tts.TextToSpeech.LANG_MISSING_DATA || res == android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED) {
+                    instance?.language = java.util.Locale.getDefault()
+                }
+            }
+        }
+        tts = instance
+        onDispose {
+            instance?.stop()
+            instance?.shutdown()
+        }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        viewModel.cancelIfMeasuring()
+        viewModel.stopCharts()
+        tts?.stop()
+    }
+    androidx.compose.runtime.LaunchedEffect(demo.alertVisible) {
+        if (demo.alertVisible) {
+            tts?.speak(demo.alertMessage, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "demo_tts")
+        } else tts?.stop() // Also silences the alert when BLE disconnects or the test is cancelled.
+    }
+
     DiagnosticContent(state, onBack, calibration, viewModel::startMeasurement, viewModel::cancelMeasurement, laboratory, viewModel::runSynthetic, viewModel::observeBle, viewModel::stopObservation,
-        realBleUpload, viewModel::startRealBleUpload, viewModel::stopRealBleUpload)
+        realBleUpload, viewModel::startRealBleUpload, viewModel::stopRealBleUpload, demo, viewModel::startDemoTest, viewModel::stopDemoTest, viewModel::dismissDemoAlert)
 }
 
 @Composable
@@ -48,7 +79,9 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
     onObserve: (com.tecsup.asistente.conduccion.domain.processing.ImuAxis, Int, com.tecsup.asistente.conduccion.domain.processing.ImuAxis, Boolean) -> Unit = { _, _, _, _ -> },
     onStopObservation: () -> Unit = {},
     realBleUpload: com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureState = com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureState(),
-    onStartRealBleUpload: () -> Unit = {}, onStopRealBleUpload: () -> Unit = {}) {
+    onStartRealBleUpload: () -> Unit = {}, onStopRealBleUpload: () -> Unit = {},
+    demo: DemoTestUiState = DemoTestUiState(),
+    onStartDemoTest: () -> Unit = {}, onStopDemoTest: () -> Unit = {}, onDismissDemoAlert: () -> Unit = {}) {
     ScreenLayout(stringResource(R.string.diagnostic_title), stringResource(R.string.diagnostic_description), onBack) {
         PresentationSection("Conexión del dispositivo") {
         StatusBadge(stringResource(state.connection.status.labelResource()))
@@ -115,9 +148,42 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         Text("Identidad del sensor no confirmada: WHO_AM_I = 0x75 observado en el módulo de prueba. La conversión es nominal, no una medición físicamente validada.")
         Text("Filtro y detector deshabilitados por defecto. No se crean eventos SENSOR. La aceleración incluye gravedad; no se ha definido la orientación respecto al vehículo.")
         }
+        PresentationSection("Prueba demostrativa provisional") {
+            if (demo.active) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("PRUEBA DEMOSTRATIVA", style = MaterialTheme.typography.titleMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text("Umbral TEST_ONLY", style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text("No representa una maniobra vehicular validada", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer)
+                        Spacer(Modifier.height(8.dp))
+                        Text("Duración restante: ${demo.remainingSeconds} s · Detecciones: ${demo.candidates}",
+                            style = MaterialTheme.typography.bodyMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                }
+                Text(demo.statusText, style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(onClick = onStopDemoTest) {
+                    Text("Detener prueba demostrativa")
+                }
+            } else {
+                Text("Flujo demostrativo: Giro brusco en IMU → Detección TEST_ONLY en Android → Orden buzzer por BLE → Buzzer ESP32 máximo 300 ms → Confirmación BUZZER_DONE → Alerta pantalla completa + Audio.")
+                Text("Duración máxima: 60 segundos. Cooldown anti-repeticiones: 3 segundos.")
+                Text(demo.statusText, style = MaterialTheme.typography.bodySmall)
+                Button(onClick = onStartDemoTest, enabled = state.connection.status == ConnectionStatus.CONNECTED && state.sensorStatus == SensorDataStatus.RECEIVING) {
+                    Text("Iniciar prueba demostrativa")
+                }
+            }
+        }
         val visibleLab = if (state.connection.status == ConnectionStatus.CONNECTED && state.sensorStatus == SensorDataStatus.RECEIVING)
             laboratory else laboratory.copy(history = emptyList(), observing = false, corrected = false)
-        ImuLaboratoryContent(visibleLab, calibration, onSynthetic, onObserve, onStopObservation)
+        ImuLaboratoryContent(visibleLab, calibration, onSynthetic, onObserve, onStopObservation, demo.triggerTimestampMillis)
         PresentationSection("Envío seguro a Diagnostics · REAL_BLE") {
         Text("Solo se envían cuentas RAW durante una prueba iniciada explícitamente. Usa HTTPS y la sesión autenticada de AVIGEM; si no hay internet, las muestras quedan en la cola local.")
         Text(realBleUpload.message)
@@ -129,6 +195,74 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
                 state.sensorStatus == SensorDataStatus.RECEIVING && state.sample != null) { Text("Iniciar envío REAL_BLE") }
         }
         Text("No acredita identidad, escala ni calibración física del sensor.", style = MaterialTheme.typography.bodySmall)
+        }
+        if (demo.alertVisible) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = onDismissDemoAlert,
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(24.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "⚠️ ALERTA DE CONDUCCIÓN",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "“${demo.alertMessage}”",
+                            style = MaterialTheme.typography.headlineSmall,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                        ) {
+                            Column(Modifier.padding(16.dp), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                Text(
+                                    "PRUEBA DEMOSTRATIVA",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    "Umbral TEST_ONLY",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                                )
+                                Text(
+                                    "No representa una maniobra vehicular validada",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(32.dp))
+                        Button(
+                            onClick = onDismissDemoAlert,
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Cerrar alerta", color = MaterialTheme.colorScheme.onError)
+                        }
+                    }
+                }
+            }
         }
         PresentationSection("Calibración experimental") {
         Text("Solo desarrollo y mantenimiento. Mantén la IMU inmóvil durante 30 segundos. La inmovilidad no se comprueba automáticamente.")

@@ -28,6 +28,8 @@ class DefaultBleRepository @Inject constructor(
     private val mutableScan = MutableStateFlow(BleScanState())
     override val scan = mutableScan.asStateFlow()
     override val connection = connector.state
+    override val buzzerDone = connector.buzzerDone
+    override fun triggerBuzzer(): Boolean = connector.triggerBuzzer()
     override val reconnection = reconnect?.state ?: com.tecsup.asistente.conduccion.domain.ble.noBleReconnect
     override fun setForeground(value: Boolean) { reconnect?.foreground(value) }
     override fun enableReconnection() { reconnect?.enable() }

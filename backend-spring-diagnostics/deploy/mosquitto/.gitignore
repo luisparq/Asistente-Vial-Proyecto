@@ -1,0 +1,7 @@
+# Ignorar credenciales y contraseñas locales de Mosquitto
+passwd
+*.passwd
+*.conf
+!*.conf.example
+*.acl
+!*.acl.example

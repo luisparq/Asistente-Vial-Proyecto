@@ -8,4 +8,6 @@ interface BleConnection {
     fun select(device: BleDevice)
     fun prepare()
     fun clear()
+    fun triggerBuzzer(): Boolean = false
+    val buzzerDone: kotlinx.coroutines.flow.SharedFlow<Unit> get() = kotlinx.coroutines.flow.MutableSharedFlow()
 }

@@ -3,7 +3,7 @@
 #include <esp_timer.h>
 #include <atomic>
 
-// Manual diagnostic only. No BLE commands, automatic alerts or SENSOR events.
+// Pulse helper for Serial PITAR/STOP and BLE WRITE. No maneuver classification.
 // Same GPIO, pulse and cooldown as DiagnosticoBuzzer.
 namespace ManualBuzzer {
 constexpr uint8_t PIN = 4;
@@ -45,29 +45,45 @@ void begin() {
   Serial.println("Buzzer GPIO4 apagado. PITAR: 300 ms; STOP: apagar. Nueva linea.");
 }
 
+bool isSounding() {
+  return sounding.load();
+}
+
+bool trigger() {
+  const uint32_t now = millis();
+  if (!timer) {
+    Serial.println("Buzzer: temporizador no disponible.");
+    return false;
+  }
+  if (sounding.load() || (used && uint32_t(now - startedAt) < COOLDOWN_MS)) {
+    Serial.println("Espera 2 segundos entre pruebas (cooldown buzzer).");
+    return false;
+  }
+  startedAt = now;
+  used = true;
+  completed.store(false);
+  sounding.store(true);
+  digitalWrite(PIN, HIGH);
+  if (esp_timer_start_once(timer, PULSE_MS * 1000ULL) != ESP_OK) {
+    stop();
+    Serial.println("Buzzer: error de temporizador; salida apagada.");
+    return false;
+  }
+  Serial.println("Buzzer: GPIO4 HIGH durante 300 ms.");
+  return true;
+}
+
+bool checkCompleted() {
+  return completed.exchange(false);
+}
+
 void execute() {
   command[length] = '\0';
   if (!overflow && strcmp(command, "STOP") == 0) {
     stop();
     Serial.println("Buzzer detenido.");
   } else if (!overflow && strcmp(command, "PITAR") == 0) {
-    const uint32_t now = millis();
-    if (!timer) Serial.println("Buzzer: prueba deshabilitada.");
-    else if (sounding.load() || (used && uint32_t(now - startedAt) < COOLDOWN_MS)) {
-      Serial.println("Espera 2 segundos entre pruebas.");
-    } else {
-      startedAt = now;
-      used = true;
-      completed.store(false);
-      sounding.store(true);
-      digitalWrite(PIN, HIGH);
-      // Independent one-shot: even existing I2C/advertising delays cannot hold
-      // the output HIGH waiting for the next loop iteration.
-      if (esp_timer_start_once(timer, PULSE_MS * 1000ULL) != ESP_OK) {
-        stop();
-        Serial.println("Buzzer: error de temporizador; salida apagada.");
-      } else Serial.println("Prueba manual: GPIO4 HIGH durante 300 ms.");
-    }
+    trigger();
   } else if (length || overflow) {
     Serial.println("Comandos buzzer: PITAR / STOP (con Nueva linea).");
   }
@@ -76,7 +92,6 @@ void execute() {
 }
 
 void poll() {
-  if (completed.exchange(false)) Serial.println("Pulso terminado: GPIO4 LOW.");
   // Bounded input processing; no wait for newline and no delay.
   for (uint8_t n = 0; n < 32 && Serial.available(); ++n) {
     const char c = char(Serial.read());

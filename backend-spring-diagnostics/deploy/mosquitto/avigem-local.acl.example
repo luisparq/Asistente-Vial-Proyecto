@@ -1,0 +1,10 @@
+# Control de acceso estricto a tópicos AVIGEM para laboratorio local
+
+# Dispositivo ESP32 (avigem-one): únicamente publicación (write) sobre su tópico de telemetría IMU.
+# Reemplazar AVIGEM-ONE-001 por el DEVICE_CODE real del dispositivo antes de usar este ACL.
+user avigem-one
+topic write avigem/devices/AVIGEM-ONE-001/imu
+
+# Backend Spring Diagnostics: únicamente suscripción/lectura (read) a la telemetría IMU
+user avigem-diagnostics
+topic read avigem/devices/+/imu

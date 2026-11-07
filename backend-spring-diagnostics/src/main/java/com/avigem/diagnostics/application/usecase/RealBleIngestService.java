@@ -45,17 +45,36 @@ public class RealBleIngestService {
 
     private RealBleBatchResponse ingest(String clientSessionId, RealBleBatchRequest request,
                                         DataOrigin origin, String deviceDescription, String notes) {
+        // Validar el payload antes de cualquier efecto lateral (crear dispositivo/sesión).
         String clientId = requireUuid(clientSessionId);
-        String deviceCode = request.getDeviceCode().trim();
-        Device device = devices.findByDeviceCode(deviceCode).orElseGet(() -> {
-            Device created = new Device();
-            created.setDeviceCode(deviceCode);
-            created.setDescription(deviceDescription);
-            created.setRegisteredAt(Instant.now());
-            return devices.save(created);
-        });
+        String deviceCode = requireDeviceCode(request);
+        List<RealBleBatchRequest.SampleItem> requested = requireSamples(request);
 
-        DiagnosticSession session = sessions.findByClientSessionId(clientId).orElseGet(() -> {
+        DiagnosticSession existingSession = sessions.findByClientSessionId(clientId).orElse(null);
+        DiagnosticSession session;
+        Device device;
+        if (existingSession != null) {
+            // Primero validar origen/estado y el dispositivo de la sesión existente.
+            if (!origin.equals(existingSession.getDataOrigin()) || !existingSession.isInProgress()) {
+                throw new BusinessRuleException(
+                    "La sesión " + origin + " no está disponible para recibir muestras");
+            }
+            device = devices.findById(existingSession.getDeviceId()).orElseThrow(() ->
+                new ResourceNotFoundException(
+                    "Dispositivo de la sesión no encontrado: " + existingSession.getDeviceId()));
+            if (!device.getDeviceCode().equals(deviceCode)) {
+                throw new BusinessRuleException(
+                    "clientSessionId ya pertenece a otro dispositivo");
+            }
+            session = existingSession;
+        } else {
+            device = devices.findByDeviceCode(deviceCode).orElseGet(() -> {
+                Device created = new Device();
+                created.setDeviceCode(deviceCode);
+                created.setDescription(deviceDescription);
+                created.setRegisteredAt(Instant.now());
+                return devices.save(created);
+            });
             DiagnosticSession created = new DiagnosticSession();
             created.setDeviceId(device.getId());
             created.setClientSessionId(clientId);
@@ -63,23 +82,17 @@ public class RealBleIngestService {
             created.setResult(SessionResult.PENDING);
             created.setDataOrigin(origin);
             created.setNotes(notes);
-            created.setStartedAt(request.getStartedAt());
-            return sessions.save(created);
-        });
-        if (!origin.equals(session.getDataOrigin()) || !session.isInProgress()) {
-            throw new BusinessRuleException("La sesión " + origin + " no está disponible para recibir muestras");
-        }
-        if (!session.getDeviceId().equals(device.getId())) {
-            throw new BusinessRuleException("clientSessionId ya pertenece a otro dispositivo");
+            created.setStartedAt(request.getStartedAt() != null ? request.getStartedAt() : Instant.now());
+            session = sessions.save(created);
         }
 
-        List<Long> requestedSequences = request.getSamples().stream()
+        List<Long> requestedSequences = requested.stream()
             .map(RealBleBatchRequest.SampleItem::getSequence).toList();
         if (new HashSet<>(requestedSequences).size() != requestedSequences.size()) {
             throw new BusinessRuleException("El lote contiene secuencias repetidas");
         }
         Set<Long> existing = new HashSet<>(samples.findSequenceNumbers(session.getId(), requestedSequences));
-        List<ImuSample> fresh = request.getSamples().stream()
+        List<ImuSample> fresh = requested.stream()
             .filter(item -> !existing.contains(item.getSequence()))
             .map(item -> toDomain(session.getId(), item))
             .toList();
@@ -90,9 +103,10 @@ public class RealBleIngestService {
 
     public SessionResponse complete(String clientSessionId) {
         DiagnosticSession session = sessions.findByClientSessionId(requireUuid(clientSessionId))
-            .orElseThrow(() -> new ResourceNotFoundException("Sesión REAL_BLE no encontrada"));
-        if (!DataOrigin.REAL_BLE.equals(session.getDataOrigin())) {
-            throw new BusinessRuleException("El origen de la sesión no es REAL_BLE");
+            .orElseThrow(() -> new ResourceNotFoundException("Sesión real no encontrada"));
+        if (!DataOrigin.REAL_BLE.equals(session.getDataOrigin())
+                && !DataOrigin.REAL_MQTT.equals(session.getDataOrigin())) {
+            throw new BusinessRuleException("El origen de la sesión no es REAL_BLE/REAL_MQTT");
         }
         if (!session.isInProgress()) return SessionResponse.from(session);
         List<ImuSample> stored = samples.findBySessionId(session.getId());
@@ -117,7 +131,7 @@ public class RealBleIngestService {
         ImuSample sample = new ImuSample();
         sample.setSessionId(sessionId);
         sample.setSequenceNumber(item.getSequence());
-        sample.setSampledAt(item.getSampledAt());
+        sample.setSampledAt(item.getSampledAt() != null ? item.getSampledAt() : Instant.now());
         sample.setAxRaw(raw(item.getAxRaw(), "axRaw"));
         sample.setAyRaw(raw(item.getAyRaw(), "ayRaw"));
         sample.setAzRaw(raw(item.getAzRaw(), "azRaw"));
@@ -125,6 +139,36 @@ public class RealBleIngestService {
         sample.setGyRaw(raw(item.getGyRaw(), "gyRaw"));
         sample.setGzRaw(raw(item.getGzRaw(), "gzRaw"));
         return sample;
+    }
+
+    private String requireDeviceCode(RealBleBatchRequest request) {
+        if (request == null || request.getDeviceCode() == null) {
+            throw new BusinessRuleException("deviceCode es obligatorio");
+        }
+        String deviceCode = request.getDeviceCode().trim();
+        if (deviceCode.isEmpty() || deviceCode.length() > 64) {
+            throw new BusinessRuleException("deviceCode debe tener entre 1 y 64 caracteres");
+        }
+        return deviceCode;
+    }
+
+    private List<RealBleBatchRequest.SampleItem> requireSamples(RealBleBatchRequest request) {
+        List<RealBleBatchRequest.SampleItem> batch = request.getSamples();
+        if (batch == null || batch.isEmpty()) {
+            throw new BusinessRuleException("El lote debe contener al menos una muestra");
+        }
+        if (batch.size() > 200) {
+            throw new BusinessRuleException("No se pueden enviar más de 200 muestras por lote");
+        }
+        for (RealBleBatchRequest.SampleItem item : batch) {
+            if (item == null) {
+                throw new BusinessRuleException("El lote contiene una muestra nula");
+            }
+            if (item.getSequence() == null || item.getSequence() < 0) {
+                throw new BusinessRuleException("sequence debe ser un entero no negativo");
+            }
+        }
+        return batch;
     }
 
     private short raw(Integer value, String field) {

@@ -6,6 +6,7 @@ interface GattTransport {
     interface Session {
         fun discover(): Boolean
         fun subscribe(): Boolean
+        fun writeBuzzer(command: ByteArray): Boolean = false
         fun close()
     }
     interface Listener {
@@ -15,6 +16,7 @@ interface GattTransport {
         fun gpsFrame(bytes: ByteArray) {}
         fun gpsUnavailable() {}
         fun frame(bytes: ByteArray)
+        fun buzzerDone() {}
         fun disconnected()
         fun failed(message: String)
     }

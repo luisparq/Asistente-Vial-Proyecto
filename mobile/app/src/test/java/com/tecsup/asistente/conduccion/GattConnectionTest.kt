@@ -5,6 +5,7 @@ import com.tecsup.asistente.conduccion.domain.ble.*
 import com.tecsup.asistente.conduccion.domain.diagnostic.SensorDataStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -25,8 +26,10 @@ internal class TestGattSession(val listener: GattTransport.Listener) : GattTrans
     var subscribes = 0
     var closes = 0
     var allowSubscribe = true
+    val buzzerWrites = mutableListOf<ByteArray>()
     override fun discover(): Boolean { discovers++; return true }
     override fun subscribe(): Boolean { subscribes++; return allowSubscribe }
+    override fun writeBuzzer(command: ByteArray): Boolean { buzzerWrites += command; return true }
     override fun close() { closes++ }
 }
 
@@ -107,6 +110,29 @@ class GattConnectionTest {
         assertEquals(1, transport.latest.closes)
         platform.available.value = BleAvailability.READY; runCurrent()
         assertEquals(3, transport.sessions.size) // no automatic reconnection
+    }
+
+    @Test fun buzzerWriteAndDoneStayOnStreamingSessionWithoutInventingConfirmation() = runTest {
+        val transport = TestGattTransport()
+        val source = RawSensorDataSource(backgroundScope)
+        val connection = GattBleConnection(transport, source, TestBlePlatform(), backgroundScope)
+        connection.select(device); connection.prepare(); runCurrent()
+        assertFalse(connection.triggerBuzzer())
+        transport.latest.listener.connected(); runCurrent()
+        transport.latest.listener.services(validProfile); runCurrent()
+        assertFalse(connection.triggerBuzzer())
+        transport.latest.listener.subscribed(); runCurrent()
+        assertTrue(connection.triggerBuzzer())
+        assertArrayEquals(byteArrayOf(0x01), transport.latest.buzzerWrites.single())
+        val confirmations = mutableListOf<Unit>()
+        backgroundScope.launch { connection.buzzerDone.collect { confirmations += it } }
+        runCurrent()
+        transport.latest.listener.buzzerDone(); runCurrent()
+        assertEquals(1, confirmations.size)
+        transport.latest.listener.disconnected(); runCurrent()
+        assertFalse(connection.triggerBuzzer())
+        transport.latest.listener.buzzerDone(); runCurrent()
+        assertEquals(1, confirmations.size)
     }
 
     @Test fun asynchronousCccdFailureAndPermissionRevocationNeverExposeConnected() = runTest {

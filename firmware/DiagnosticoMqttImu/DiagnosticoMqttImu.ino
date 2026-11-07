@@ -96,7 +96,8 @@ void connectWifi() {
 }
 
 void reconnectMqtt() {
-  if (mqtt.connected() || millis() < nextReconnect) return;
+  // Diferencia firmada: segura ante el desbordamiento de millis() (~49,7 días).
+  if (mqtt.connected() || int32_t(millis() - nextReconnect) < 0) return;
   nextReconnect = millis() + 5000;
   String clientId = String("avigem-one-") + String((uint32_t)ESP.getEfuseMac(), HEX);
   bool ok = mqtt.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD);
@@ -110,6 +111,7 @@ void publishAxes(const int16_t (&v)[6]) {
     "\"axRaw\":%d,\"ayRaw\":%d,\"azRaw\":%d,\"gxRaw\":%d,\"gyRaw\":%d,\"gzRaw\":%d}",
     sessionId, DEVICE_CODE, (unsigned long long)sequenceNumber,
     v[0], v[1], v[2], v[3], v[4], v[5]);
+  // PubSubClient solo publica con QoS 0; el tercer argumento es "retained", no QoS.
   if (mqtt.publish(topic, payload, false)) {
     Serial.printf("MQTT #%llu ax=%d ay=%d az=%d gx=%d gy=%d gz=%d\n",
       (unsigned long long)sequenceNumber, v[0], v[1], v[2], v[3], v[4], v[5]);

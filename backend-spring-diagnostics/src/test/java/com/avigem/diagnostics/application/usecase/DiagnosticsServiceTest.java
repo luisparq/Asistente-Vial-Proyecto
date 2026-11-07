@@ -265,6 +265,37 @@ class DiagnosticsServiceTest {
         verify(summaryRepo, never()).save(any());
     }
 
+    @Test
+    @DisplayName("addSamples rechaza sesiones REAL_MQTT/REAL_BLE aunque estén en progreso")
+    void addSamples_realOrigin_throws() {
+        mockSession.setDataOrigin(DataOrigin.REAL_MQTT);
+        when(sessionRepo.findById(10L)).thenReturn(Optional.of(mockSession));
+
+        AddSamplesRequest req = new AddSamplesRequest(List.of(
+            new AddSamplesRequest.SampleItem(1, 2, 3, 4, 5, 6, null)
+        ));
+
+        assertThatThrownBy(() -> service.addSamples(10L, req))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("TEST_DATA");
+
+        verify(sampleRepo, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("completeSession rechaza sesiones reales y no sobrescribe su origen")
+    void completeSession_realOrigin_throws() {
+        mockSession.setDataOrigin(DataOrigin.REAL_BLE);
+        when(sessionRepo.findById(10L)).thenReturn(Optional.of(mockSession));
+
+        assertThatThrownBy(() -> service.completeSession(10L))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("TEST_DATA");
+
+        verify(sessionRepo, never()).save(any());
+        assertThat(mockSession.getDataOrigin()).isEqualTo(DataOrigin.REAL_BLE);
+    }
+
     // ── cancelSession ─────────────────────────────────────────────────────────
 
     @Test
