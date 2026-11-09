@@ -2,7 +2,7 @@
 @section('title','Centro de soporte técnico')
 @section('description','Incidencias y seguimiento de dispositivos, sin diagnóstico remoto automático.')
 @section('content')
-<link rel="stylesheet" href="{{ asset('css/support.css') }}">
+
 <div class="actions"><a class="button" href="{{ route($base.'.create') }}">Registrar incidencia</a><a class="button quiet" href="{{ route(($global?'platform':'dashboard').'.devices') }}">Dispositivos</a>@if($global)<a class="button quiet" href="{{ route('platform.companies') }}">Empresas</a>@endif</div>
 <p>Indicadores actuales {{ $global?'de toda la plataforma':'de tu empresa' }}; independientes de los filtros.</p>
 <div class="support-metrics">@foreach(\App\Models\SupportTicket::STATUSES as $key=>$label)<article class="panel"><span>{{ $label }}</span><strong>{{ $metrics[$key]??0 }}</strong></article>@endforeach</div>

@@ -4,15 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AVIGEM Diagnostics — herramienta técnica</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/avigem-tokens.css">
   <link rel="stylesheet" href="/css/app.css">
 </head>
-<body>
+<body class="theme-dark">
   <a class="skip-link" href="#contenido">Saltar al contenido</a>
 
   <header class="site-header">
     <div class="header-inner">
-      <p class="product-name">AVIGEM Diagnostics</p>
-      <p class="product-stage">Herramienta técnica en desarrollo</p>
+      <div class="brand">
+        <span class="brand-mark"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" aria-hidden="true"><g stroke="currentColor" stroke-linecap="round"><path stroke-width="5.5" d="M10 41 21 14"/><path stroke-width="5.5" d="M38 41 27 14"/><path stroke-width="4" d="M24 41v-6"/><path stroke-width="3.2" d="M24 28.5V25"/></g><circle class="node" cx="24" cy="8" r="4.6"/></svg></span>
+        <div>
+          <p class="product-name">AVIGEM Diagnostics</p>
+          <p class="product-stage">Herramienta técnica en desarrollo · Vialigent Technologies</p>
+        </div>
+      </div>
+      <p class="identity-flag" role="status"><span>Identidad no confirmada</span> · <code>WHO_AM_I 0x75 ≠ 0x68</code></p>
     </div>
     <p class="permanent-banner" role="status">
       TEST_DATA permanece separado · REAL_BLE/REAL_MQTT no implican validación física · Escala nominal, no calibrada · Identidad del sensor no confirmada
@@ -22,80 +30,71 @@
   <main id="contenido" class="layout">
     <section class="diagnostic-workspace" aria-labelledby="diagnostico-titulo">
       <div class="panel-head">
-        <div>
-          <p class="eyebrow">Fuentes separadas: TEST_DATA / REAL_BLE / REAL_MQTT</p>
-          <h1 id="diagnostico-titulo">Diagnóstico IMU</h1>
-        </div>
+        <h1 id="diagnostico-titulo">Diagnóstico IMU</h1>
         <div id="test-state" class="test-state" role="status">Vista previa TEST_DATA · no enviada</div>
       </div>
-      <p class="diagnostic-notice">Selecciona una prueba REAL_BLE o REAL_MQTT para ver sus muestras. Los datos observados siguen sin acreditar identidad, escala o calibración física.</p>
+      <ul class="evidence-legend" aria-label="Tipos de información">
+        <li class="ev ev-test"><code>TEST_DATA</code> Dato de prueba</li>
+        <li class="ev ev-real"><code>REAL_BLE</code> <code>REAL_MQTT</code> Datos recibidos, no certificados</li>
+        <li class="ev ev-error">Error: revisar mensaje de la sesión</li>
+        <li class="ev ev-empty">Sin datos: no hay muestras en la ventana</li>
+      </ul>
 
-      <div class="diagnostic-toolbar" role="group" aria-label="Unidad de visualización">
-        <span class="toolbar-label">Mostrar:</span>
-        <label class="choice"><input type="radio" name="units" value="nominal" checked> Conversión nominal (<code>g</code> / <code>°/s</code>)</label>
-        <label class="choice"><input type="radio" name="units" value="raw"> Cuentas crudas (<code>int16</code>)</label>
-        <span id="source-note" class="muted">Búfer visual limitado a ~30 s.</span>
-      </div>
+      <div class="workspace-grid">
+        <div class="charts-grid">
+          <section class="chart-card" aria-labelledby="acc-chart-title">
+            <div class="chart-head"><h2 id="acc-chart-title">Aceleración X / Y / Z</h2><span id="acc-chart-unit" class="muted">g nominal</span></div>
+            <div class="axis-metrics">
+              <div class="axis-card axis-x"><span>ACC X</span><strong id="metric-ax">—</strong></div>
+              <div class="axis-card axis-y"><span>ACC Y</span><strong id="metric-ay">—</strong></div>
+              <div class="axis-card axis-z"><span>ACC Z</span><strong id="metric-az">—</strong></div>
+            </div>
+            <canvas id="acc-chart" class="imu-chart" width="880" height="280" role="img" aria-label="Gráfica temporal de aceleración X, Y y Z"></canvas>
+            <p class="chart-caption">Ventana de ~30 s. Las líneas se interrumpen en intervalos sin muestras.</p>
+          </section>
+          <section class="chart-card" aria-labelledby="gyro-chart-title">
+            <div class="chart-head"><h2 id="gyro-chart-title">Giroscopio X / Y / Z</h2><span id="gyro-chart-unit" class="muted">°/s nominal</span></div>
+            <div class="axis-metrics">
+              <div class="axis-card axis-x"><span>GYRO X</span><strong id="metric-gx">—</strong></div>
+              <div class="axis-card axis-y"><span>GYRO Y</span><strong id="metric-gy">—</strong></div>
+              <div class="axis-card axis-z"><span>GYRO Z</span><strong id="metric-gz">—</strong></div>
+            </div>
+            <canvas id="gyro-chart" class="imu-chart" width="880" height="280" role="img" aria-label="Gráfica temporal de giroscopio X, Y y Z"></canvas>
+            <p class="chart-caption">Escala nominal, no calibrada. No interpreta maniobras ni valida el sensor.</p>
+          </section>
+        </div>
 
-      <div class="metrics-grid" aria-live="polite">
-        <section class="metrics-group" aria-labelledby="acc-title">
-          <h2 id="acc-title">Aceleración actual</h2>
-          <div class="axis-metrics">
-            <div class="axis-card axis-x"><span>ACC X</span><strong id="metric-ax">—</strong></div>
-            <div class="axis-card axis-y"><span>ACC Y</span><strong id="metric-ay">—</strong></div>
-            <div class="axis-card axis-z"><span>ACC Z</span><strong id="metric-az">—</strong></div>
-          </div>
-        </section>
-        <section class="metrics-group" aria-labelledby="gyro-title">
-          <h2 id="gyro-title">Giroscopio actual</h2>
-          <div class="axis-metrics">
-            <div class="axis-card axis-x"><span>GYRO X</span><strong id="metric-gx">—</strong></div>
-            <div class="axis-card axis-y"><span>GYRO Y</span><strong id="metric-gy">—</strong></div>
-            <div class="axis-card axis-z"><span>GYRO Z</span><strong id="metric-gz">—</strong></div>
-          </div>
-        </section>
-        <section class="metrics-group reception-group" aria-labelledby="reception-title">
-          <h2 id="reception-title">Recepción de la fuente seleccionada</h2>
-          <div class="reception-metrics">
-            <div><span>Frecuencia aprox.</span><strong id="metric-frequency">—</strong></div>
-            <div><span>Muestras en búfer</span><strong id="metric-samples">—</strong></div>
-            <div><span>Huecos detectados</span><strong id="metric-gaps">—</strong></div>
-          </div>
-        </section>
-      </div>
+        <aside class="side-rail">
+          <section class="rail-block reception-group" aria-labelledby="reception-title" aria-live="polite">
+            <h2 id="reception-title">Recepción de la fuente seleccionada</h2>
+            <div class="reception-metrics">
+              <div class="reception-main"><span>Frecuencia aprox.</span><strong id="metric-frequency">—</strong></div>
+              <div><span>Muestras en búfer</span><strong id="metric-samples">—</strong></div>
+              <div><span>Huecos detectados</span><strong id="metric-gaps">—</strong></div>
+            </div>
+            <p id="source-note" class="muted">Búfer visual limitado a ~30 s.</p>
+          </section>
 
-      <div class="charts-grid">
-        <section class="chart-card" aria-labelledby="acc-chart-title">
-          <div class="chart-head"><h2 id="acc-chart-title">Aceleración X / Y / Z</h2><span id="acc-chart-unit" class="muted">g nominal</span></div>
-          <canvas id="acc-chart" class="imu-chart" width="760" height="260" role="img" aria-label="Gráfica temporal de aceleración X, Y y Z"></canvas>
-          <p class="chart-caption">Ventana de ~30 s. Las líneas se interrumpen en intervalos sin muestras.</p>
-        </section>
-        <section class="chart-card" aria-labelledby="gyro-chart-title">
-          <div class="chart-head"><h2 id="gyro-chart-title">Giroscopio X / Y / Z</h2><span id="gyro-chart-unit" class="muted">°/s nominal</span></div>
-          <canvas id="gyro-chart" class="imu-chart" width="760" height="260" role="img" aria-label="Gráfica temporal de giroscopio X, Y y Z"></canvas>
-          <p class="chart-caption">Escala nominal, no calibrada. No interpreta maniobras ni valida el sensor.</p>
-        </section>
+          <section class="rail-block" role="group" aria-labelledby="units-title">
+            <h2 id="units-title">Unidad de visualización</h2>
+            <label class="choice"><input type="radio" name="units" value="nominal" checked> <span>Conversión nominal (<code>g</code> / <code>°/s</code>)</span></label>
+            <label class="choice"><input type="radio" name="units" value="raw"> <span>Cuentas crudas (<code>int16</code>)</span></label>
+          </section>
+
+          <section class="rail-block" aria-labelledby="session-control-title">
+            <h2 id="session-control-title">Control de sesión</h2>
+            <p id="selected-session-label" class="muted">Seleccione una sesión para ver el resumen técnico.</p>
+            <div class="actions-row">
+              <button type="button" id="btn-complete" class="btn btn-primary" disabled>Completar sesión</button>
+              <button type="button" id="btn-cancel" class="btn btn-danger" disabled>Cancelar sesión</button>
+            </div>
+            <p id="session-action-msg" class="status-line" aria-live="polite"></p>
+          </section>
+
+          <p class="diagnostic-notice">Selecciona una prueba REAL_BLE o REAL_MQTT para ver sus muestras. Los datos observados siguen sin acreditar identidad, escala o calibración física.</p>
+        </aside>
       </div>
     </section>
-
-    <details class="glossary">
-      <summary>Términos de esta etapa</summary>
-      <h2 id="glosario-titulo">Términos de esta etapa</h2>
-      <dl>
-        <div>
-          <dt><code>TEST_DATA</code></dt>
-          <dd>Origen asignado por el backend. Los valores RAW son de prueba de software; no son mediciones físicas reales.</dd>
-        </div>
-        <div>
-          <dt><code>OBSERVED</code></dt>
-          <dd>Sesión <code>TEST_DATA</code> completada con una o más muestras. Solo se verificó el flujo de software; nunca equivale a <code>PASSED</code>.</dd>
-        </div>
-        <div>
-          <dt><code>NOT_EVALUATED</code></dt>
-          <dd>Sesión cancelada, o completada sin muestras. No hay datos suficientes para evaluar.</dd>
-        </div>
-      </dl>
-    </details>
 
     <div class="panels secondary-panels">
       <section class="panel" aria-labelledby="dispositivos-titulo">
@@ -150,16 +149,8 @@
       </section>
     </div>
 
-    <details class="panel panel-wide" aria-labelledby="detalle-titulo">
-      <summary id="detalle-titulo">Administración de pruebas</summary>
-      <h2>Detalle de prueba</h2>
-      <p id="selected-session-label" class="muted">Seleccione una sesión para ver el resumen técnico.</p>
-
-      <div class="actions-row">
-        <button type="button" id="btn-complete" class="btn btn-primary" disabled>Completar sesión</button>
-        <button type="button" id="btn-cancel" class="btn btn-danger" disabled>Cancelar sesión</button>
-      </div>
-      <p id="session-action-msg" class="status-line" aria-live="polite"></p>
+    <details class="panel panel-wide" open>
+      <summary id="detalle-titulo">Detalle de prueba y datos sintéticos</summary>
 
       <div id="synthetic-block" class="synthetic" hidden>
         <h3>Datos sintéticos generados por la interfaz</h3>
@@ -178,6 +169,24 @@
       </div>
 
       <div id="session-detail" class="detail"></div>
+    </details>
+
+    <details class="glossary">
+      <summary>Términos de esta etapa</summary>
+      <dl>
+        <div>
+          <dt><code>TEST_DATA</code></dt>
+          <dd>Origen asignado por el backend. Los valores RAW son de prueba de software; no son mediciones físicas reales.</dd>
+        </div>
+        <div>
+          <dt><code>OBSERVED</code></dt>
+          <dd>Sesión <code>TEST_DATA</code> completada con una o más muestras. Solo se verificó el flujo de software; nunca equivale a <code>PASSED</code>.</dd>
+        </div>
+        <div>
+          <dt><code>NOT_EVALUATED</code></dt>
+          <dd>Sesión cancelada, o completada sin muestras. No hay datos suficientes para evaluar.</dd>
+        </div>
+      </dl>
     </details>
   </main>
 

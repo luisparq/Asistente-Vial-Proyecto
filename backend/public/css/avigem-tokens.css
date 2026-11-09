@@ -1,0 +1,53 @@
+/* AVIGEM · tokens compartidos por Vialigent Platform, AVIGEM Fleet y AVIGEM Diagnostics.
+   El espejo nativo vive en mobile/.../core/ui/AsistenteVialTheme.kt. */
+@font-face{font-family:"Archivo";src:url("../fonts/archivo-latin-var.woff2") format("woff2");font-weight:100 900;font-stretch:62% 125%;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url("../fonts/jetbrains-mono-latin-var.woff2") format("woff2");font-weight:100 800;font-display:swap}
+:root{
+  /* Materia */
+  --sillar-50:#FFFDF8;--sillar-100:#F4F1E9;--sillar-200:#EAE6DA;--sillar-300:#D9D4C5;
+  --mineral-400:#A9A79B;--mineral-600:#5F6058;
+  --volcanic-900:#15161A;--graphite-800:#26282D;--graphite-700:#34373D;
+  --night-950:#0C1620;--night-900:#101E2B;--night-850:#162736;--night-800:#1E3244;--night-700:#2C4358;
+  --citrine-400:#D4F23A;--citrine-300:#E0F76E;--citrine-700:#47520A;
+  /* Tipografía */
+  --font:"Archivo","Segoe UI",system-ui,sans-serif;--mono:"JetBrains Mono",Consolas,monospace;
+  --t-xs:.75rem;--t-sm:.8125rem;--t-md:.9375rem;--t-lg:1.125rem;--t-xl:1.5rem;--t-2xl:clamp(1.65rem,2.3vw,2.25rem);
+  /* Espacio, radios, elevación */
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--r-pill:999px;
+  --shadow-1:0 1px 2px rgb(21 22 26/.05),0 8px 24px rgb(21 22 26/.05);
+  /* Movimiento */
+  --ease-out:cubic-bezier(.23,1,.32,1);--fast:140ms;--base:200ms;
+  /* Iconos de estado: forma además de color */
+  --i-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5 6.5 12 13 4.5' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --i-pulse:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='3.5'/%3E%3Ccircle cx='8' cy='8' r='6.5' fill='none' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E");
+  --i-warn:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M8 1.2 15.4 14.6H.6zM7.1 6v4.4h1.8V6zm0 5.4v1.7h1.8v-1.7z'/%3E%3C/svg%3E");
+  --i-x:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3.5 3.5 9 9m0-9-9 9' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  --i-minus:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8h10' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E");
+  --i-flask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M5.5 1h5v1.4h-.8v3.8l4.2 7A1.2 1.2 0 0 1 12.9 15H3.1a1.2 1.2 0 0 1-1-1.8l4.2-7V2.4h-.8zm2.2 1.4v4.2L6.4 8.8h3.2L8.3 6.6V2.4z'/%3E%3C/svg%3E");
+  --i-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8h9.5M8.5 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --i-back:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M13 8H3.5M7.5 4l-4 4 4 4' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --i-chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m6 3.5 4.5 4.5L6 12.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  /* Semántica clara (AVIGEM Fleet) */
+  color-scheme:light;
+  --bg:var(--sillar-100);--surface:var(--sillar-50);--surface-2:var(--sillar-200);--border:var(--sillar-300);--border-strong:var(--mineral-400);
+  --text:var(--volcanic-900);--text-2:var(--mineral-600);
+  --action:var(--volcanic-900);--on-action:var(--sillar-50);--action-hover:var(--graphite-700);
+  --accent:var(--citrine-400);--on-accent:var(--volcanic-900);
+  --link:var(--citrine-700);--focus:var(--volcanic-900);
+  --rail:var(--volcanic-900);--rail-2:var(--graphite-800);--rail-border:#34373D;--rail-text:#E9E6DC;--rail-muted:#A9A79B;
+  --ok:#2C6339;--ok-bg:#E2EDD9;--warn:#7D5200;--warn-bg:#F8EACB;--bad:#9C2F1B;--bad-bg:#F9E1DA;--info:#22507A;--info-bg:#DFE9F2;--idle:#55564F;--idle-bg:#E8E5DA;
+  --chart-1:var(--volcanic-900);--chart-test:#C98A12;--chart-sensor:#22507A;--chart-axis:var(--sillar-300);--chart-label:var(--mineral-600);
+}
+/* Semántica oscura (Vialigent Platform y AVIGEM Diagnostics) */
+.admin-ui,.theme-dark{
+  color-scheme:dark;
+  --bg:var(--night-950);--surface:var(--night-900);--surface-2:var(--night-850);--border:var(--night-800);--border-strong:var(--night-700);
+  --text:#F1EFE7;--text-2:#A9B4BD;
+  --action:var(--citrine-400);--on-action:var(--volcanic-900);--action-hover:var(--citrine-300);
+  --link:var(--citrine-300);--focus:var(--citrine-400);
+  --rail:#091119;--rail-2:var(--night-850);--rail-border:var(--night-800);--rail-text:#E6E8E4;--rail-muted:#94A2AE;
+  --shadow-1:0 1px 2px rgb(0 0 0/.3);
+  --ok:#A9DDB5;--ok-bg:#183626;--warn:#F4CF85;--warn-bg:#3B2C10;--bad:#F5B4A6;--bad-bg:#472017;--info:#A5CCEF;--info-bg:#17324A;--idle:#BAC3CB;--idle-bg:#22313F;
+  --chart-1:var(--citrine-400);--chart-test:#E9B44C;--chart-sensor:#7FB2E0;--chart-axis:var(--night-700);--chart-label:#A9B4BD;
+}

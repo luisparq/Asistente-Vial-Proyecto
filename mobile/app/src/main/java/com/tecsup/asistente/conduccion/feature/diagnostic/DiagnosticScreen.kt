@@ -27,6 +27,7 @@ import com.tecsup.asistente.conduccion.domain.ble.ConnectionStatus
 import java.util.Locale
 import com.tecsup.asistente.conduccion.domain.processing.isStableForLab
 import com.tecsup.asistente.conduccion.core.ui.labelResource
+import com.tecsup.asistente.conduccion.core.ui.tone
 
 @Composable
 fun DiagnosticScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hiltViewModel()) {
@@ -84,7 +85,7 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
     onStartDemoTest: () -> Unit = {}, onStopDemoTest: () -> Unit = {}, onDismissDemoAlert: () -> Unit = {}) {
     ScreenLayout(stringResource(R.string.diagnostic_title), stringResource(R.string.diagnostic_description), onBack) {
         PresentationSection("Conexión del dispositivo") {
-        StatusBadge(stringResource(state.connection.status.labelResource()))
+        StatusBadge(stringResource(state.connection.status.labelResource()), state.connection.status.tone())
         state.connection.device?.let {
             Text(it.name?.takeIf(String::isNotBlank) ?: stringResource(R.string.ble_unnamed))
             Text(it.address, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -151,21 +152,21 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         PresentationSection("Prueba demostrativa provisional") {
             if (demo.active) {
                 Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 ) {
                     Column(Modifier.padding(14.dp)) {
                         Text("PRUEBA DEMOSTRATIVA", style = MaterialTheme.typography.titleMedium,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         Text("Umbral TEST_ONLY", style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = MaterialTheme.colorScheme.onErrorContainer)
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         Text("No representa una maniobra vehicular validada", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer)
+                            color = MaterialTheme.colorScheme.onSurface)
                         Spacer(Modifier.height(8.dp))
                         Text("Duración restante: ${demo.remainingSeconds} s · Detecciones: ${demo.candidates}",
                             style = MaterialTheme.typography.bodyMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer)
+                            color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
                 Text(demo.statusText, style = MaterialTheme.typography.bodyMedium)
@@ -196,74 +197,7 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         }
         Text("No acredita identidad, escala ni calibración física del sensor.", style = MaterialTheme.typography.bodySmall)
         }
-        if (demo.alertVisible) {
-            androidx.compose.ui.window.Dialog(
-                onDismissRequest = onDismissDemoAlert,
-                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.errorContainer
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "⚠️ ALERTA DE CONDUCCIÓN",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            "“${demo.alertMessage}”",
-                            style = MaterialTheme.typography.headlineSmall,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(24.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.surface,
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-                        ) {
-                            Column(Modifier.padding(16.dp), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                                Text(
-                                    "PRUEBA DEMOSTRATIVA",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                                Text(
-                                    "Umbral TEST_ONLY",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
-                                )
-                                Text(
-                                    "No representa una maniobra vehicular validada",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(32.dp))
-                        Button(
-                            onClick = onDismissDemoAlert,
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Text("Cerrar alerta", color = MaterialTheme.colorScheme.onError)
-                        }
-                    }
-                }
-            }
-        }
+        if (demo.alertVisible) DemoAlertOverlay(demo.alertMessage, onDismissDemoAlert)
         PresentationSection("Calibración experimental") {
         Text("Solo desarrollo y mantenimiento. Mantén la IMU inmóvil durante 30 segundos. La inmovilidad no se comprueba automáticamente.")
         Text("Promedios y offsets estimados experimentales: no se aplican ni se guardan permanentemente. WHO_AM_I = 0x75; identidad no confirmada.")

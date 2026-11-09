@@ -34,8 +34,8 @@ class LoginPresentationTest {
         var demo = 0
         var activation = 0
         compose.setContent { MaterialTheme { LoginScreen({ demo++ }, { activation++ }, { _, _ -> }, {}) } }
-        compose.onNodeWithText("Activar mi cuenta").performScrollTo().performClick()
-        compose.onNodeWithText("Probar modo demo").performScrollTo().performClick()
+        compose.onNodeWithText("Activar cuenta").performScrollTo().performClick()
+        compose.onNodeWithText("Probar modo demostración").performScrollTo().performClick()
         assertEquals(1, activation)
         assertEquals(1, demo)
     }
@@ -45,14 +45,14 @@ class LoginPresentationTest {
             LoginScreen({}, {}, { _, _ -> }, {}, AccessState(busy = true))
         } }
         compose.onNodeWithText("Iniciando sesión…").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("Activar mi cuenta").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("Probar modo demo").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Activar cuenta").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Probar modo demostración").performScrollTo().assertIsNotEnabled()
     }
 
     @Test fun welcomeUsesProvidedNameWithoutInventingProfile() {
         compose.setContent { MaterialTheme { WelcomeScreen("TEST conductor", {}) } }
         compose.onNodeWithText("Hola, TEST conductor").assertIsDisplayed()
-        compose.onNodeWithText("Bienvenido a Asistente Vial").assertIsDisplayed()
+        compose.onNodeWithText("Bienvenido a AVIGEM").assertIsDisplayed()
     }
 
     @Test fun demoShowsExplicitSimulatedNotice() {

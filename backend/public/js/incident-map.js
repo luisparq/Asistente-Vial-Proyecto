@@ -30,9 +30,9 @@
     map.addSource('incidents', {type:'geojson', data});
     map.addLayer({id:'incident-heat', type:'heatmap', source:'incidents', layout:{visibility:'none'}, paint:{
       'heatmap-weight':1, 'heatmap-intensity':1.5, 'heatmap-radius':35, 'heatmap-opacity':0.8,
-      'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',0.15,'#36b8cd',0.4,'#31b98a',0.65,'#f9cb51',1,'#ec5845']}});
+      'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(0,0,0,0)',0.15,'#D4F23A',0.4,'#E9B44C',0.65,'#C96A1B',1,'#9C2F1B']}});
     map.addLayer({id:'incident-points', type:'circle', source:'incidents', paint:{'circle-radius':7,
-      'circle-color':['match',['get','origin'],'SIMULATED','#d99720','#137a90'], 'circle-stroke-color':'#fff','circle-stroke-width':2}});
+      'circle-color':['match',['get','origin'],'SIMULATED','#C98A12','#22507A'], 'circle-stroke-color':'#fff','circle-stroke-width':2}});
     map.addLayer({id:'incident-hit', type:'circle', source:'incidents', paint:{'circle-radius':18,'circle-opacity':0,'circle-stroke-opacity':0}});
     map.on('click','incident-hit',e=> { if (e.features.length) detail(e.features[0]); });
     map.on('mouseenter','incident-hit',()=>map.getCanvas().style.cursor='pointer');

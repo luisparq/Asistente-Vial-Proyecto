@@ -3,7 +3,7 @@
 @section('description', 'Eventos georreferenciados de tu empresa. Sin seguimiento en tiempo real.')
 @push('head')
 <link rel="stylesheet" href="{{ asset('vendor/maplibre/maplibre-gl.css') }}">
-<link rel="stylesheet" href="{{ asset('css/incident-map.css') }}">
+
 @endpush
 @section('content')
 <form class="filters panel" method="get" action="{{ route('dashboard.map') }}">
@@ -14,7 +14,7 @@
 <button class="button primary">Aplicar filtros</button><a href="{{ route('dashboard.map') }}">Limpiar</a></form>
 <section class="panel incident-panel">
 <div class="panel-heading"><div><h2>{{ count($geojson['features']) }} {{ count($geojson['features']) === 1 ? 'evento' : 'eventos' }} con ubicación</h2><p>Solo coordenadas válidas; registros sin ubicación excluidos.</p></div><div class="map-modes" role="group" aria-label="Visualización del mapa"><button id="mode-markers" type="button" class="button primary" aria-pressed="true" disabled>Marcadores</button><button id="mode-heat" type="button" class="button" aria-pressed="false" disabled>Mapa de calor</button></div></div>
-<div class="map-legend"><span><i class="legend-dot simulated"></i> SIMULATED · prueba</span><span><i class="legend-dot sensor"></i> SENSOR · futuro, no validado</span><span id="heat-legend" hidden>Menor concentración <i class="heat-scale"></i> Mayor concentración</span></div>
+<div class="map-legend"><span><i class="legend-dot simulated"></i> Dato de prueba (SIMULATED)</span><span><i class="legend-dot sensor"></i> SENSOR · reservado, sin validación física</span><span id="heat-legend" hidden>Menor concentración <i class="heat-scale"></i> Mayor concentración</span></div>
 <p class="context">La intensidad indica concentración relativa de registros al zoom actual, no riesgo vial demostrado. Incluso un solo evento produce una señal de calor. Los datos de prueba no acreditan zonas peligrosas.</p>
 <p id="map-status" role="status">Cargando cartografía…</p>
 @if(count($geojson['features']) === 0)<p class="empty">No hay eventos con ubicación para estos filtros.</p>@endif

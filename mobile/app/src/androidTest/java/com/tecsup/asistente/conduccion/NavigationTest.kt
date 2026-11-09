@@ -1,5 +1,8 @@
 package com.tecsup.asistente.conduccion
 
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -28,13 +31,13 @@ class NavigationTest {
 
     @Test
     fun opensActivationFromLoginAndReturnsWithoutRequiringWeb() {
-        compose.waitForText("Activar mi cuenta")
-        compose.onNodeWithText("Activar mi cuenta").performScrollTo().performClick()
+        compose.waitForText("Activar cuenta")
+        compose.onNodeWithText("Activar cuenta").performScrollTo().performClick()
         compose.onNodeWithText("Código de activación").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Nueva contraseña").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Confirmar contraseña").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(compose.activity.getString(R.string.back)).performClick()
-        compose.onNodeWithText("Activar mi cuenta").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Activar cuenta").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -50,6 +53,7 @@ class NavigationTest {
             compose.onNodeWithText(text(R.string.home_title)).assertIsDisplayed()
         }
         compose.onNodeWithText(text(R.string.ble_title)).performScrollTo().performClick()
+        compose.onNodeWithTag("ble_list").performScrollToNode(hasText(text(R.string.diagnostic_title)))
         compose.onNodeWithText(text(R.string.diagnostic_title)).performClick()
         compose.onNodeWithText(text(R.string.diagnostic_title)).assertIsDisplayed()
         compose.onNodeWithText(text(R.string.back)).performClick()

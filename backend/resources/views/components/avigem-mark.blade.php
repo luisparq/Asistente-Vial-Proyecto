@@ -1,0 +1,3 @@
+@props(['size' => 28])
+{{-- Símbolo provisional AVIGEM: vía en perspectiva, carril central y punto de asistencia. Pendiente de aprobación. --}}
+<svg {{ $attributes->merge(['class' => 'avigem-mark']) }} width="{{ $size }}" height="{{ $size }}" viewBox="0 0 48 48" fill="none" aria-hidden="true"><g stroke="currentColor" stroke-linecap="round"><path pathLength="1" stroke-width="5.5" d="M10 41 21 14"/><path pathLength="1" stroke-width="5.5" d="M38 41 27 14"/><path stroke-width="4" d="M24 41v-6"/><path stroke-width="3.2" d="M24 28.5V25"/></g><circle class="avigem-node" cx="24" cy="8" r="4.6"/></svg>

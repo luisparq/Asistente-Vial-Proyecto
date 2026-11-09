@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +22,7 @@ import com.tecsup.asistente.conduccion.core.ui.LoadState
 import com.tecsup.asistente.conduccion.core.ui.ReadError
 import com.tecsup.asistente.conduccion.core.ui.ScreenLayout
 import com.tecsup.asistente.conduccion.core.ui.TripInfo
+import com.tecsup.asistente.conduccion.core.ui.InfoCard
 
 @Composable
 fun TripDetailScreen(onBack: () -> Unit, viewModel: TripDetailViewModel = hiltViewModel()) {
@@ -40,17 +40,13 @@ fun TripDetailScreen(onBack: () -> Unit, viewModel: TripDetailViewModel = hiltVi
                     Text(stringResource(R.string.trip_not_found))
                 } else {
                     LazyColumn(modifier = Modifier.weight(1f).testTag("events_list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        item { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { TripInfo(detail.trip) } }
+                        item { InfoCard { TripInfo(detail.trip) } }
                         item { Text(stringResource(R.string.event_count, detail.events.size)) }
                         if (detail.events.isEmpty()) {
                             item { Text(stringResource(R.string.no_events)) }
                         }
                         items(detail.events, key = { it.id }) { event ->
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    EventInfo(event)
-                                }
-                            }
+                            InfoCard { EventInfo(event) }
                         }
                     }
                 }

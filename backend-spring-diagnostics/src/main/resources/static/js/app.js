@@ -8,7 +8,7 @@
   var DIAGNOSTIC_WINDOW_MS = 30000;
   var NOMINAL_ACCEL_LSB_PER_G = 16384;
   var NOMINAL_GYRO_LSB_PER_DPS = 131;
-  var AXIS_COLORS = ["#7eb6ff", "#69d5a3", "#f5c36a"];
+  var AXIS_COLORS = ["#D4F23A", "#7FC8F8", "#F59E6B"];
 
   var state = {
     devicePage: 0,
@@ -416,6 +416,7 @@
     els.metricFrequency.textContent = reception.frequency + " Hz";
     els.metricSamples.textContent = String(samples.length);
     els.metricGaps.textContent = String(reception.gaps);
+    els.testState.dataset.source = samples.length ? state.diagnosticSource : "EMPTY";
     els.sourceNote.textContent = samples.length + " muestras " + state.diagnosticSource + " en ventana visual de ~30 s · " + reception.gaps + " hueco(s).";
     var raw = state.units === "raw";
     els.accChartUnit.textContent = raw ? "int16 crudo" : "g nominal";
@@ -469,21 +470,21 @@
     minimum -= range * 0.15;
     maximum += range * 0.15;
     context.clearRect(0, 0, width, height);
-    context.fillStyle = "#0b1016";
+    context.fillStyle = "#0C1620";
     context.fillRect(0, 0, width, height);
-    context.strokeStyle = "#273545";
+    context.strokeStyle = "#1E3244";
     context.lineWidth = 1;
     for (var row = 0; row <= 4; row += 1) {
       var y = padding.top + (height - padding.top - padding.bottom) * row / 4;
       context.beginPath(); context.moveTo(padding.left, y); context.lineTo(width - padding.right, y); context.stroke();
     }
-    context.fillStyle = "#b7c3d0";
-    context.font = "12px Segoe UI";
+    context.fillStyle = "#A9B4BD";
+    context.font = "12px Archivo, Segoe UI, sans-serif";
     context.fillText(maximum.toFixed(2), 2, padding.top + 4);
     context.fillText(minimum.toFixed(2), 2, height - padding.bottom + 4);
     context.fillText("-30 s", padding.left, height - 7);
     context.fillText("ahora", width - padding.right - 34, height - 7);
-    context.fillStyle = "#f2f5f8";
+    context.fillStyle = "#F1EFE7";
     context.fillText(label + " · " + (state.units === "raw" ? "int16" : "nominal"), padding.left, 14);
     fields.forEach(function (field, fieldIndex) {
       context.strokeStyle = AXIS_COLORS[fieldIndex];
@@ -508,7 +509,7 @@
       var x = width - padding.right - 125 + index * 42;
       context.fillStyle = AXIS_COLORS[index];
       context.fillRect(x, 8, 10, 3);
-      context.fillStyle = "#b7c3d0";
+      context.fillStyle = "#A9B4BD";
       context.fillText(field.replace("Raw", "").toUpperCase().slice(-1), x + 14, 14);
     });
   }

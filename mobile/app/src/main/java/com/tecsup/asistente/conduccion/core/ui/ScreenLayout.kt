@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -57,13 +56,13 @@ fun ScreenLayout(
         Column(
             modifier = Modifier.fillMaxSize().padding(padding)
                 .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                .padding(horizontal = 22.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (LocalDemoMode.current) {
-                Card(Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Modo demostración", style = MaterialTheme.typography.titleSmall)
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        StatusBadge("Modo demostración", StatusTone.WARNING)
                         Text("Los datos y eventos generados en este modo son simulados y no representan detecciones físicas reales.",
                             style = MaterialTheme.typography.bodySmall)
                     }

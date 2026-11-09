@@ -23,6 +23,7 @@ import com.tecsup.asistente.conduccion.core.ui.PresentationSection
 import com.tecsup.asistente.conduccion.core.ui.StatusBadge
 import androidx.compose.foundation.layout.heightIn
 import com.tecsup.asistente.conduccion.core.ui.labelResource
+import com.tecsup.asistente.conduccion.core.ui.tone
 import com.tecsup.asistente.conduccion.domain.ble.BleAvailability
 import com.tecsup.asistente.conduccion.domain.ble.ConnectionStatus
 import com.tecsup.asistente.conduccion.domain.ble.ScanStatus
@@ -52,11 +53,11 @@ fun BleContent(
         LazyColumn(modifier = Modifier.weight(1f).testTag("ble_list"),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
-                PresentationSection("Conexión del asistente") {
+                PresentationSection("AVIGEM One") {
                     StatusBadge(if (state.scan.availability == BleAvailability.PERMISSION_REQUIRED) "Permisos requeridos"
                         else if (state.reconnection.running) "Reconectando"
                         else if (state.connection.status == ConnectionStatus.SELECTED && state.reconnection.message?.startsWith("Desconectado") == true) "Desconectado"
-                        else stringResource(state.connection.status.labelResource()))
+                        else stringResource(state.connection.status.labelResource()), state.connection.status.tone())
                     state.connection.device?.let { device ->
                         Text(device.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.ble_unnamed))
                         Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -73,11 +74,6 @@ fun BleContent(
                     state.connection.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Text(stringResource(R.string.ble_not_verified))
                 }
-            }
-            item {
-                Text("Herramientas técnicas", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = onDiagnostic) { Text(stringResource(R.string.diagnostic_title)) }
-                Text("Consulta técnica de las mediciones del dispositivo.", style = MaterialTheme.typography.bodySmall)
             }
             item {
                 PresentationSection("Buscar dispositivos") {
@@ -126,7 +122,7 @@ fun BleContent(
                 Text(stringResource(if (state.scan.status == ScanStatus.IDLE) R.string.ble_no_scan else R.string.ble_no_devices))
             }
             items(state.scan.devices, key = { it.address }) { device ->
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth(), colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(device.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.ble_unnamed))
                         Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -135,6 +131,10 @@ fun BleContent(
                         }
                     }
                 }
+            }
+            item {
+                TextButton(onClick = onDiagnostic, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.diagnostic_title)) }
+                Text("Herramienta técnica: consulta de mediciones del dispositivo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

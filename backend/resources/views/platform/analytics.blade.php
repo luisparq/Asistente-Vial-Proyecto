@@ -1,7 +1,7 @@
 @extends('platform.layout')
 @section('title','Análisis global de actividad')
 @section('content')
-<link rel="stylesheet" href="{{ asset('css/platform-overview.css') }}"><link rel="stylesheet" href="{{ asset('css/platform-analytics.css') }}"><link rel="stylesheet" href="{{ asset('vendor/maplibre/maplibre-gl.css') }}"><link rel="stylesheet" href="{{ asset('css/incident-map.css') }}">
+<link rel="stylesheet" href="{{ asset('vendor/maplibre/maplibre-gl.css') }}">
 <p>Periodo: {{ $filters['from'] }} a {{ $filters['to'] }}, inclusive · America/Lima. Volumen de registros, no evaluación de seguridad.</p>
 <form method="get" class="filters panel" action="{{ route('platform.analytics') }}">
 <div><label for="company_id">Empresa</label><select name="company_id" id="company_id"><option value="">Todas</option>@foreach($companies as $company)<option value="{{ $company->id }}" @selected(($filters['company_id']??'')==$company->id)>{{ $company->name }}</option>@endforeach</select></div>

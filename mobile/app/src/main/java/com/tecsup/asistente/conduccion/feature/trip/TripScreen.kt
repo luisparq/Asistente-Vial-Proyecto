@@ -3,11 +3,11 @@ package com.tecsup.asistente.conduccion.feature.trip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -27,6 +27,7 @@ import com.tecsup.asistente.conduccion.core.ui.LoadState
 import com.tecsup.asistente.conduccion.core.ui.ReadError
 import com.tecsup.asistente.conduccion.core.ui.ScreenLayout
 import com.tecsup.asistente.conduccion.core.ui.TripInfo
+import com.tecsup.asistente.conduccion.core.ui.InfoCard
 import com.tecsup.asistente.conduccion.core.ui.labelResource
 import com.tecsup.asistente.conduccion.domain.model.DrivingEventType
 
@@ -60,14 +61,14 @@ fun TripScreen(
                     Text(stringResource(R.string.event_count, detail.events.size))
                     LazyColumn(modifier = Modifier.weight(1f).testTag("trip_list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         item {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            InfoCard {
                                 TripInfo(detail.trip)
-                                Text(stringResource(R.string.active_survives_close))
+                                Text(stringResource(R.string.active_survives_close), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         item {
                             Button(onClick = viewModel::finish, enabled = !action.busy && !action.openHistory,
-                                modifier = Modifier.fillMaxWidth()) {
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp), shape = MaterialTheme.shapes.small) {
                                 Text(stringResource(R.string.finish_trip))
                             }
                         }
@@ -79,11 +80,7 @@ fun TripScreen(
                         }
                         if (detail.events.isEmpty()) item { Text(stringResource(R.string.no_events)) }
                         items(detail.events, key = { "event-${it.id}" }) { event ->
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    EventInfo(event)
-                                }
-                            }
+                            InfoCard { EventInfo(event) }
                         }
                     }
                 }

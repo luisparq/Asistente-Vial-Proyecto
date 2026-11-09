@@ -1,7 +1,10 @@
 package com.tecsup.asistente.conduccion.feature.login
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tecsup.asistente.conduccion.core.ui.ScreenLayout
@@ -16,14 +19,14 @@ fun ActivationScreen(onBack: () -> Unit, onLogin: (String) -> Unit, viewModel: A
     var confirmation by remember { mutableStateOf("") }
     ScreenLayout("Activar cuenta", "Introduce el código que tu empresa te entregó de forma privada.", onBack) {
         if (!state.activated) {
-            OutlinedTextField(code, { code = it }, label = { Text("Código de activación") }, singleLine = true, enabled = !state.busy)
+            OutlinedTextField(code, { code = it }, label = { Text("Código de activación") }, singleLine = true, enabled = !state.busy, modifier = androidx.compose.ui.Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small)
             PasswordField(password, { password = it }, "Nueva contraseña", enabled = !state.busy)
             PasswordField(confirmation, { confirmation = it }, "Confirmar contraseña", enabled = !state.busy)
             Text("La contraseña debe tener al menos 12 caracteres. El código vence en 24 horas y permite un solo uso.")
             Button(onClick = {
                 viewModel.activate(url, code, password, confirmation)
                 password = ""; confirmation = ""
-            }, enabled = !state.busy && code.isNotBlank() && password.isNotEmpty() && confirmation.isNotEmpty()) {
+            }, enabled = !state.busy && code.isNotBlank() && password.isNotEmpty() && confirmation.isNotEmpty(), modifier = androidx.compose.ui.Modifier.fillMaxWidth().heightIn(min = 54.dp), shape = MaterialTheme.shapes.small) {
                 Text(if (state.busy) "Activando…" else "Activar cuenta")
             }
         }

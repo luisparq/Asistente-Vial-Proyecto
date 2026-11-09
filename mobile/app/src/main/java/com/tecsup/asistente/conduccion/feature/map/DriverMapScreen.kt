@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -42,13 +43,13 @@ fun DriverMapScreen(onBack:()->Unit,viewModel:DriverMapViewModel=hiltViewModel()
                 GpsStatus.WAITING -> "Esperando posición GPS"
             },style=MaterialTheme.typography.titleMedium)
             state.position?.let { Text("Latitud: ${it.latitude} · Longitud: ${it.longitude}", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant) }
-            Button(onClick={center++},enabled=state.position!=null) { Text("Centrar mi posición") }
+            Button(onClick={center++},enabled=state.position!=null,modifier=Modifier.fillMaxWidth().heightIn(min=50.dp),shape=MaterialTheme.shapes.small) { Text("Centrar mi posición") }
         } }
-        Text("Turquesa: posición actual · Ámbar: eventos SIMULATED del recorrido activo", style=MaterialTheme.typography.labelLarge)
-        Text("${state.events.size} eventos de prueba con ubicación. No son detecciones físicas ni zonas de riesgo comprobadas.")
+        Text("Punto grande citrino: posición actual · Punto ámbar: datos de prueba SIMULATED del recorrido activo", style=MaterialTheme.typography.labelMedium)
+        Text("${state.events.size} eventos de prueba con ubicación. No son detecciones físicas ni zonas de riesgo comprobadas.", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
         mapError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
         NativeDriverMap(state,center,{mapError=it})
-        Text("La cartografía requiere Internet. El monitoreo, los recorridos y la sincronización funcionan sin mantener este mapa abierto.")
+        Text("La cartografía requiere Internet. El monitoreo, los recorridos y la sincronización funcionan sin mantener este mapa abierto.", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -84,8 +85,8 @@ private fun NativeDriverMap(state:DriverMapState,center:Int,onError:(String)->Un
                 if(!alive) return@setStyle
                 style.addSource(GeoJsonSource("current-gps","{\"type\":\"FeatureCollection\",\"features\":[]}"))
                 style.addSource(GeoJsonSource("trip-events","{\"type\":\"FeatureCollection\",\"features\":[]}"))
-                style.addLayer(CircleLayer("event-points","trip-events").withProperties(circleColor(Color.rgb(217,151,32)),circleRadius(7f),circleStrokeColor(Color.WHITE),circleStrokeWidth(2f)))
-                style.addLayer(CircleLayer("gps-point","current-gps").withProperties(circleColor(Color.rgb(20,170,160)),circleRadius(9f),circleStrokeColor(Color.WHITE),circleStrokeWidth(3f)))
+                style.addLayer(CircleLayer("event-points","trip-events").withProperties(circleColor(Color.rgb(201,138,18)),circleRadius(7f),circleStrokeColor(Color.WHITE),circleStrokeWidth(2f)))
+                style.addLayer(CircleLayer("gps-point","current-gps").withProperties(circleColor(Color.rgb(212,242,58)),circleRadius(9f),circleStrokeColor(Color.rgb(21,22,26)),circleStrokeWidth(3f)))
                 ready=true
             }
             loaded.addOnMapClickListener { coordinate ->
@@ -113,6 +114,6 @@ private fun NativeDriverMap(state:DriverMapState,center:Int,onError:(String)->Un
     }
     LaunchedEffect(center,ready) { if(center>0 && ready)state.position?.let { map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude,it.longitude),15.0)) } }
     LaunchedEffect(state.tripId) { selected=null }
-    AndroidView(factory={view},modifier=Modifier.fillMaxWidth().height(420.dp))
+    AndroidView(factory={view},modifier=Modifier.fillMaxWidth().height(420.dp).clip(MaterialTheme.shapes.large))
     selected?.let { Text(it) }
 }

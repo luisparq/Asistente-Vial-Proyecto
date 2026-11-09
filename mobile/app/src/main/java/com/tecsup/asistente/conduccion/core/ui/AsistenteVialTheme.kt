@@ -1,72 +1,127 @@
 package com.tecsup.asistente.conduccion.core.ui
 
+import android.provider.Settings
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.tecsup.asistente.conduccion.R
+
+/** Espejo nativo de backend/public/css/avigem-tokens.css. */
+object AvigemColors {
+    val Sillar50 = Color(0xFFFFFDF8)
+    val Sillar100 = Color(0xFFF4F1E9)
+    val Sillar200 = Color(0xFFEAE6DA)
+    val Sillar300 = Color(0xFFD9D4C5)
+    val Mineral400 = Color(0xFFA9A79B)
+    val Mineral600 = Color(0xFF5F6058)
+    val Volcanic = Color(0xFF15161A)
+    val Graphite = Color(0xFF26282D)
+    val Graphite700 = Color(0xFF34373D)
+    val Citrine = Color(0xFFD4F23A)
+    val Citrine300 = Color(0xFFE0F76E)
+}
+
+private val Archivo = FontFamily(
+    Font(R.font.archivo_regular, FontWeight.Normal),
+    Font(R.font.archivo_medium, FontWeight.Medium),
+    Font(R.font.archivo_semibold, FontWeight.SemiBold),
+    Font(R.font.archivo_bold, FontWeight.Bold),
+)
+val ArchivoExpanded = FontFamily(Font(R.font.archivo_expanded_bold, FontWeight.Bold))
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFFAA4224),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFDCCB),
-    onPrimaryContainer = Color(0xFF55200F),
-    secondary = Color(0xFF5E6250),
-    secondaryContainer = Color(0xFFE7E8DA),
-    onSecondaryContainer = Color(0xFF34382C),
-    tertiary = Color(0xFF725D87),
-    background = Color(0xFFF5F2EB),
-    surface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFFECE7DD),
-    surfaceContainer = Color(0xFFF0ECE4),
-    surfaceContainerLow = Color(0xFFF9F6F0),
-    surfaceContainerHigh = Color(0xFFEAE5DB),
-    outline = Color(0xFF82796F),
-    outlineVariant = Color(0xFFDFD8CB),
-    onSurfaceVariant = Color(0xFF6C635B),
-    onSurface = Color(0xFF292721),
-    onBackground = Color(0xFF292721),
-)
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFFFFB491),
-    onPrimary = Color(0xFF55200F),
-    primaryContainer = Color(0xFF71341E),
-    onPrimaryContainer = Color(0xFFFFDCCB),
-    secondary = Color(0xFFC6CBB2),
-    tertiary = Color(0xFFD4BCE8),
-    secondaryContainer = Color(0xFF393D30),
-    onSecondaryContainer = Color(0xFFE7E8DA),
-    background = Color(0xFF1B1B18),
-    surface = Color(0xFF252521),
-    surfaceVariant = Color(0xFF38362F),
-    surfaceContainer = Color(0xFF2B2A25),
-    surfaceContainerLow = Color(0xFF22221E),
-    surfaceContainerHigh = Color(0xFF34322C),
-    outline = Color(0xFFA69B8D),
-    outlineVariant = Color(0xFF4C483F),
-    onSurfaceVariant = Color(0xFFCCC3B5),
-    onSurface = Color(0xFFF0ECE2),
-    onBackground = Color(0xFFF0ECE2),
+    primary = AvigemColors.Volcanic,
+    onPrimary = AvigemColors.Sillar50,
+    primaryContainer = AvigemColors.Citrine,
+    onPrimaryContainer = AvigemColors.Volcanic,
+    secondary = AvigemColors.Mineral600,
+    onSecondary = AvigemColors.Sillar50,
+    secondaryContainer = AvigemColors.Sillar200,
+    onSecondaryContainer = AvigemColors.Volcanic,
+    tertiary = Color(0xFF22507A),
+    onTertiary = AvigemColors.Sillar50,
+    background = AvigemColors.Sillar100,
+    onBackground = AvigemColors.Volcanic,
+    surface = AvigemColors.Sillar50,
+    onSurface = AvigemColors.Volcanic,
+    surfaceVariant = AvigemColors.Sillar200,
+    onSurfaceVariant = AvigemColors.Mineral600,
+    surfaceContainerLowest = AvigemColors.Sillar50,
+    surfaceContainerLow = AvigemColors.Sillar50,
+    surfaceContainer = AvigemColors.Sillar200,
+    surfaceContainerHigh = AvigemColors.Sillar200,
+    surfaceContainerHighest = AvigemColors.Sillar300,
+    outline = AvigemColors.Mineral400,
+    outlineVariant = AvigemColors.Sillar300,
+    error = Color(0xFF9C2F1B),
+    onError = AvigemColors.Sillar50,
+    errorContainer = Color(0xFFF9E1DA),
+    onErrorContainer = Color(0xFF6B1F11),
 )
 
-private val AppTypography = Typography(
-    headlineLarge = TextStyle(fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-1).sp, fontWeight = FontWeight.Bold),
-    headlineMedium = TextStyle(fontSize = 29.sp, lineHeight = 35.sp, letterSpacing = (-0.7).sp, fontWeight = FontWeight.Bold),
-    titleLarge = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 25.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 22.sp),
-    labelLarge = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.sp, fontWeight = FontWeight.SemiBold),
+private val DarkColors = darkColorScheme(
+    primary = AvigemColors.Citrine,
+    onPrimary = AvigemColors.Volcanic,
+    primaryContainer = AvigemColors.Citrine,
+    onPrimaryContainer = AvigemColors.Volcanic,
+    secondary = AvigemColors.Mineral400,
+    onSecondary = AvigemColors.Volcanic,
+    secondaryContainer = AvigemColors.Graphite700,
+    onSecondaryContainer = Color(0xFFF1EFE7),
+    tertiary = Color(0xFFA5CCEF),
+    onTertiary = AvigemColors.Volcanic,
+    background = AvigemColors.Volcanic,
+    onBackground = Color(0xFFF1EFE7),
+    surface = AvigemColors.Graphite,
+    onSurface = Color(0xFFF1EFE7),
+    surfaceVariant = AvigemColors.Graphite700,
+    onSurfaceVariant = Color(0xFFC6C4B9),
+    surfaceContainerLowest = AvigemColors.Volcanic,
+    surfaceContainerLow = AvigemColors.Graphite,
+    surfaceContainer = AvigemColors.Graphite,
+    surfaceContainerHigh = AvigemColors.Graphite700,
+    surfaceContainerHighest = AvigemColors.Graphite700,
+    outline = AvigemColors.Mineral400,
+    outlineVariant = AvigemColors.Graphite700,
+    error = Color(0xFFF5B4A6),
+    onError = Color(0xFF472017),
+    errorContainer = Color(0xFF472017),
+    onErrorContainer = Color(0xFFF5B4A6),
 )
-private val AppShapes = Shapes(small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(22.dp))
+
+private fun style(size: Int, line: Int, weight: FontWeight = FontWeight.Normal, tracking: Double = 0.0, family: FontFamily = Archivo) =
+    TextStyle(fontFamily = family, fontSize = size.sp, lineHeight = line.sp, fontWeight = weight, letterSpacing = tracking.sp)
+
+private val AppTypography = Typography(
+    displaySmall = style(36, 40, FontWeight.Bold, -0.5, ArchivoExpanded),
+    headlineLarge = style(30, 36, FontWeight.Bold, -0.5, ArchivoExpanded),
+    headlineMedium = style(26, 32, FontWeight.Bold, -0.3, ArchivoExpanded),
+    headlineSmall = style(22, 28, FontWeight.SemiBold, -0.2),
+    titleLarge = style(20, 26, FontWeight.SemiBold),
+    titleMedium = style(17, 24, FontWeight.SemiBold),
+    titleSmall = style(15, 21, FontWeight.SemiBold),
+    bodyLarge = style(16, 24),
+    bodyMedium = style(14, 21),
+    bodySmall = style(13, 19),
+    labelLarge = style(14, 20, FontWeight.SemiBold),
+    labelMedium = style(13, 18, FontWeight.Medium),
+    labelSmall = style(12, 16, FontWeight.Medium),
+)
+private val AppShapes = Shapes(small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(16.dp))
 
 @Composable
 fun AsistenteVialTheme(content: @Composable () -> Unit) {
@@ -76,4 +131,13 @@ fun AsistenteVialTheme(content: @Composable () -> Unit) {
         shapes = AppShapes,
         content = content,
     )
+}
+
+/** True si el usuario desactivó las animaciones del sistema. */
+@Composable
+fun rememberReducedMotion(): Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
 }
