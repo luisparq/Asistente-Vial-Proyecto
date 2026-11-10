@@ -23,7 +23,9 @@ class SyncViewModel @Inject constructor(store: SessionStore, db: AsistenteVialDa
     val busy = MutableStateFlow(false)
     val syncing = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
-    private fun perform(isSync: Boolean = false, action: suspend () -> String) {
+    /** Se muestra junto al botón "Cerrar sesión", no al final de la configuración avanzada. */
+    val logoutError = MutableStateFlow<String?>(null)
+    private fun perform(isSync: Boolean = false, action: suspend () -> String?) {
         // Reserve synchronously, before launching: rapid taps cannot queue extra attempts.
         if (!busy.compareAndSet(false, true)) return
         syncing.value = isSync
@@ -36,7 +38,12 @@ class SyncViewModel @Inject constructor(store: SessionStore, db: AsistenteVialDa
         }
     }
     fun login(url: String, email: String, password: String) = perform { account.login(url, email, password); "Operación completada." }
-    fun logout() = perform { account.logout(); "Operación completada." }
+    fun logout() = perform {
+        logoutError.value = null
+        try { account.logout() }
+        catch (blocked: IllegalStateException) { logoutError.value = blocked.message }
+        null
+    }
     fun adopt(id: Long) = perform { account.adopt(id); "Operación completada." }
     fun sync() = perform(isSync = true) {
         var needsBackup = true

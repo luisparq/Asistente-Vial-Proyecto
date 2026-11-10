@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -32,7 +33,7 @@ private val EaseOut = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
 
 /** Solo presentación: el buzzer y la voz siguen controlados por DiagnosticScreen y su ViewModel. */
 @Composable
-fun DemoAlertOverlay(message: String, onDismiss: () -> Unit) {
+fun DemoAlertOverlay(title: String, observed: String, threshold: String, onDismiss: () -> Unit) {
     val reducedMotion = rememberReducedMotion()
     val entrance = remember { Animatable(if (reducedMotion) 1f else 0f) }
     val ring = remember { Animatable(if (reducedMotion) 1f else 0f) }
@@ -68,9 +69,13 @@ fun DemoAlertOverlay(message: String, onDismiss: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(28.dp))
-                Text("Alerta de conducción", style = MaterialTheme.typography.titleMedium, color = AvigemColors.Mineral400)
+                Text("PRUEBA DEMOSTRATIVA · TEST_ONLY", style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = AvigemColors.Mineral400)
                 Spacer(Modifier.height(10.dp))
-                Text(message, style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center, color = AvigemColors.Sillar100)
+                Text(title, style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center, color = AvigemColors.Sillar100)
+                Spacer(Modifier.height(16.dp))
+                Text(observed, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, color = AvigemColors.Sillar100)
+                Spacer(Modifier.height(4.dp))
+                Text("Umbral: $threshold", style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, color = AvigemColors.Sillar200)
                 Spacer(Modifier.weight(1f))
                 Surface(color = AvigemColors.Graphite, shape = MaterialTheme.shapes.small) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {

@@ -44,6 +44,9 @@ class DrivingEventDetector(private val configuration: DetectorConfiguration? = n
     private var previousTimestamp: Long? = null
     fun reset() { windows.clear(); previousTimestamp = null }
 
+    /** Read-only count of samples currently above the trigger; does not change detector decisions. */
+    fun consecutiveTriggers(type: DrivingEventType): Int = windows[type]?.triggerCount ?: 0
+
     /** Read-only temporal evidence for the experimental UI; does not change detector decisions. */
     fun evidence(type: DrivingEventType, now: Long): String {
         val window = windows[type] ?: return "Sin evidencia"

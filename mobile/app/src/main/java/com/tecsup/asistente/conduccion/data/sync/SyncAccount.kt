@@ -5,7 +5,9 @@ import com.tecsup.asistente.conduccion.data.local.*
 import com.tecsup.asistente.conduccion.data.network.*
 import com.tecsup.asistente.conduccion.domain.sync.*
 import javax.inject.Inject
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 
 class SyncAccount @Inject constructor(private val db: AsistenteVialDatabase, private val session: SessionStore, private val api: LaravelApi, private val scheduler: SyncScheduler) {
@@ -35,7 +37,10 @@ class SyncAccount @Inject constructor(private val db: AsistenteVialDatabase, pri
             check(active == null) { "Finaliza el recorrido antes de cerrar sesión." }
             session.state.value.also { session.save(null) }
         }
-        if (previous?.token != null) runCatching { api.request(previous.baseUrl, "api/v1/auth/token", previous.token, method = "DELETE") }
+        // La pantalla navega al limpiar la sesión; revocar el token no debe cancelarse con su ViewModel.
+        if (previous?.token != null) withContext(NonCancellable) {
+            runCatching { api.request(previous.baseUrl, "api/v1/auth/token", previous.token, method = "DELETE") }
+        }
     }
     suspend fun adopt(id: Long) {
         session.gate.withLock {

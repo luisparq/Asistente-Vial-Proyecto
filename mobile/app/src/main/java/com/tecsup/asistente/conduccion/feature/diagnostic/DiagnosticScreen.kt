@@ -72,6 +72,26 @@ fun DiagnosticScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hiltVi
         realBleUpload, viewModel::startRealBleUpload, viewModel::stopRealBleUpload, demo, viewModel::startDemoTest, viewModel::stopDemoTest, viewModel::dismissDemoAlert)
 }
 
+/** Observaciones en memoria de la prueba demostrativa; no son eventos oficiales. */
+@Composable
+private fun DemoReadouts(demo: DemoTestUiState) {
+    val demoConfig = com.tecsup.asistente.conduccion.domain.processing.ManeuverDemoTestOnly
+    fun number(format: String, value: Double?) = value?.let { String.format(Locale.ROOT, format, it) } ?: "—"
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        listOf(
+            "Modo: PRUEBA DEMOSTRATIVA",
+            "Umbrales TEST_ONLY: |gz| > ${demoConfig.TURN_THRESHOLD_TEST_ONLY_DPS} °/s · ax corregido > ${number("%+.2f", demoConfig.ACCELERATION_THRESHOLD_TEST_ONLY_G)} g o < ${number("%+.2f", demoConfig.BRAKING_THRESHOLD_TEST_ONLY_G)} g",
+            "ax corregido: ${number("%+.3f", demo.axCorrectedG)} g · gz: ${number("%+.1f", demo.gzDps)} °/s",
+            "Muestras consecutivas: ${demo.consecutiveSamples}/${demoConfig.CONSECUTIVE_SAMPLES_TEST_ONLY} · Cooldown: ${number("%.1f", demo.cooldownRemainingMillis / 1000.0)} s",
+            "Último patrón: ${demo.lastPattern ?: "—"}",
+            "Buzzer: ${demo.buzzerCommand}",
+            "BUZZER_DONE: ${if (demo.buzzerDoneConfirmed) "confirmado" else "sin confirmar"}",
+        ).forEach {
+            Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 @Composable
 fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
     calibration: CalibrationUiState = CalibrationUiState(), onStartMeasurement: () -> Unit = {},
@@ -174,13 +194,14 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
                     Text("Detener prueba demostrativa")
                 }
             } else {
-                Text("Flujo demostrativo: Giro brusco en IMU → Detección TEST_ONLY en Android → Orden buzzer por BLE → Buzzer ESP32 máximo 300 ms → Confirmación BUZZER_DONE → Alerta pantalla completa + Audio.")
-                Text("Duración máxima: 60 segundos. Cooldown anti-repeticiones: 3 segundos.")
+                Text("Flujo demostrativo: Movimiento del circuito → Patrón TEST_ONLY en Android → Alerta pantalla completa + Voz → Orden buzzer por BLE → Buzzer ESP32 máximo 300 ms → Confirmación BUZZER_DONE.")
+                Text("Al iniciar, mantén el circuito quieto 2 segundos. Duración máxima: 60 segundos. Cooldown anti-repeticiones: 3 segundos.")
                 Text(demo.statusText, style = MaterialTheme.typography.bodySmall)
                 Button(onClick = onStartDemoTest, enabled = state.connection.status == ConnectionStatus.CONNECTED && state.sensorStatus == SensorDataStatus.RECEIVING) {
                     Text("Iniciar prueba demostrativa")
                 }
             }
+            DemoReadouts(demo)
         }
         val visibleLab = if (state.connection.status == ConnectionStatus.CONNECTED && state.sensorStatus == SensorDataStatus.RECEIVING)
             laboratory else laboratory.copy(history = emptyList(), observing = false, corrected = false)
@@ -197,7 +218,7 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         }
         Text("No acredita identidad, escala ni calibración física del sensor.", style = MaterialTheme.typography.bodySmall)
         }
-        if (demo.alertVisible) DemoAlertOverlay(demo.alertMessage, onDismissDemoAlert)
+        if (demo.alertVisible) DemoAlertOverlay(demo.alertTitle, demo.alertObserved, demo.alertThreshold, onDismissDemoAlert)
         PresentationSection("Calibración experimental") {
         Text("Solo desarrollo y mantenimiento. Mantén la IMU inmóvil durante 30 segundos. La inmovilidad no se comprueba automáticamente.")
         Text("Promedios y offsets estimados experimentales: no se aplican ni se guardan permanentemente. WHO_AM_I = 0x75; identidad no confirmada.")

@@ -1,4 +1,5 @@
-/* Etapa 3B: MPU6050 -> BLE IMU_RAW. GPS UART independiente; buzzer manual y control BLE.
+/* AVIGEM One: MPU6050 -> BLE IMU_RAW + MQTT Diagnostics.
+ * GPS UART independiente; buzzer manual y control BLE.
  * Arduino ESP32 Dev Module, core Espressif 3.3.12.
  * Protocolo permanente: ../../docs/ETAPA_3B_BLE.md
  */
@@ -11,6 +12,7 @@
 #include <atomic>
 #include "GpsTelemetry.h"
 #include "ManualBuzzer.h"
+#include "MqttTelemetry.h"
 
 constexpr char DEVICE_NAME[] = "AsistenteVial-IMU";
 constexpr char SERVICE_UUID[] = "73e8ca02-41d7-45bd-9d39-7187649746ca";
@@ -308,6 +310,7 @@ void setup() {
   advertising->setScanResponse(true);
   BLEDevice::startAdvertising();
   Serial.printf("Anunciando %s\nServicio: %s\nIMU_RAW: %s\n", DEVICE_NAME, SERVICE_UUID, IMU_RAW_UUID);
+  MqttTelemetry::begin();  // Tras iniciar BLE; Wi-Fi/MQTT corren en su propia tarea.
 }
 
 void loop() {
@@ -329,17 +332,20 @@ void loop() {
     BLEDevice::startAdvertising();
   }
   const uint32_t now = millis();
-  if (connected.load() && subscribed.load() && uint32_t(now - lastSample) >= SAMPLE_PERIOD_MS) {
+  if (uint32_t(now - lastSample) >= SAMPLE_PERIOD_MS) {
     lastSample = now; // No burst/catch-up of stale samples.
     uint8_t frame[FRAME_SIZE];
     if (readFrame(frame)) {
+      int16_t raw[6];
+      for (size_t i = 0; i < 6; ++i) {
+        raw[i] = int16_t(uint16_t(frame[i * 2]) | (uint16_t(frame[i * 2 + 1]) << 8));
+      }
       if (connected.load() && subscribed.load()) {
         imuRaw->setValue(frame, sizeof(frame));
         imuRaw->notify();
-        int16_t raw[6];
-        for (size_t i = 0; i < 6; ++i) raw[i] = int16_t(uint16_t(frame[i * 2]) | (uint16_t(frame[i * 2 + 1]) << 8));
         Serial.printf("RAW ax=%d ay=%d az=%d gx=%d gy=%d gz=%d\n", raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
       }
+      MqttTelemetry::publishRaw(raw);
     } else Serial.println("ERROR lectura MPU6050: muestra omitida, no se envian valores sustitutos.");
   }
   if (uint32_t(now - lastGps) >= 1000) {

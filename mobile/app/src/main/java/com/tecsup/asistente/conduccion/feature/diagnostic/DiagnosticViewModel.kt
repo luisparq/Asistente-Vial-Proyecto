@@ -41,12 +41,37 @@ data class DemoTestUiState(
     val active: Boolean = false,
     val remainingSeconds: Int = 60,
     val alertVisible: Boolean = false,
-    val alertMessage: String = "Ey, noté un giro brusco. Vamos con calma",
+    val alertTitle: String = "",
+    val alertMessage: String = "",
+    val alertObserved: String = "",
+    val alertThreshold: String = "",
     val triggerTimestampMillis: Long? = null,
     val statusText: String = "Inactiva",
     val buzzerPending: Boolean = false,
-    val candidates: Int = 0
+    val candidates: Int = 0,
+    val restReady: Boolean = false,
+    val axCorrectedG: Double? = null,
+    val gzDps: Double? = null,
+    val consecutiveSamples: Int = 0,
+    val cooldownRemainingMillis: Long = 0,
+    val lastPattern: String? = null,
+    val buzzerCommand: String = "Sin enviar",
+    val buzzerDoneConfirmed: Boolean = false,
 )
+
+private data class DemoAlertText(val title: String, val voice: String, val observed: String, val threshold: String)
+
+private fun ManeuverDemoDetection.alertText(): DemoAlertText {
+    fun text(format: String, value: Double) = format.format(java.util.Locale.ROOT, value)
+    return when (type) {
+        DrivingEventType.SHARP_TURN -> DemoAlertText("Giro brusco detectado", "Ey, noté un giro brusco. Vamos con calma.",
+            text("GIRO_BRUSCO_TEST · |gz| %.1f °/s", observed), text("|gz| > %.1f °/s", ManeuverDemoTestOnly.TURN_THRESHOLD_TEST_ONLY_DPS))
+        DrivingEventType.HARSH_ACCELERATION -> DemoAlertText("Aceleración brusca detectada", "Ey, noté una aceleración brusca. Acelera con suavidad.",
+            text("ACELERACION_BRUSCA_TEST · ax corregido %+.2f g", observed), text("ax corregido > %+.2f g", ManeuverDemoTestOnly.ACCELERATION_THRESHOLD_TEST_ONLY_G))
+        DrivingEventType.HARSH_BRAKING -> DemoAlertText("Frenado brusco detectado", "Ey, noté un frenado brusco. Mantengamos una conducción suave.",
+            text("FRENADO_BRUSCO_TEST · ax corregido %+.2f g", observed), text("ax corregido < %+.2f g", ManeuverDemoTestOnly.BRAKING_THRESHOLD_TEST_ONLY_G))
+    }
+}
 
 data class DiagnosticUiState(
     val connection: BleConnectionState = BleConnectionState(),
@@ -72,9 +97,8 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
     val demo = mutableDemo.asStateFlow()
     private var demoJob: Job? = null
     private var demoConfirmationJob: Job? = null
-    private var demoDetector = DrivingEventDetector()
+    private val demoTracker = ManeuverDemoTracker()
     private var demoProcessor = ImuProcessor()
-    private var lastDemoTriggerMillis: Long? = null
     private val chartBuffer = ImuChartBuffer()
     private var chartJob: Job? = null
     private var chartAddress: String? = null
@@ -170,7 +194,8 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
                     demoConfirmationJob = null
                     mutableDemo.value = current.copy(
                         buzzerPending = false,
-                        alertVisible = true,
+                        buzzerCommand = "Ejecutado por ESP32",
+                        buzzerDoneConfirmed = true,
                         statusText = "Confirmación BUZZER_DONE recibida de ESP32."
                     )
                 }
@@ -253,25 +278,12 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
             mutableDemo.value = DemoTestUiState(statusText = "Conecta el dispositivo y espera recepción IMU antes de iniciar.")
             return
         }
-        val current = laboratory.value.history.lastOrNull()
-        val rest = current?.accelerationG ?: Vector3(0.0, 0.0, 1.0)
-        val config = DetectorConfiguration(
-            longitudinalAxis = ImuAxis.X,
-            forwardSign = 1,
-            turnAxis = ImuAxis.Z,
-            acceleration = CandidateCriteria(0.35, 0.1, 250, 2, 600, 3000, 2000),
-            braking = CandidateCriteria(0.35, 0.1, 250, 2, 600, 3000, 2000),
-            turn = CandidateCriteria(30.0, 10.0, 250, 2, 600, 3000, 2000),
-            status = CriteriaStatus.TEST_ONLY,
-            restAccelerationG = rest
-        )
-        demoDetector = DrivingEventDetector(config)
+        demoTracker.reset()
         demoProcessor = ImuProcessor()
-        lastDemoTriggerMillis = null
         mutableDemo.value = DemoTestUiState(
             active = true,
             remainingSeconds = 60,
-            statusText = "Prueba demostrativa activa · Esperando giro/movimiento brusco..."
+            statusText = "Mantén el circuito quieto · midiendo reposo..."
         )
         demoJob?.cancel()
         demoJob = viewModelScope.launch {
@@ -292,10 +304,15 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
         demoJob = null
         demoConfirmationJob?.cancel()
         demoConfirmationJob = null
-        demoDetector.reset()
-        mutableDemo.value = mutableDemo.value.copy(
+        demoTracker.reset()
+        val current = mutableDemo.value
+        mutableDemo.value = current.copy(
             active = false,
             buzzerPending = false,
+            buzzerCommand = if (current.buzzerPending) "Cancelado sin confirmación" else current.buzzerCommand,
+            restReady = false,
+            consecutiveSamples = 0,
+            cooldownRemainingMillis = 0,
             statusText = reason
         )
     }
@@ -307,36 +324,59 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
     private fun evaluateDemo(sample: PhysicalImuSample) {
         val current = mutableDemo.value
         if (!current.active) return
-        val processed = demoProcessor.process(sample)
-        val candidates = demoDetector.detect(processed)
-        val now = sample.receivedAtMillis
-        if (candidates.isNotEmpty()) {
-            val lastTrigger = lastDemoTriggerMillis
-            if (!current.buzzerPending && !current.alertVisible && (lastTrigger == null || now - lastTrigger >= 3000L)) {
-                if (!repository.triggerBuzzer()) {
-                    mutableDemo.value = current.copy(
-                        statusText = "Umbral TEST_ONLY superado, pero no se pudo enviar la orden BLE del buzzer."
-                    )
-                    return
-                }
-                lastDemoTriggerMillis = now
-                mutableDemo.value = current.copy(
-                    buzzerPending = true,
-                    triggerTimestampMillis = now,
-                    candidates = current.candidates + candidates.size,
-                    statusText = "Umbral TEST_ONLY superado. Ordenando buzzer por BLE..."
+        val reading = demoTracker.accept(demoProcessor.process(sample), blocked = current.buzzerPending || current.alertVisible)
+        val updated = current.copy(
+            restReady = reading.restReady,
+            axCorrectedG = reading.axCorrectedG,
+            gzDps = reading.gzDps,
+            consecutiveSamples = reading.consecutiveSamples,
+            cooldownRemainingMillis = reading.cooldownRemainingMillis,
+            statusText = when {
+                !reading.restReady -> "Mantén el circuito quieto · reposo ${reading.restSamples}/${ManeuverDemoTestOnly.REST_SAMPLES_TEST_ONLY}"
+                !current.restReady -> "Reposo medido · Mueve el circuito con la mano."
+                else -> current.statusText
+            },
+        )
+        val detection = reading.detection
+        if (detection == null) {
+            mutableDemo.value = updated
+            return
+        }
+        val alert = detection.alertText()
+        // Alerta y voz primero; pending antes de escribir para impedir una segunda orden GATT.
+        mutableDemo.value = updated.copy(
+            alertVisible = true,
+            alertTitle = alert.title,
+            alertMessage = alert.voice,
+            alertObserved = alert.observed,
+            alertThreshold = alert.threshold,
+            triggerTimestampMillis = detection.atMillis,
+            candidates = current.candidates + 1,
+            lastPattern = alert.observed,
+            buzzerPending = true,
+            buzzerCommand = "Enviando orden BLE",
+            buzzerDoneConfirmed = false,
+            statusText = "Patrón TEST_ONLY observado. Ordenando buzzer por BLE...",
+        )
+        if (!repository.triggerBuzzer()) {
+            mutableDemo.value = mutableDemo.value.copy(
+                buzzerPending = false,
+                buzzerCommand = "No enviado",
+                statusText = "Patrón TEST_ONLY observado, pero no se pudo enviar la orden BLE del buzzer.",
+            )
+            return
+        }
+        mutableDemo.value = mutableDemo.value.copy(buzzerCommand = "Enviado · esperando BUZZER_DONE")
+        demoConfirmationJob?.cancel()
+        demoConfirmationJob = viewModelScope.launch {
+            delay(DEMO_CONFIRMATION_TIMEOUT_MILLIS)
+            val pending = mutableDemo.value
+            if (pending.active && pending.buzzerPending) {
+                mutableDemo.value = pending.copy(
+                    buzzerPending = false,
+                    buzzerCommand = "Sin confirmación",
+                    statusText = "Sin confirmación BUZZER_DONE del ESP32.",
                 )
-                demoConfirmationJob?.cancel()
-                demoConfirmationJob = viewModelScope.launch {
-                    delay(DEMO_CONFIRMATION_TIMEOUT_MILLIS)
-                    val pending = mutableDemo.value
-                    if (pending.active && pending.buzzerPending) {
-                        mutableDemo.value = pending.copy(
-                            buzzerPending = false,
-                            statusText = "Sin confirmación BUZZER_DONE. Alerta no mostrada."
-                        )
-                    }
-                }
             }
         }
     }

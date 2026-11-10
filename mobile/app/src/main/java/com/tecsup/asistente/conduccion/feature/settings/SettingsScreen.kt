@@ -33,10 +33,17 @@ fun SettingsScreen(onBack: () -> Unit, onReturnToLogin: () -> Unit, viewModel: S
     var password by remember { mutableStateOf("") }
     var adoption by remember { mutableStateOf<Long?>(null) }
     var configurationMessage by remember { mutableStateOf<String?>(null) }
+    val logoutError by viewModel.logoutError.collectAsStateWithLifecycle()
+    var hadSession by remember { mutableStateOf(session != null) }
+    LaunchedEffect(session) {
+        if (hadSession && session == null) onReturnToLogin()
+        hadSession = session != null
+    }
     ScreenLayout(stringResource(R.string.settings_title), stringResource(R.string.settings_description), onBack) {
         com.tecsup.asistente.conduccion.core.ui.PresentationSection("Mi cuenta") {
         session?.let { Text("${it.email}\n${it.companyName}") } ?: Text("Sin cuenta iniciada.")
         if (session != null) OutlinedButton(onClick = viewModel::logout, enabled = !busy) { Text("Cerrar sesión") }
+        logoutError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
         Card(Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
           Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
