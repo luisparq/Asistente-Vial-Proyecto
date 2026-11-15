@@ -8,6 +8,8 @@ import com.tecsup.asistente.conduccion.data.network.*
 import com.tecsup.asistente.conduccion.data.repository.RoomTripRepository
 import com.tecsup.asistente.conduccion.data.sync.*
 import com.tecsup.asistente.conduccion.domain.model.DrivingEventType
+import com.tecsup.asistente.conduccion.domain.diagnostic.GpsStatus
+import com.tecsup.asistente.conduccion.domain.diagnostic.GpsTelemetry
 import com.tecsup.asistente.conduccion.domain.sync.*
 import java.time.Clock
 import java.util.UUID
@@ -75,6 +77,34 @@ class SyncIntegrationTest {
         assertEquals("Bearer TEST-only-token", server.takeRequest().getHeader("Authorization"))
         assertTrue(server.takeRequest().body.readUtf8().contains("COMPLETED"))
         assertTrue(server.takeRequest().body.readUtf8().contains("SIMULATED"))
+    }
+    @Test fun gpsPointsBelongToActiveTripAndSyncAfterTripReceipt() = runBlocking {
+        val repository = repo()
+        fun sample() = GpsTelemetry(
+            status = GpsStatus.VALID, latitude = -16.39891, longitude = -71.53695, ageMillis = 0,
+            receivedAtMillis = clock.millis(), receivedAtMonotonicMillis = System.nanoTime() / 1_000_000,
+        )
+        repository.recordTrackPoint(sample())
+        assertTrue(db.syncDao().all().isEmpty())
+        val trip = repository.startOrResumeTrip()
+        val firstFix = sample()
+        repository.recordTrackPoint(firstFix)
+        repository.recordTrackPoint(firstFix)
+        val queued = db.syncDao().all()
+        assertEquals(2, queued.size)
+        db.close()
+        open()
+        assertEquals(queued.map { it.operationId }, db.syncDao().all().map { it.operationId })
+        server.enqueue(ack(queued.single { it.revision == 1 }))
+        val point = queued.single { it.revision == TrackPointWriter.REVISION }
+        server.enqueue(MockResponse().setResponseCode(201).setBody("{\"data\":${point.payload}}"))
+        assertFalse(engine().drain())
+        assertTrue(db.syncDao().all().all { it.state == "ACKED" })
+        assertEquals("/api/v1/trips/${db.syncDao().trip(trip.id)!!.clientTripId}", server.takeRequest().path)
+        assertEquals("/${point.path}", server.takeRequest().path)
+        repo().finishTrip(trip.id)
+        repo().recordTrackPoint(sample())
+        assertEquals(1, db.syncDao().all().count { it.revision == TrackPointWriter.REVISION })
     }
     @Test fun offlineQueueAndUuidSurviveReopenAndNetworkFailure() = runBlocking {
         val trip = repo().startOrResumeTrip()

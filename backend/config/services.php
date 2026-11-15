@@ -28,6 +28,14 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    'overpass' => [
+        'url' => env('OVERPASS_URL', 'https://overpass-api.de/api/interpreter'),
+    ],
+
+    'tomtom' => [
+        'key' => env('TOMTOM_TRAFFIC_KEY'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

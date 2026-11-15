@@ -3,6 +3,8 @@
 use App\Http\Controllers\AccessController;
 use App\Http\Controllers\Dashboard\DashboardController;
 use App\Http\Controllers\Dashboard\FleetController;
+use App\Http\Controllers\Dashboard\LiveMapController;
+use App\Http\Controllers\Dashboard\MqttDiagnosticsController;
 use App\Http\Controllers\Dashboard\SessionController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Middleware\DashboardHeaders;
@@ -10,7 +12,7 @@ use App\Http\Middleware\FleetAdmin;
 use App\Http\Middleware\PlatformAdmin;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => response()->json(['service' => 'Asistente Vial API', 'version' => 'v1']));
+Route::get('/', fn () => redirect('/admin/login'));
 
 Route::middleware(DashboardHeaders::class)->group(function () {
     Route::get('/dashboard/login', [SessionController::class, 'create'])->name('login');
@@ -18,8 +20,11 @@ Route::middleware(DashboardHeaders::class)->group(function () {
     Route::post('/dashboard/logout', [SessionController::class, 'destroy'])->middleware('auth:web')->name('dashboard.logout');
     Route::prefix('dashboard')->name('dashboard.')->middleware(['auth:web', 'auth.session', FleetAdmin::class])->group(function () {
         Route::get('/devices', [\App\Http\Controllers\DeviceController::class, 'fleet'])->name('devices');
+        Route::get('/devices/diagnostics', MqttDiagnosticsController::class)->name('devices.diagnostics');
         $support=\App\Http\Controllers\SupportController::class;
         Route::get('/support',[$support,'index'])->name('support');
+        Route::get('/support/devices',[$support,'devices'])->name('support.devices');
+        Route::get('/support/devices/{id}',[$support,'device'])->whereNumber('id')->name('support.devices.show');
         Route::get('/support/create',[$support,'create'])->name('support.create');
         Route::post('/support',[$support,'store'])->block(10,10)->name('support.store');
         Route::get('/support/{id}',[$support,'show'])->whereNumber('id')->name('support.show');
@@ -32,6 +37,7 @@ Route::middleware(DashboardHeaders::class)->group(function () {
         Route::post('/drivers', [$fleet, 'storeDriver'])->name('drivers.store');
         Route::get('/drivers/{id}', [$fleet, 'showDriver'])->whereNumber('id')->name('drivers.show');
         Route::get('/drivers/{id}/edit', [$fleet, 'editDriver'])->whereNumber('id')->name('drivers.edit');
+        Route::get('/drivers/{id}/photo', [$fleet, 'driverPhoto'])->whereNumber('id')->name('drivers.photo');
         Route::put('/drivers/{id}', [$fleet, 'updateDriver'])->whereNumber('id')->name('drivers.update');
         Route::post('/drivers/{id}/access', [$fleet, 'access'])->whereNumber('id')->name('drivers.access');
         Route::post('/drivers/{id}/assignment', [$fleet, 'assign'])->whereNumber('id')->name('drivers.assign');
@@ -46,11 +52,15 @@ Route::middleware(DashboardHeaders::class)->group(function () {
         Route::put('/vehicles/{id}', [$fleet, 'updateVehicle'])->whereNumber('id')->name('vehicles.update');
         Route::get('/', [DashboardController::class, 'index'])->name('index');
         Route::get('/trips', [DashboardController::class, 'trips'])->name('trips');
+        Route::get('/live-map', [LiveMapController::class, 'show'])->name('live-map');
+        Route::get('/live-map/vehicles', [LiveMapController::class, 'vehicles'])->middleware('throttle:30,1')->name('live-map.vehicles');
         Route::get('/trips/{uuid}', [DashboardController::class, 'trip'])->whereUuid('uuid')->name('trip');
-        Route::get('/events', [DashboardController::class, 'events'])->name('events');
+        Route::get('/events', [\App\Http\Controllers\Dashboard\IncidentMapController::class, 'show'])->name('events');
         Route::get('/map', \App\Http\Controllers\Dashboard\IncidentMapController::class)->name('map');
         Route::get('/analytics', [DashboardController::class, 'analytics'])->name('analytics');
+        Route::get('/notifications', [DashboardController::class, 'notifications'])->name('notifications');
         Route::get('/settings', [DashboardController::class, 'settings'])->name('settings');
+        Route::put('/settings', [DashboardController::class, 'updateSettings'])->name('settings.update');
     });
     Route::get('/platform/{path?}', fn (?string $path = null) => redirect('/admin'.($path ? '/'.$path : ''), 302))->where('path', '.*');
     Route::get('/access', [AccessController::class, 'create'])->name('access');

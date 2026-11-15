@@ -21,12 +21,15 @@ interface SyncDao {
     fun statuses(owner: String?): Flow<List<QueueStatus>>
     @Query("SELECT * FROM sync_outbox ORDER BY localTripId, revision, operationId") suspend fun all(): List<OutboxEntity>
     @Query("SELECT * FROM sync_outbox WHERE operationId = :id") suspend fun operation(id: String): OutboxEntity?
+    @Query("SELECT * FROM sync_outbox WHERE localTripId = :tripId AND revision = :revision ORDER BY rowid DESC LIMIT 1")
+    suspend fun lastTrackPoint(tripId: Long, revision: Int): OutboxEntity?
     @Query("UPDATE sync_outbox SET state = 'RETRY_WAIT', leaseToken = NULL, leaseUntil = 0 WHERE state = 'IN_FLIGHT' AND leaseUntil <= :now")
     suspend fun recover(now: Long)
     @Query("""SELECT o.* FROM sync_outbox o JOIN trip_sync m ON m.localTripId = o.localTripId
         WHERE m.ownerKey = :owner AND o.state IN ('PENDING','RETRY_WAIT') AND o.nextAttemptAt <= :now
-        AND (o.eventUuid IS NULL OR EXISTS (SELECT 1 FROM sync_outbox p WHERE p.localTripId = o.localTripId AND p.eventUuid IS NULL AND p.state = 'ACKED'))
-        ORDER BY o.eventUuid IS NOT NULL, o.revision, o.localTripId LIMIT 1""")
+        AND (o.revision > 0 OR EXISTS (SELECT 1 FROM sync_outbox p WHERE p.localTripId = o.localTripId AND p.revision > 0 AND p.state = 'ACKED'))
+        ORDER BY CASE WHEN o.revision > 0 THEN 0 WHEN o.eventUuid IS NOT NULL THEN 1 ELSE 2 END,
+            o.revision, o.localTripId, o.rowid LIMIT 1""")
     suspend fun next(owner: String, now: Long): OutboxEntity?
     @Query("UPDATE sync_outbox SET state = 'IN_FLIGHT', leaseUntil = :until, leaseToken = :lease, attempts = attempts + 1 WHERE operationId = :id AND state IN ('PENDING','RETRY_WAIT')")
     suspend fun claim(id: String, lease: String, until: Long): Int

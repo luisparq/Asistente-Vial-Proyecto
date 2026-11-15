@@ -15,8 +15,11 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\AccessInvitations;
 use App\Services\AdministrativeAudit;
+use App\Services\DriverScores;
 use App\Services\VehicleAssignments;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -24,6 +27,13 @@ use Illuminate\Validation\ValidationException;
 
 class FleetController extends Controller
 {
+    private const REGISTRATION_DOCUMENTS = [
+        'DRIVING_LICENSE' => 'Licencia de conducir',
+        'DRIVER_CREDENTIAL' => 'Credencial del conductor',
+        'NATIONAL_ID' => 'DNI vigente',
+        'DRIVER_CONTRACT' => 'Contrato',
+    ];
+
     private function driver(Request $r, int $id): Driver
     {
         return Driver::where('company_id', $r->user()->company_id)->findOrFail($id);
@@ -49,66 +59,140 @@ class FleetController extends Controller
         }
     }
 
-    public function drivers(Request $r)
+    private function profileRules(): array
     {
-        return view('fleet.drivers', ['drivers' => Driver::where('company_id', $r->user()->company_id)->with(['user', 'currentAssignment.vehicle', 'documents'])->orderBy('full_name')->paginate(20)]);
+        return [
+            'address' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:40',
+            'photo' => 'nullable|file|mimes:jpg,jpeg,png|extensions:jpg,jpeg,png|max:2048',
+            'documents' => 'nullable|array:'.implode(',', array_keys(self::REGISTRATION_DOCUMENTS)),
+            'documents.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|extensions:pdf,jpg,jpeg,png|max:5120',
+        ] + $this->contactRules();
+    }
+
+    private function saveProfileFiles(Request $request, Driver $driver, array $data, array &$stored): ?string
+    {
+        $oldPhoto = null;
+        if (isset($data['photo'])) {
+            $oldPhoto = $driver->photo_path;
+            $stored[] = $path = $data['photo']->store($driver->company_id.'/profiles', 'driver_documents');
+            $driver->update(['photo_path' => $path]);
+        }
+
+        if (! empty($data['documents'])) {
+            $types = DocumentType::whereIn('code', array_keys($data['documents']))->pluck('id', 'code');
+            foreach (array_filter($data['documents']) as $code => $file) {
+                $stored[] = $path = $file->store((string) $driver->company_id, 'driver_documents');
+                $this->recordDocument($request, $driver, $file, $path, ['document_type_id' => $types[$code]]);
+            }
+        }
+
+        return $oldPhoto;
+    }
+
+    public function drivers(Request $r, DriverScores $scores)
+    {
+        return view('fleet.drivers', ['drivers' => $scores->query($r->user()->company_id)
+            ->with(['user', 'currentAssignment.vehicle'])->withCount([
+                'documents',
+                'documents as pending_documents_count' => fn ($documents) => $documents->where('review_status', 'PENDING'),
+            ])->orderBy('full_name')->orderBy('id')->paginate(20)]);
     }
 
     public function createDriver(Request $r)
     {
-        return view('fleet.driver-form', ['driver' => null, 'vehicles' => Vehicle::where('company_id', $r->user()->company_id)->where('status', 'ACTIVE')->whereDoesntHave('currentAssignment')->get()]);
+        return view('fleet.driver-form', ['driver' => null, 'documentLabels' => self::REGISTRATION_DOCUMENTS,
+            'vehicles' => Vehicle::where('company_id', $r->user()->company_id)->where('status', 'ACTIVE')->whereDoesntHave('currentAssignment')->orderBy('plate')->get()]);
     }
 
     public function storeDriver(Request $r, AccessInvitations $invitations, VehicleAssignments $assignments)
     {
         $r->merge(['email' => strtolower((string) $r->input('email'))]);
-        $data = $r->validate(['full_name' => 'required|string|max:255', 'email' => 'required|email|max:255|unique:users,email', 'vehicle_id' => ['nullable', 'integer', Rule::exists('vehicles', 'id')->where('company_id', $r->user()->company_id)]] + $this->contactRules());
-        [$driver,$code] = DB::transaction(function () use ($r, $data, $invitations, $assignments) {
-            $user = new User;
-            $user->forceFill(['company_id' => $r->user()->company_id, 'name' => $data['full_name'], 'email' => $data['email'], 'role' => 'driver', 'access_status' => 'PENDING', 'password' => bin2hex(random_bytes(32))])->save();
-            $driver = new Driver;
-            $driver->forceFill(['company_id' => $user->company_id, 'user_id' => $user->id, 'full_name' => $data['full_name'], 'status' => 'ACTIVE'])->save();
-            $this->saveContact($driver, $data);
-            if (! empty($data['vehicle_id'])) {
-                $assignments->assign($r->user(), $driver, (int) $data['vehicle_id']);
-            }
-            AdministrativeAudit::record($r->user(), $user->company_id, 'driver.created', $driver, ['full_name', 'email', 'contact']);
+        $data = $r->validate(['full_name' => 'required|string|max:255', 'email' => 'required|email|max:255|unique:users,email', 'vehicle_id' => ['nullable', 'integer', Rule::exists('vehicles', 'id')->where('company_id', $r->user()->company_id)]] + $this->profileRules());
+        $stored = [];
+        try {
+            [$driver, $code] = DB::transaction(function () use ($r, $data, $invitations, $assignments, &$stored) {
+                $user = new User;
+                $user->forceFill(['company_id' => $r->user()->company_id, 'name' => $data['full_name'], 'email' => $data['email'], 'role' => 'driver', 'access_status' => 'PENDING', 'password' => bin2hex(random_bytes(32))])->save();
+                $driver = new Driver;
+                $driver->forceFill(['company_id' => $user->company_id, 'user_id' => $user->id, 'full_name' => $data['full_name'], 'status' => 'ACTIVE',
+                    'address' => $data['address'] ?? null, 'phone' => $data['phone'] ?? null])->save();
+                $this->saveContact($driver, $data);
+                if (! empty($data['vehicle_id'])) {
+                    $assignments->assign($r->user(), $driver, (int) $data['vehicle_id']);
+                }
+                $this->saveProfileFiles($r, $driver, $data, $stored);
+                AdministrativeAudit::record($r->user(), $user->company_id, 'driver.created', $driver, ['full_name', 'email', 'contact', 'address', 'phone']);
 
-            return [$driver, $invitations->issue($r->user(), $user)];
-        });
+                return [$driver, $invitations->issue($r->user(), $user)];
+            });
+        } catch (\Throwable $e) {
+            Storage::disk('driver_documents')->delete($stored);
+            throw $e;
+        }
 
         return redirect()->route('dashboard.drivers.show', $driver->id)->with('activation_code', $code)->with('activation_for_driver', true);
     }
 
-    public function showDriver(Request $r, int $id)
+    public function showDriver(Request $r, int $id, DriverScores $scores)
     {
-        $driver = $this->driver($r, $id)->load(['user', 'emergencyContact', 'documents.type', 'currentAssignment.vehicle']);
-        $trips = Trip::where('company_id', $driver->company_id)->where('created_by_user_id', $driver->user_id)->orderByDesc('started_at')->paginate(10, ['*'], 'trips_page');
-        $eventCount = DrivingEvent::where('company_id', $driver->company_id)->whereIn('trip_id', Trip::where('company_id', $driver->company_id)->where('created_by_user_id', $driver->user_id)->select('id'))->count();
+        $driver = $scores->query($r->user()->company_id)
+            ->with(['user', 'emergencyContact', 'documents.type', 'currentAssignment.vehicle'])->findOrFail($id);
+        $history = Trip::where('company_id', $driver->company_id)->where(function ($trips) use ($driver) {
+            $trips->where('driver_id', $driver->id)->orWhere(fn ($legacy) => $legacy
+                ->whereNull('driver_id')->where('created_by_user_id', $driver->user_id));
+        });
+        $events = DrivingEvent::where('company_id', $driver->company_id)->whereIn('trip_id', (clone $history)->select('id'))
+            ->with('trip')->latest('occurred_at')->orderByDesc('id')->paginate(10, ['*'], 'events_page')->withQueryString();
+        $trips = $history->with('vehicle')->withCount('events')->latest('started_at')->orderByDesc('id')
+            ->paginate(10, ['*'], 'trips_page')->withQueryString();
 
-        return view('fleet.driver', ['driver' => $driver, 'trips' => $trips, 'eventCount' => $eventCount, 'assignments' => $driver->assignments()->with('vehicle')->latest('started_at')->paginate(10, ['*'], 'assignments_page'), 'types' => DocumentType::all(), 'vehicles' => Vehicle::where('company_id', $driver->company_id)->where('status', 'ACTIVE')->get()]);
+        return view('fleet.driver', ['driver' => $driver, 'trips' => $trips, 'events' => $events, 'assignments' => $driver->assignments()->with('vehicle')->latest('started_at')->paginate(10, ['*'], 'assignments_page')->withQueryString(), 'types' => DocumentType::all(), 'vehicles' => Vehicle::where('company_id', $driver->company_id)->where('status', 'ACTIVE')->get()]);
+    }
+
+    public function driverPhoto(Request $r, int $id)
+    {
+        $driver = $this->driver($r, $id);
+        abort_unless($driver->photo_path && Storage::disk('driver_documents')->exists($driver->photo_path), 404);
+        $mime = str_ends_with($driver->photo_path, '.png') ? 'image/png' : 'image/jpeg';
+
+        return Storage::disk('driver_documents')->response($driver->photo_path, null, ['Content-Type' => $mime]);
     }
 
     public function editDriver(Request $r, int $id)
     {
-        return view('fleet.driver-form', ['driver' => $this->driver($r, $id)->load(['user', 'emergencyContact']), 'vehicles' => collect()]);
+        return view('fleet.driver-form', ['driver' => $this->driver($r, $id)->load(['user', 'emergencyContact']), 'vehicles' => collect(), 'documentLabels' => self::REGISTRATION_DOCUMENTS]);
     }
 
     public function updateDriver(Request $r, int $id, VehicleAssignments $assignments)
     {
         $driver = $this->driver($r, $id);
-        $data = $r->validate(['full_name' => 'required|string|max:255', 'status' => ['required', Rule::in(['ACTIVE', 'INACTIVE'])]] + $this->contactRules());
-        DB::transaction(function () use ($r, $driver, $data, $assignments) {
-            $driver->update(['full_name' => $data['full_name'], 'status' => $data['status']]);
-            $driver->user->update(['name' => $data['full_name']]);
-            $this->saveContact($driver, $data);
-            if ($data['status'] === 'INACTIVE') {
-                $assignments->assign($r->user(), $driver, null);
-                $driver->user->forceFill(['access_status' => 'DISABLED'])->save();
-                AccessInvitation::where('user_id', $driver->user_id)->whereNull('consumed_at')->update(['consumed_at' => now()]);
-            }
-            AdministrativeAudit::record($r->user(), $driver->company_id, 'driver.updated', $driver, ['full_name', 'status', 'contact', 'access_status']);
-        });
+        $data = $r->validate(['full_name' => 'required|string|max:255', 'status' => ['required', Rule::in(['ACTIVE', 'INACTIVE'])]] + $this->profileRules());
+        $stored = [];
+        try {
+            $oldPhoto = DB::transaction(function () use ($r, $driver, $data, $assignments, &$stored) {
+                Company::whereKey($driver->company_id)->update(['name' => DB::raw('name')]);
+                $driver->refresh();
+                $driver->update(Arr::only($data, ['full_name', 'status', 'address', 'phone']));
+                $driver->user->update(['name' => $data['full_name']]);
+                $this->saveContact($driver, $data);
+                if ($data['status'] === 'INACTIVE') {
+                    $assignments->assign($r->user(), $driver, null);
+                    $driver->user->forceFill(['access_status' => 'DISABLED'])->save();
+                    AccessInvitation::where('user_id', $driver->user_id)->whereNull('consumed_at')->update(['consumed_at' => now()]);
+                }
+                $oldPhoto = $this->saveProfileFiles($r, $driver, $data, $stored);
+                AdministrativeAudit::record($r->user(), $driver->company_id, 'driver.updated', $driver, ['full_name', 'status', 'contact', 'access_status', 'address', 'phone']);
+
+                return $oldPhoto;
+            });
+        } catch (\Throwable $e) {
+            Storage::disk('driver_documents')->delete($stored);
+            throw $e;
+        }
+        if ($oldPhoto) {
+            Storage::disk('driver_documents')->delete($oldPhoto);
+        }
 
         return redirect()->route('dashboard.drivers.show', $id)->with('success', 'Perfil actualizado.');
     }
@@ -156,10 +240,8 @@ class FleetController extends Controller
         $path = $file->store((string) $driver->company_id, 'driver_documents');
         try {
             DB::transaction(function () use ($r, $driver, $data, $file, $path) {
-                $document = new DriverDocument;
                 unset($data['document']);
-                $document->forceFill($data + ['company_id' => $driver->company_id, 'driver_id' => $driver->id, 'path' => $path, 'mime' => $file->getMimeType(), 'size' => $file->getSize(), 'review_status' => 'PENDING'])->save();
-                AdministrativeAudit::record($r->user(), $driver->company_id, 'document.uploaded', $document, ['document']);
+                $this->recordDocument($r, $driver, $file, $path, $data);
             });
         } catch (\Throwable $e) {
             Storage::disk('driver_documents')->delete($path);
@@ -167,6 +249,13 @@ class FleetController extends Controller
         }
 
         return back()->with('success', 'Documento privado guardado. Pendiente de revisión administrativa.');
+    }
+
+    private function recordDocument(Request $r, Driver $driver, UploadedFile $file, string $path, array $data): void
+    {
+        $document = new DriverDocument;
+        $document->forceFill($data + ['company_id' => $driver->company_id, 'driver_id' => $driver->id, 'path' => $path, 'mime' => $file->getMimeType(), 'size' => $file->getSize(), 'review_status' => 'PENDING'])->save();
+        AdministrativeAudit::record($r->user(), $driver->company_id, 'document.uploaded', $document, ['document']);
     }
 
     public function download(Request $r, int $id)
@@ -196,9 +285,10 @@ class FleetController extends Controller
         return view('fleet.vehicles', ['vehicles' => Vehicle::where('company_id', $r->user()->company_id)->with('currentAssignment.driver')->orderBy('plate')->paginate(20)]);
     }
 
-    public function createVehicle()
+    public function createVehicle(Request $r)
     {
-        return view('fleet.vehicle-form', ['vehicle' => null]);
+        return view('fleet.vehicle-form', ['vehicle' => null, 'drivers' => Driver::where('company_id', $r->user()->company_id)
+            ->where('status', 'ACTIVE')->whereDoesntHave('currentAssignment')->orderBy('full_name')->get()]);
     }
 
     private function vehicleData(Request $r, ?Vehicle $vehicle = null): array
@@ -208,12 +298,20 @@ class FleetController extends Controller
         return $r->validate(['plate' => ['required', 'string', 'max:30', Rule::unique('vehicles')->where('company_id', $r->user()->company_id)->ignore($vehicle?->id)], 'brand' => 'required|string|max:100', 'model' => 'required|string|max:100', 'status' => ['required', Rule::in(['ACTIVE', 'INACTIVE'])]]);
     }
 
-    public function storeVehicle(Request $r)
+    public function storeVehicle(Request $r, VehicleAssignments $assignments)
     {
         $data = $this->vehicleData($r);
-        $vehicle = DB::transaction(function () use ($r, $data) {
+        $initial = $r->validate(['driver_id' => ['nullable', 'integer', Rule::exists('drivers', 'id')->where('company_id', $r->user()->company_id)]]);
+        $driver = isset($initial['driver_id']) ? $this->driver($r, $initial['driver_id']) : null;
+        if ($driver && $data['status'] !== 'ACTIVE') {
+            throw ValidationException::withMessages(['driver_id' => 'Activa el vehículo para asignarle un conductor.']);
+        }
+        $vehicle = DB::transaction(function () use ($r, $data, $driver, $assignments) {
             $v = new Vehicle;
             $v->forceFill($data + ['company_id' => $r->user()->company_id])->save();
+            if ($driver) {
+                $assignments->assign($r->user(), $driver, $v->id, requireUnassigned: true);
+            }
             AdministrativeAudit::record($r->user(), $v->company_id, 'vehicle.created', $v, array_keys($data));
 
             return $v;

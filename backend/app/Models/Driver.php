@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Driver extends Model
 {
     protected $guarded = ['id', 'company_id', 'user_id'];
+    protected $hidden = ['photo_path'];
 
     public function user()
     {
@@ -41,5 +42,14 @@ class Driver extends Model
     public function trips()
     {
         return $this->hasMany(Trip::class);
+    }
+
+    public function score(): ?int
+    {
+        if (! $this->scoring_trips_count && ! $this->scoring_events_count) {
+            return null;
+        }
+
+        return max(0, 100 - \App\Services\DriverScores::PENALTY * $this->scoring_events_count);
     }
 }

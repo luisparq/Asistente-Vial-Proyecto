@@ -10,7 +10,7 @@ class ResourceIds
 {
     public function handle(Request $request, Closure $next)
     {
-        foreach (['client_trip_id', 'client_event_id'] as $key) {
+        foreach (['client_trip_id', 'client_event_id', 'client_point_id'] as $key) {
             if ($request->route($key) !== null) {
                 Validator::make([$key => $request->route($key)], [$key => ['required', 'uuid:4']])->validate();
                 $request->route()->setParameter($key, strtolower($request->route($key)));

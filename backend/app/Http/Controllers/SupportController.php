@@ -32,14 +32,15 @@ class SupportController extends Controller {
         if($sort==='priority')$query->orderByRaw("case priority when 'HIGH' then 3 when 'MEDIUM' then 2 else 1 end ".$direction);else$query->orderBy($sort,$direction);
         $metrics=$this->query($r)->selectRaw('status,count(*) as total')->groupBy('status')->pluck('total','status');
         $pending=$this->query($r)->where('status','OPEN')->with('company')->orderByRaw("case priority when 'HIGH' then 1 when 'MEDIUM' then 2 else 3 end")->oldest()->limit(5)->get();
-        $openCompanies=$this->query($r)->whereIn('status',['OPEN','IN_PROGRESS'])->selectRaw('company_id,count(*) as total')->groupBy('company_id')->with('company')->orderByDesc('total')->limit(5)->get();
-        return view('support.index',compact('global','base','metrics','pending','openCompanies','filters')+
+        $openCompanies=$global?$this->query($r)->whereIn('status',['OPEN','IN_PROGRESS'])->selectRaw('company_id,count(*) as total')->groupBy('company_id')->with('company')->orderByDesc('total')->limit(5)->get():collect();
+        return view($global?'support.index':'support.fleet-index',compact('global','base','metrics','pending','openCompanies','filters')+
             ['tickets'=>$query->with(['company','responsible'])->orderByDesc('id')->paginate(20)->withQueryString(),
                 'companies'=>$global?Company::orderBy('name')->get(['id','name']):collect()]);
     }
     public function create(Request $r) {
         $global=$this->global($r);$base=$this->base($r);
-        return view('support.create',compact('global','base')+['companies'=>$global?Company::orderBy('name')->get(['id','name']):collect(),
+        $initialDevice = $global ? null : $r->validate(['device_id' => $this->deviceRule($r->user()->company_id)])['device_id'] ?? null;
+        return view('support.create',compact('global','base','initialDevice')+['companies'=>$global?Company::orderBy('name')->get(['id','name']):collect(),
             'devices'=>Device::when(!$global,fn($q)=>$q->where('company_id',$r->user()->company_id))->with('company')->orderBy('company_id')->get(['id','company_id','name','client_device_id'])]);
     }
     public function store(Request $r) {
@@ -90,6 +91,24 @@ class SupportController extends Controller {
             AdministrativeAudit::record($r->user(),$ticket->company_id,'support.comment',$ticket,['comment']);
         });return back()->with('success','Comentario registrado.');
     }
+    public function devices(Request $request)
+    {
+        $filters = $request->validate(['q' => 'nullable|string|max:100']);
+        $companyId = $request->user()->company_id;
+        $devices = Device::where('company_id', $companyId)
+            ->withCount(['supportTickets as open_tickets_count' => fn ($tickets) => $tickets
+                ->where('company_id', $companyId)->whereIn('status', ['OPEN', 'IN_PROGRESS'])]);
+        if (! empty($filters['q'])) {
+            $search = '%'.$filters['q'].'%';
+            $devices->where(fn ($query) => $query->where('name', 'like', $search)->orWhere('client_device_id', 'like', $search));
+        }
+
+        return view('support.fleet-devices', [
+            'devices' => $devices->orderBy('name')->orderBy('id')->paginate(16)->withQueryString(),
+            'search' => $filters['q'] ?? '',
+        ]);
+    }
+
     public function device(Request $r,int $id) {
         $global=$this->global($r);$base=$this->base($r);
         $device=Device::when(!$global,fn($q)=>$q->where('company_id',$r->user()->company_id))->with('company')->findOrFail($id);

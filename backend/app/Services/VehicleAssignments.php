@@ -12,12 +12,15 @@ use Illuminate\Validation\ValidationException;
 
 class VehicleAssignments
 {
-    public function assign(User $actor, Driver $driver, ?int $vehicleId): void
+    public function assign(User $actor, Driver $driver, ?int $vehicleId, bool $requireUnassigned = false): void
     {
-        DB::transaction(function () use ($actor, $driver, $vehicleId) {
+        DB::transaction(function () use ($actor, $driver, $vehicleId, $requireUnassigned) {
             Company::whereKey($driver->company_id)->update(['name' => DB::raw('name')]);
             $driver->refresh();
             $current = $driver->assignments()->where('active_slot', 1)->first();
+            if ($requireUnassigned && $current) {
+                throw ValidationException::withMessages(['driver_id' => 'El conductor ya tiene un vehículo asignado.']);
+            }
             if ($vehicleId !== null) {
                 $vehicle = Vehicle::where('company_id', $driver->company_id)->findOrFail($vehicleId);
                 if ($driver->status !== 'ACTIVE' || $vehicle->status !== 'ACTIVE') {

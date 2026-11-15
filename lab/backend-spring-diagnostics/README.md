@@ -1,5 +1,8 @@
 # AVIGEM One Diagnostics — backend-spring-diagnostics
 
+> **Estado: archivado, reemplazado por el módulo Diagnóstico de Laravel.**
+> La implementación del reemplazo está prevista para la fase 3. Este directorio conserva el proyecto Spring y sus instrucciones históricas.
+
 MVP del módulo de diagnóstico IMU con **Java 17 · Spring Boot 3.3 · Maven · Arquitectura Hexagonal · JPA · MySQL · Flyway**.
 
 > **NOTA DE ETAPA**: `TEST_DATA`, `REAL_BLE` y `REAL_MQTT` permanecen separados.

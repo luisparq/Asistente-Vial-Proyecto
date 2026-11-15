@@ -7,6 +7,7 @@ class Device extends Model {
     protected function casts(): array { return ['observed_at'=>'immutable_datetime', 'received_at'=>'immutable_datetime', 'last_contact_at'=>'immutable_datetime']; }
     public function company() { return $this->belongsTo(Company::class); }
     public function user() { return $this->belongsTo(User::class); }
+    public function supportTickets() { return $this->hasMany(SupportTicket::class); }
     public function communicationState(): string {
         if (! $this->observed_at || ! $this->received_at) return 'Sin información';
         $now = now();

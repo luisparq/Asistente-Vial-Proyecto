@@ -3,6 +3,7 @@ package com.tecsup.asistente.conduccion.data.sync
 import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.*
+import com.tecsup.asistente.conduccion.data.devices.DeviceReportSync
 import com.tecsup.asistente.conduccion.domain.sync.SyncScheduler
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -12,13 +13,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @HiltWorker
-class SyncWorker @AssistedInject constructor(@Assisted context: Context, @Assisted params: WorkerParameters, private val engine: SyncEngine, private val deviceReports: com.tecsup.asistente.conduccion.data.devices.DeviceReportSync,
-    private val diagnostics: com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsSyncEngine) : CoroutineWorker(context, params) {
+class SyncWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val engine: SyncEngine,
+    private val deviceReports: DeviceReportSync,
+) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val tripsRetry = engine.drain()
         val devicesRetry = deviceReports.flush()
-        val diagnosticsRetry = diagnostics.flush()
-        return if (tripsRetry || devicesRetry || diagnosticsRetry) Result.retry() else Result.success()
+        return if (tripsRetry || devicesRetry) Result.retry() else Result.success()
     }
 }
 

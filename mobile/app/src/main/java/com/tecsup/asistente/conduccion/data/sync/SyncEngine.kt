@@ -85,6 +85,10 @@ class SyncEngine @Inject constructor(
     }
 
     private suspend fun validateReceipt(op: OutboxEntity, body: String): Boolean {
+        if (op.revision == TrackPointWriter.REVISION) {
+            return Contract.json.decodeFromString<Envelope<TrackPointDto>>(body).data ==
+                Contract.json.decodeFromString<TrackPointDto>(op.payload)
+        }
         val meta = checkNotNull(db.syncDao().trip(op.localTripId))
         if (op.eventUuid != null) {
             val sent = Contract.json.decodeFromString<EventDto>(op.payload)

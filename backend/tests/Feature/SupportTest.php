@@ -32,6 +32,23 @@ class SupportTest extends TestCase {
         $this->get('/admin/support/'.$ticket->id)->assertOk()->assertSee('TEST ONLY follow-up')->assertSee($fleet->name)->assertSee($global->name)->assertSee('Últimos reportes conocidos');
         $this->get('/admin/support')->assertOk()->assertViewHas('metrics',fn($m)=>$m['RESOLVED']===1);
     }
+    public function test_fleet_device_support_stays_in_support_and_only_shows_its_company(): void
+    {
+        $fleet = $this->fleet();
+        $device = $this->device($fleet);
+        $foreign = $this->device($this->fleet());
+        $ticket = $this->create($fleet, $device);
+        $this->get('/dashboard/support')->assertOk()->assertSee('href="'.route('dashboard.support.devices').'"', false);
+        $this->get('/dashboard/support/devices?q=ESP32')->assertOk()
+            ->assertSee($device->client_device_id)->assertDontSee($foreign->client_device_id)
+            ->assertViewHas('devices', fn ($rows) => (int) $rows->first()->open_tickets_count === 1);
+        $this->get('/dashboard/support/devices/'.$device->id)->assertOk()->assertSee($ticket->subject)
+            ->assertSee('href="'.route('dashboard.support.create', ['device_id' => $device->id]).'"', false);
+        $this->get('/dashboard/support/create?device_id='.$device->id)->assertOk()->assertViewHas('initialDevice', (string) $device->id);
+        $this->get('/dashboard/support/devices/'.$foreign->id)->assertNotFound();
+        $this->get('/dashboard/support/create?device_id='.$foreign->id)->assertSessionHasErrors('device_id');
+    }
+
     public function test_cross_company_ids_comments_updates_and_devices_are_denied(): void {
         $a=$this->fleet();$b=$this->fleet();$device=$this->device($a);$ticket=$this->create($a,$device);
         $this->actingAs($b)->get('/dashboard/support/'.$ticket->id)->assertNotFound();

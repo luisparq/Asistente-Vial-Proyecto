@@ -2,6 +2,7 @@ package com.tecsup.asistente.conduccion.data.repository
 
 import androidx.room.withTransaction
 import com.tecsup.asistente.conduccion.data.local.*
+import com.tecsup.asistente.conduccion.domain.diagnostic.GpsTelemetry
 import com.tecsup.asistente.conduccion.domain.model.*
 import com.tecsup.asistente.conduccion.domain.repository.TripRepository
 import com.tecsup.asistente.conduccion.domain.sync.*
@@ -40,6 +41,19 @@ class RoomTripRepository @Inject constructor(
     private suspend fun checkAccess(id: Long) {
         val owner = sync.trip(id)?.ownerKey
         check(owner == null || owner == session.state.value?.ownerKey) { "El recorrido pertenece a otra sesión. Inicia sesión con su propietario." }
+    }
+
+    suspend fun recordTrackPoint(gps: GpsTelemetry) {
+        val fix = EventLocationPolicy.capture(gps, clock.millis(), System.nanoTime() / 1_000_000) ?: return
+        val saved = session.gate.withLock {
+            database.withTransaction {
+                val trip = dao.findActive() ?: return@withTransaction false
+                val meta = sync.trip(trip.id) ?: return@withTransaction false
+                if (meta.ownerKey != session.state.value?.ownerKey && meta.ownerKey != null) return@withTransaction false
+                TrackPointWriter.record(database, trip, fix)
+            }
+        }
+        if (saved) scheduler.scheduleFallback()
     }
 
     override suspend fun startOrResumeTrip(): Trip = session.gate.withLock {
@@ -84,7 +98,10 @@ class RoomTripRepository @Inject constructor(
                 checkAccess(tripId)
                 val trip = checkNotNull(dao.findTrip(tripId)) { "El recorrido no existe." }
                 if (trip.status == TripStatus.ACTIVE.name) {
-                    dao.finishTrip(tripId, clock.millis())
+                    val endedAt = clock.millis()
+                    val fix = EventLocationPolicy.capture(sensors?.gps?.value, endedAt, System.nanoTime() / 1_000_000)
+                    TrackPointWriter.record(database, trip, fix, force = true)
+                    dao.finishTrip(tripId, endedAt)
                     sync.revision(tripId, 2)
                     OutboxWriter.trip(database, checkNotNull(dao.findTrip(tripId)), checkNotNull(sync.trip(tripId)))
                 }

@@ -12,7 +12,6 @@
 #include <atomic>
 #include "GpsTelemetry.h"
 #include "ManualBuzzer.h"
-#include "MqttTelemetry.h"
 
 constexpr char DEVICE_NAME[] = "AsistenteVial-IMU";
 constexpr char SERVICE_UUID[] = "73e8ca02-41d7-45bd-9d39-7187649746ca";
@@ -310,7 +309,6 @@ void setup() {
   advertising->setScanResponse(true);
   BLEDevice::startAdvertising();
   Serial.printf("Anunciando %s\nServicio: %s\nIMU_RAW: %s\n", DEVICE_NAME, SERVICE_UUID, IMU_RAW_UUID);
-  MqttTelemetry::begin();  // Tras iniciar BLE; Wi-Fi/MQTT corren en su propia tarea.
 }
 
 void loop() {
@@ -345,7 +343,6 @@ void loop() {
         imuRaw->notify();
         Serial.printf("RAW ax=%d ay=%d az=%d gx=%d gy=%d gz=%d\n", raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
       }
-      MqttTelemetry::publishRaw(raw);
     } else Serial.println("ERROR lectura MPU6050: muestra omitida, no se envian valores sustitutos.");
   }
   if (uint32_t(now - lastGps) >= 1000) {

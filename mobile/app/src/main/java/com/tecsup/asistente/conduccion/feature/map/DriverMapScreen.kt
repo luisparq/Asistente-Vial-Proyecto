@@ -21,6 +21,7 @@ import org.maplibre.android.maps.*
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.PropertyFactory.*
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.json.*
@@ -28,9 +29,12 @@ import org.json.*
 @Composable
 fun DriverMapScreen(onBack:()->Unit,viewModel:DriverMapViewModel=hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val registeredCatalog by rememberRoadCatalog(viewModel.catalogUrl)
+    val now by rememberRoadTime()
+    val catalog = registeredCatalog?.activeAt(now) ?: RoadCatalog(osmAvailable = false)
     var center by remember { mutableIntStateOf(0) }
     var mapError by remember { mutableStateOf<String?>(null) }
-    ScreenLayout("Mi mapa","Mapa opcional · GPS del dispositivo BLE, no del teléfono",onBack) {
+    ScreenLayout("Mi mapa", "GPS del dispositivo BLE", onBack) {
         Card(Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Text(when(state.gpsStatus) {
                 GpsStatus.VALID -> if(state.position!=null) "Posición GPS válida" else "Posición GPS no disponible"
@@ -43,18 +47,21 @@ fun DriverMapScreen(onBack:()->Unit,viewModel:DriverMapViewModel=hiltViewModel()
                 GpsStatus.WAITING -> "Esperando posición GPS"
             },style=MaterialTheme.typography.titleMedium)
             state.position?.let { Text("Latitud: ${it.latitude} · Longitud: ${it.longitude}", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant) }
-            Button(onClick={center++},enabled=state.position!=null,modifier=Modifier.fillMaxWidth().heightIn(min=50.dp),shape=MaterialTheme.shapes.small) { Text("Centrar mi posición") }
+            Button(onClick={center++},enabled=state.position!=null,modifier=Modifier.fillMaxWidth().heightIn(min=50.dp),shape=MaterialTheme.shapes.small) { Text("Centrar posición") }
         } }
         Text("Punto grande citrino: posición actual · Punto ámbar: datos de prueba SIMULATED del recorrido activo", style=MaterialTheme.typography.labelMedium)
         Text("${state.events.size} eventos de prueba con ubicación. No son detecciones físicas ni zonas de riesgo comprobadas.", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
         mapError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-        NativeDriverMap(state,center,{mapError=it})
+        RoadAlertPanel(catalog, registeredCatalog != null, state.position?.let { RoadPoint(it.latitude, it.longitude) })
+        Text("Azul: límite · Violeta: colegio · Rojo: tráfico · Datos © OpenStreetMap y TomTom",
+            style = MaterialTheme.typography.labelMedium)
+        NativeDriverMap(state, catalog, center) { mapError = it }
         Text("La cartografía requiere Internet. El monitoreo, los recorridos y la sincronización funcionan sin mantener este mapa abierto.", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun NativeDriverMap(state:DriverMapState,center:Int,onError:(String)->Unit) {
+private fun NativeDriverMap(state:DriverMapState,catalog:RoadCatalog,center:Int,onError:(String)->Unit) {
     val context=LocalContext.current
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val currentState by rememberUpdatedState(state)
@@ -85,21 +92,34 @@ private fun NativeDriverMap(state:DriverMapState,center:Int,onError:(String)->Un
                 if(!alive) return@setStyle
                 style.addSource(GeoJsonSource("current-gps","{\"type\":\"FeatureCollection\",\"features\":[]}"))
                 style.addSource(GeoJsonSource("trip-events","{\"type\":\"FeatureCollection\",\"features\":[]}"))
+                for ((id, color) in listOf("road-zones" to Color.rgb(138, 79, 202), "road-traffic" to Color.rgb(205, 55, 58))) {
+                    style.addSource(GeoJsonSource(id, "{\"type\":\"FeatureCollection\",\"features\":[]}"))
+                    style.addLayer(CircleLayer("$id-points", id).withProperties(
+                        circleColor(color), circleRadius(8f), circleStrokeColor(Color.WHITE), circleStrokeWidth(2f)
+                    ))
+                }
+                style.addSource(GeoJsonSource("road-limits", "{\"type\":\"FeatureCollection\",\"features\":[]}"))
+                style.addLayer(LineLayer("road-limit-lines", "road-limits").withProperties(
+                    lineColor(Color.rgb(42, 117, 224)), lineWidth(5f)
+                ))
                 style.addLayer(CircleLayer("event-points","trip-events").withProperties(circleColor(Color.rgb(201,138,18)),circleRadius(7f),circleStrokeColor(Color.WHITE),circleStrokeWidth(2f)))
                 style.addLayer(CircleLayer("gps-point","current-gps").withProperties(circleColor(Color.rgb(212,242,58)),circleRadius(9f),circleStrokeColor(Color.rgb(21,22,26)),circleStrokeWidth(3f)))
                 ready=true
             }
             loaded.addOnMapClickListener { coordinate ->
                 val hit=loaded.queryRenderedFeatures(loaded.projection.toScreenLocation(coordinate),"event-points").firstOrNull()
+                val roadHit = loaded.queryRenderedFeatures(loaded.projection.toScreenLocation(coordinate),
+                    "road-zones-points", "road-traffic-points", "road-limit-lines").firstOrNull()
                 val id=hit?.getNumberProperty("event_id")?.toLong()
                 val event=currentState.events.firstOrNull { it.id==id }
                 selected=event?.let { "Evento SIMULATED · ${it.type}\n"+com.tecsup.asistente.conduccion.core.ui.formatTimestamp(it.occurredAt)+"\n${it.latitude}, ${it.longitude}" }
-                event!=null
+                if (event == null) selected = roadHit?.getStringProperty("road_label")
+                event != null || roadHit != null
             }
         }
         onDispose { alive=false;lifecycle.removeObserver(observer);if(resumed)view.onPause();if(started)view.onStop();ready=false;map=null;view.onDestroy() }
     }
-    LaunchedEffect(state,ready) {
+    LaunchedEffect(state,catalog,ready) {
         if(!ready) return@LaunchedEffect
         fun feature(lat:Double,lon:Double,id:Long?=null)=JSONObject().put("type","Feature")
             .put("geometry",JSONObject().put("type","Point").put("coordinates",JSONArray().put(lon).put(lat)))
@@ -109,8 +129,26 @@ private fun NativeDriverMap(state:DriverMapState,center:Int,onError:(String)->Un
         val events=JSONArray();state.events.forEach { events.put(feature(it.latitude!!,it.longitude!!,it.id)) }
         map?.style?.getSourceAs<GeoJsonSource>("current-gps")?.setGeoJson(collection(gps))
         map?.style?.getSourceAs<GeoJsonSource>("trip-events")?.setGeoJson(collection(events))
+        val zones = JSONArray()
+        catalog.zones.forEach {
+            zones.put(feature(it.point.lat, it.point.lon).put("properties", JSONObject().put("road_label", it.name)))
+        }
+        val traffic = JSONArray()
+        catalog.traffic.forEach {
+            traffic.put(feature(it.point.lat, it.point.lon).put("properties", JSONObject().put("road_label", "Tráfico reportado")))
+        }
+        val limits = JSONArray()
+        catalog.speedSections.forEach {
+            val coordinates = JSONArray().put(JSONArray().put(it.start.lon).put(it.start.lat))
+                .put(JSONArray().put(it.end.lon).put(it.end.lat))
+            limits.put(JSONObject().put("type", "Feature")
+                .put("geometry", JSONObject().put("type", "LineString").put("coordinates", coordinates))
+                .put("properties", JSONObject().put("road_label", "Límite: ${it.kmh} km/h")))
+        }
+        map?.style?.getSourceAs<GeoJsonSource>("road-zones")?.setGeoJson(collection(zones))
+        map?.style?.getSourceAs<GeoJsonSource>("road-traffic")?.setGeoJson(collection(traffic))
+        map?.style?.getSourceAs<GeoJsonSource>("road-limits")?.setGeoJson(collection(limits))
         if(!firstCenter && state.position!=null){map?.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(state.position.latitude,state.position.longitude),15.0));firstCenter=true}
-        if(state.events.isEmpty())selected=null
     }
     LaunchedEffect(center,ready) { if(center>0 && ready)state.position?.let { map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude,it.longitude),15.0)) } }
     LaunchedEffect(state.tripId) { selected=null }

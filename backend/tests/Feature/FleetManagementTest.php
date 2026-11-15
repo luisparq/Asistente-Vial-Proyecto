@@ -8,7 +8,9 @@ use App\Models\Company;
 use App\Models\DocumentType;
 use App\Models\Driver;
 use App\Models\DriverDocument;
+use App\Models\DrivingEvent;
 use App\Models\EmergencyContact;
+use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
@@ -208,6 +210,75 @@ class FleetManagementTest extends TestCase
         $this->put('/dashboard/drivers/'.$d->id, ['full_name' => 'intrusion', 'status' => 'ACTIVE'])->assertNotFound();
         $this->post('/dashboard/drivers/'.$d->id.'/access', ['action' => 'invite'])->assertNotFound();
         $this->actingAs($d->user)->get('/dashboard/drivers')->assertForbidden();
+    }
+
+    public function test_driver_registration_saves_profile_and_private_files_in_one_submission(): void
+    {
+        Storage::fake('driver_documents');
+        $admin = $this->admin();
+        $vehicle = $this->vehicle($admin);
+        $this->actingAs($admin)->post('/dashboard/drivers', [
+            'full_name' => 'TEST New Driver', 'email' => 'new-driver@example.test',
+            'address' => 'TEST Calle 123', 'phone' => '999111222', 'vehicle_id' => $vehicle->id,
+            'contact_name' => 'TEST Contact', 'contact_relationship' => 'Familiar', 'contact_phone' => '999111333',
+            'photo' => UploadedFile::fake()->create('perfil.png', 20, 'image/png'),
+            'documents' => [
+                'DRIVING_LICENSE' => UploadedFile::fake()->create('licencia.pdf', 20, 'application/pdf'),
+                'DRIVER_CREDENTIAL' => UploadedFile::fake()->create('credencial.pdf', 20, 'application/pdf'),
+                'NATIONAL_ID' => UploadedFile::fake()->create('dni.pdf', 20, 'application/pdf'),
+                'DRIVER_CONTRACT' => UploadedFile::fake()->create('contrato.pdf', 20, 'application/pdf'),
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('activation_code');
+        $driver = Driver::sole();
+        $this->assertSame('TEST Calle 123', $driver->address);
+        $this->assertSame('999111222', $driver->phone);
+        $this->assertSame('TEST Contact', $driver->emergencyContact->name);
+        $this->assertSame($vehicle->id, $driver->currentAssignment->vehicle_id);
+        $this->assertCount(4, $driver->documents);
+        Storage::disk('driver_documents')->assertExists($driver->photo_path);
+        foreach ($driver->documents as $document) {
+            Storage::disk('driver_documents')->assertExists($document->path);
+            $this->assertSame('PENDING', $document->review_status);
+        }
+        $photo = '/dashboard/drivers/'.$driver->id.'/photo';
+        $this->get($photo)->assertOk()->assertHeader('Content-Type', 'image/png');
+        $this->actingAs($this->admin())->get($photo)->assertNotFound();
+
+        $this->actingAs($admin)->post('/dashboard/vehicles', [
+            'plate' => 'TEST-SECOND', 'brand' => 'TEST', 'model' => 'TEST', 'status' => 'ACTIVE', 'driver_id' => $driver->id,
+        ])->assertSessionHasErrors('driver_id');
+        $this->assertDatabaseMissing('vehicles', ['plate' => 'TEST-SECOND']);
+        $available = $this->driver($admin);
+        $this->post('/dashboard/vehicles', [
+            'plate' => 'TEST-SECOND', 'brand' => 'TEST', 'model' => 'TEST', 'status' => 'ACTIVE', 'driver_id' => $available->id,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('TEST-SECOND', $available->currentAssignment->vehicle->plate);
+    }
+
+    public function test_driver_history_and_demo_ranking_use_company_and_trip_context(): void
+    {
+        $admin = $this->admin();
+        $first = $this->driver($admin);
+        $second = $this->driver($admin);
+        $foreign = $this->driver($this->admin());
+        $createTrip = function (Driver $owner, ?Driver $confirmed = null): Trip {
+            return Trip::create(['company_id' => $owner->company_id, 'created_by_user_id' => $owner->user_id,
+                'driver_id' => $confirmed?->id, 'client_trip_id' => (string) Str::uuid(), 'started_at' => now()->subMinute(),
+                'first_received_at' => now(), 'last_changed_at' => now(), 'status' => 'ACTIVE', 'client_revision' => 1]);
+        };
+        $legacy = $createTrip($first);
+        $confirmed = $createTrip($first, $second);
+        $unrelated = $createTrip($foreign);
+        foreach ([$legacy, $confirmed, $confirmed, $unrelated] as $trip) {
+            DrivingEvent::create(['company_id' => $trip->company_id, 'trip_id' => $trip->id, 'client_event_id' => (string) Str::uuid(),
+                'type' => 'SHARP_TURN', 'origin' => 'SIMULATED', 'occurred_at' => now(), 'first_received_at' => now()]);
+        }
+        $this->actingAs($admin)->get('/dashboard')
+            ->assertOk()->assertViewHas('driverLeaders', fn ($drivers) => $drivers->pluck('id')->all() === [$first->id, $second->id])
+            ->assertSee('Puntajes de prueba')->assertSee('95/100')->assertSee('90/100');
+        $this->get('/dashboard/drivers/'.$first->id)->assertOk()
+            ->assertSee('Sin contexto confirmado')->assertSee('Giro brusco')->assertSee($legacy->client_trip_id)
+            ->assertDontSee($confirmed->client_trip_id)->assertDontSee($unrelated->client_trip_id);
     }
 
     public function test_inactive_driver_closes_assignment_and_disables_access(): void

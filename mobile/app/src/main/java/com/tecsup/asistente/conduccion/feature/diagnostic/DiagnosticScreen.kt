@@ -33,7 +33,6 @@ import com.tecsup.asistente.conduccion.core.ui.tone
 fun DiagnosticScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val laboratory by viewModel.laboratory.collectAsStateWithLifecycle()
-    val realBleUpload by viewModel.realBleUpload.collectAsStateWithLifecycle()
     val demo by viewModel.demo.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.startCharts() }
     val calibration by viewModel.calibration.collectAsStateWithLifecycle()
@@ -69,7 +68,7 @@ fun DiagnosticScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hiltVi
     }
 
     DiagnosticContent(state, onBack, calibration, viewModel::startMeasurement, viewModel::cancelMeasurement, laboratory, viewModel::runSynthetic, viewModel::observeBle, viewModel::stopObservation,
-        realBleUpload, viewModel::startRealBleUpload, viewModel::stopRealBleUpload, demo, viewModel::startDemoTest, viewModel::stopDemoTest, viewModel::dismissDemoAlert)
+        demo, viewModel::startDemoTest, viewModel::stopDemoTest, viewModel::dismissDemoAlert)
 }
 
 /** Observaciones en memoria de la prueba demostrativa; no son eventos oficiales. */
@@ -99,8 +98,6 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
     onSynthetic: (com.tecsup.asistente.conduccion.domain.model.DrivingEventType?) -> Unit = {},
     onObserve: (com.tecsup.asistente.conduccion.domain.processing.ImuAxis, Int, com.tecsup.asistente.conduccion.domain.processing.ImuAxis, Boolean) -> Unit = { _, _, _, _ -> },
     onStopObservation: () -> Unit = {},
-    realBleUpload: com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureState = com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureState(),
-    onStartRealBleUpload: () -> Unit = {}, onStopRealBleUpload: () -> Unit = {},
     demo: DemoTestUiState = DemoTestUiState(),
     onStartDemoTest: () -> Unit = {}, onStopDemoTest: () -> Unit = {}, onDismissDemoAlert: () -> Unit = {}) {
     ScreenLayout(stringResource(R.string.diagnostic_title), stringResource(R.string.diagnostic_description), onBack) {
@@ -206,18 +203,6 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         val visibleLab = if (state.connection.status == ConnectionStatus.CONNECTED && state.sensorStatus == SensorDataStatus.RECEIVING)
             laboratory else laboratory.copy(history = emptyList(), observing = false, corrected = false)
         ImuLaboratoryContent(visibleLab, calibration, onSynthetic, onObserve, onStopObservation, demo.triggerTimestampMillis)
-        PresentationSection("Envío seguro a Diagnostics · REAL_BLE") {
-        Text("Solo se envían cuentas RAW durante una prueba iniciada explícitamente. Usa HTTPS y la sesión autenticada de AVIGEM; si no hay internet, las muestras quedan en la cola local.")
-        Text(realBleUpload.message)
-        if (realBleUpload.active) {
-            Text("Muestras en la captura actual: ${realBleUpload.queuedSamples}")
-            OutlinedButton(onClick = onStopRealBleUpload) { Text("Finalizar y sincronizar prueba") }
-        } else {
-            Button(onClick = onStartRealBleUpload, enabled = state.connection.status == ConnectionStatus.CONNECTED &&
-                state.sensorStatus == SensorDataStatus.RECEIVING && state.sample != null) { Text("Iniciar envío REAL_BLE") }
-        }
-        Text("No acredita identidad, escala ni calibración física del sensor.", style = MaterialTheme.typography.bodySmall)
-        }
         if (demo.alertVisible) DemoAlertOverlay(demo.alertTitle, demo.alertObserved, demo.alertThreshold, onDismissDemoAlert)
         PresentationSection("Calibración experimental") {
         Text("Solo desarrollo y mantenimiento. Mantén la IMU inmóvil durante 30 segundos. La inmovilidad no se comprueba automáticamente.")

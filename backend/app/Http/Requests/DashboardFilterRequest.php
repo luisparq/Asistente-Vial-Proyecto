@@ -24,6 +24,8 @@ class DashboardFilterRequest extends FormRequest
             'type' => ['nullable', Rule::enum(DrivingEventType::class)],
             'origin' => ['nullable', Rule::enum(DataOrigin::class)],
             'user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('company_id', $this->user('web')->company_id)],
+            'notice_driver' => ['nullable', 'integer', Rule::exists('drivers', 'id')->where('company_id', $this->user('web')->company_id)],
+            'notice_vehicle' => ['nullable', 'integer', Rule::exists('vehicles', 'id')->where('company_id', $this->user('web')->company_id)],
             'page' => ['nullable', 'integer', 'min:1', 'max:1000000'],
         ];
     }

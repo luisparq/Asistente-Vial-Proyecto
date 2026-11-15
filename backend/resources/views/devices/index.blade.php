@@ -2,6 +2,9 @@
 @section('title','Estado de dispositivos')
 @section('description','Última información técnica reportada desde Android')
 @section('content')
+@unless($global)
+    @include('devices.tabs', ['diagnosticsTab' => false])
+@endunless
 <p>Android envía como máximo un reporte por minuto mientras la aplicación está abierta. Comunicación reciente: reporte de los últimos 3 minutos. No garantiza que el ESP32 siga conectado. Un envío offline antiguo no se considera reciente.</p>
 <section class="panel table-wrap"><table><thead><tr>@if($global)<th>Empresa</th>@endif<th>Dispositivo / identificador local</th><th>Conductor / vehículo actual</th><th>Comunicación Android</th><th>BLE / IMU / GPS</th><th>Último reporte / contacto BLE</th><th>Error técnico</th></tr></thead><tbody>
 @forelse($devices as $device)<tr>

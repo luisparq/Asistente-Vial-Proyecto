@@ -6,11 +6,11 @@ use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    public function test_service_and_health_routes_are_available_without_frontend_assets(): void
+    public function test_root_redirects_to_admin_login_and_health_route_is_available(): void
     {
-        $response = $this->get('/');
+        $this->get('/')->assertRedirect('/admin/login');
 
-        $response->assertOk()->assertExactJson(['service' => 'Asistente Vial API', 'version' => 'v1']);
+        $this->get('/admin/login')->assertOk();
         $this->get('/up')->assertOk();
     }
 }

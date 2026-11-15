@@ -12,6 +12,7 @@ object Contract {
 }
 
 @Serializable data class TripDto(val started_at: String, val ended_at: String?, val status: String, val client_revision: Int)
+@Serializable data class TrackPointDto(val captured_at: String, val latitude: Double, val longitude: Double)
 @Serializable data class EventDto(val type: String, val occurred_at: String, val origin: String = "SIMULATED", val latitude: Double? = null, val longitude: Double? = null,
     val location_origin: String? = null, val gps_utc_seconds: Int? = null,
     val gps_received_at: String? = null, val gps_age_ms: Long? = null)
