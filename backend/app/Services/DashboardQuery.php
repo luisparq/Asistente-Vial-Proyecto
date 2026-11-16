@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DrivingEvent;
+use App\Models\ManeuverAlert;
 use App\Models\Trip;
 use App\Models\User;
 use App\Support\DashboardDisplay;
@@ -34,6 +35,28 @@ class DashboardQuery
         }
 
         return $this->dates($query, 'occurred_at', $filters);
+    }
+
+    public function alerts(User $user, array $filters = []): Builder
+    {
+        $scope = fn ($relation) => $relation->where('company_id', $user->company_id);
+        $query = ManeuverAlert::query()->where('company_id', $user->company_id)->whereHas('trip', $scope)
+            ->with(['trip' => $scope, 'driver' => $scope, 'vehicle' => $scope]);
+        foreach (['notice_driver' => 'driver_id', 'notice_vehicle' => 'vehicle_id', 'vehicle_id' => 'vehicle_id'] as $key => $column) {
+            if (! empty($filters[$key])) {
+                $query->where($column, $filters[$key]);
+            }
+        }
+        if (($filters['alert_status'] ?? null) === 'pending') {
+            $query->where('test_only', false)->whereNull('reviewed_at');
+        }
+
+        return $this->dates($query, 'occurred_at', $filters);
+    }
+
+    public function alert(User $user, string $uuid): ManeuverAlert
+    {
+        return $this->alerts($user)->where('client_alert_id', strtolower($uuid))->firstOrFail();
     }
 
     private function dates(Builder $query, string $column, array $filters): Builder

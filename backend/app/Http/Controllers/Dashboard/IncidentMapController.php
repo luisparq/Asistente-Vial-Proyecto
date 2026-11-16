@@ -20,6 +20,10 @@ class IncidentMapController extends Controller
     {
         $user = $request->user('web');
         $filters = $request->validated();
+        if (($filters['kind'] ?? null) === 'alerts') {
+            return $this->alerts($request, $query, $filters);
+        }
+
         $matchingEvents = $query->events($user, $filters);
         if (!empty($filters['vehicle_id'])) {
             $matchingEvents->whereHas('trip', fn ($trip) => $trip->where('company_id', $user->company_id)
@@ -49,15 +53,44 @@ class IncidentMapController extends Controller
         $vehicles = Vehicle::where('company_id',$user->company_id)->whereHas('trips', fn ($q) => $q->where('company_id',$user->company_id)
             ->whereHas('events', fn ($e) => $e->where('company_id',$user->company_id)->whereBetween('latitude',[-90,90])->whereBetween('longitude',[-180,180])))
             ->orderBy('plate')->get(['id','plate']);
-        $origins = implode(' ', config('maps.allowed_origins', []));
-
-        return response()->view('dashboard.events', [
+        return view('dashboard.events', [
             'events' => $events,
             'tripReturn' => $tripReturn,
             'geojson' => ['type' => 'FeatureCollection', 'features' => $features],
             'filters' => $filters,
             'vehicles' => $vehicles,
             'mapStyle' => config('maps.style_url'),
-        ])->header('Content-Security-Policy', "default-src 'self'; script-src 'self'; worker-src 'self' blob:; connect-src 'self' $origins; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: $origins; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+        ]);
+    }
+
+    private function alerts(IncidentMapRequest $request, DashboardQuery $query, array $filters)
+    {
+        $user = $request->user('web');
+        $matching = $query->alerts($user, $filters);
+        $alerts = (clone $matching)->orderByDesc('occurred_at')->orderByDesc('id')->paginate(20)->withQueryString();
+        $focused = isset($filters['focus_alert']) ? $query->alert($user, $filters['focus_alert']) : null;
+        $located = $focused ? collect([$focused])->filter(fn ($alert) => $alert->location_status === 'AVAILABLE')
+            : $matching->where('location_status', 'AVAILABLE')->whereNotNull('latitude')->whereNotNull('longitude')->get();
+
+        $features = $located->map(fn ($alert) => [
+            'type' => 'Feature', 'id' => $alert->client_alert_id,
+            'geometry' => ['type' => 'Point', 'coordinates' => [$alert->longitude, $alert->latitude]],
+            'properties' => [
+                'uuid' => $alert->client_alert_id, 'label' => 'Maniobras repetidas',
+                'origin_label' => $alert->test_only ? 'Alerta de prueba' : 'Alerta operativa',
+                'origin' => $alert->test_only ? 'SIMULATED' : 'SENSOR',
+                'date' => DashboardDisplay::date($alert->occurred_at),
+                'vehicle' => $alert->vehicle?->plate,
+                'alert_url' => route('dashboard.alerts.show', $alert->client_alert_id),
+            ],
+        ])->values();
+
+        return view('dashboard.events', [
+            'alerts' => $alerts, 'focusedAlert' => $focused,
+            'geojson' => ['type' => 'FeatureCollection', 'features' => $features],
+            'filters' => $filters,
+            'vehicles' => Vehicle::where('company_id', $user->company_id)->orderBy('plate')->get(['id', 'plate']),
+            'mapStyle' => config('maps.style_url'),
+        ]);
     }
 }

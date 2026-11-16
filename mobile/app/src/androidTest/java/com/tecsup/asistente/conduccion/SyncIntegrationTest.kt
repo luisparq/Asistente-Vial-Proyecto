@@ -11,7 +11,10 @@ import com.tecsup.asistente.conduccion.domain.model.DrivingEventType
 import com.tecsup.asistente.conduccion.domain.diagnostic.GpsStatus
 import com.tecsup.asistente.conduccion.domain.diagnostic.GpsTelemetry
 import com.tecsup.asistente.conduccion.domain.sync.*
+import com.tecsup.asistente.conduccion.domain.processing.ManeuverAlertRule
 import java.time.Clock
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -35,7 +38,7 @@ class SyncIntegrationTest {
     private val clock = Clock.systemUTC()
     private fun repo() = RoomTripRepository(db, clock, session, scheduler)
     private fun engine() = SyncEngine(db, session, api, clock)
-    private fun open() { db = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build() }
+    private fun open() { db = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build() }
     @Before fun setup() {
         name = "sync-test-${UUID.randomUUID()}.db"
         open()
@@ -51,6 +54,7 @@ class SyncIntegrationTest {
             payload.forEach { (k, v) -> put(k, v) }
             put("client_trip_id", meta.clientTripId)
             op.eventUuid?.let { put("client_event_id", it) }
+            if (op.revision == OutboxWriter.MANEUVER_ALERT_REVISION) put("client_alert_id", op.operationId)
         }
         return MockResponse().setResponseCode(200).setBody(buildJsonObject {
             put("data", data)
@@ -106,6 +110,42 @@ class SyncIntegrationTest {
         repo().recordTrackPoint(sample())
         assertEquals(1, db.syncDao().all().count { it.revision == TrackPointWriter.REVISION })
     }
+    @Test fun maneuverAlertRetriesTheSameIdAndPayloadAfterItsEvents() = runBlocking {
+        val repository = RoomTripRepository(db, clock, session, scheduler,
+            maneuverAlertRule = ManeuverAlertRule(groupingMillis = 0))
+        val trip = repository.startOrResumeTrip()
+        repeat(3) { repository.simulateManeuver(trip.id, DrivingEventType.entries[it]) }
+        val alertId = checkNotNull(repository.simulateManeuver(trip.id, DrivingEventType.SHARP_TURN))
+        val operations = db.syncDao().all()
+        val tripOperation = operations.single { it.revision == 1 }
+        val maneuverOperations = operations.filter { it.eventUuid != null }
+        val alert = operations.single { it.revision == OutboxWriter.MANEUVER_ALERT_REVISION }
+        assertEquals(alertId, alert.operationId)
+        server.enqueue(ack(tripOperation))
+        // Events are sent in insertion order, irrespective of their randomly assigned IDs.
+        for (event in db.tripDao().simulatedManeuvers(trip.id)) {
+            server.enqueue(ack(maneuverOperations.single { it.eventUuid == event.eventId }))
+        }
+        server.enqueue(MockResponse().setResponseCode(425))
+        assertTrue(engine().drain())
+        assertEquals("RETRY_WAIT", db.syncDao().operation(alertId)?.state)
+        repeat(5) { assertNotNull(server.takeRequest(2, TimeUnit.SECONDS)) }
+        val first = checkNotNull(server.takeRequest(2, TimeUnit.SECONDS))
+        assertEquals("/${alert.path}", first.path)
+        assertEquals(alert.payload, first.body.readUtf8())
+
+        db.close()
+        open()
+        server.enqueue(ack(alert))
+        val afterBackoff = Clock.offset(clock, Duration.ofMinutes(5))
+        assertFalse(SyncEngine(db, session, api, afterBackoff).drain())
+        val retry = checkNotNull(server.takeRequest(2, TimeUnit.SECONDS))
+        assertEquals(first.path, retry.path)
+        assertEquals(alert.payload, retry.body.readUtf8())
+        assertEquals("ACKED", db.syncDao().operation(alertId)?.state)
+        assertEquals(alertId, db.tripDao().latestManeuverAlert(trip.id)?.id)
+    }
+
     @Test fun offlineQueueAndUuidSurviveReopenAndNetworkFailure() = runBlocking {
         val trip = repo().startOrResumeTrip()
         repo().addSimulatedEvent(trip.id, DrivingEventType.SHARP_TURN)

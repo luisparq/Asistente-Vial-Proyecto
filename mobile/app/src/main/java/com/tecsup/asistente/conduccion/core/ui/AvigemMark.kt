@@ -37,7 +37,7 @@ fun AvigemMark(modifier: Modifier = Modifier, progress: Float = 1f, color: Color
         segment(38f, 41f, 27f, 14f, 5.5f, legs)
         segment(24f, 41f, 24f, 35f, 4f, lanes)
         segment(24f, 28.5f, 24f, 25f, 3.2f, ((lanes - 0.5f) * 2f).coerceIn(0f, 1f))
-        if (dot > 0f) drawCircle(node.copy(alpha = dot), radius = lerp(3.2f, 4.6f, dot) * u, center = point(24f, 8f))
+        if (dot > 0f) drawCircle(node.copy(alpha = node.alpha * dot), radius = lerp(3.2f, 4.6f, dot) * u, center = point(24f, 8f))
     }
 }
 

@@ -1,7 +1,6 @@
 package com.tecsup.asistente.conduccion.core.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -35,11 +34,10 @@ private data class TonePalette(val background: Color, val content: Color, val ic
 
 @Composable
 private fun StatusTone.palette(): TonePalette {
-    val dark = isSystemInDarkTheme()
     return when (this) {
-        StatusTone.OK -> TonePalette(if (dark) Color(0xFF183626) else Color(0xFFE2EDD9), if (dark) Color(0xFFA9DDB5) else Color(0xFF2C6339), Icons.Filled.Check)
-        StatusTone.PROGRESS -> TonePalette(if (dark) Color(0xFF17324A) else Color(0xFFDFE9F2), if (dark) Color(0xFFA5CCEF) else Color(0xFF22507A), Icons.Filled.Refresh)
-        StatusTone.WARNING -> TonePalette(if (dark) Color(0xFF3B2C10) else Color(0xFFF8EACB), if (dark) Color(0xFFF4CF85) else Color(0xFF7D5200), Icons.Filled.Warning)
+        StatusTone.OK -> TonePalette(Color(0xFF183626), Color(0xFFA9DDB5), Icons.Filled.Check)
+        StatusTone.PROGRESS -> TonePalette(Color(0xFF17324A), Color(0xFFA5CCEF), Icons.Filled.Refresh)
+        StatusTone.WARNING -> TonePalette(Color(0xFF3B2C10), Color(0xFFF4CF85), Icons.Filled.Warning)
         StatusTone.ERROR -> TonePalette(MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer, Icons.Filled.Close)
         StatusTone.NEUTRAL -> TonePalette(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer, Icons.Filled.Info)
     }

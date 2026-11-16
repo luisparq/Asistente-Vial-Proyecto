@@ -34,7 +34,8 @@ class LiveMapTest extends TestCase
         $response = $this->actingAs($admin)->get($page)->assertOk()
             ->assertSee('Mapa en vivo')->assertSee('live-map.js')
             ->assertSee('Capas viales de Arequipa')->assertSee('Límites de velocidad')
-            ->assertSee('Colegios')->assertSee('Tráfico reciente')->assertSee('data-url="/api/v1/road-catalog"', false);
+            ->assertSee('Colegios cercanos')->assertSee('Flujo de tráfico en vivo')->assertSee('Incidentes y cierres')
+            ->assertSee('Puntos de auxilio')->assertSee('data-url="/api/v1/road-catalog"', false);
         $this->assertStringContainsString("worker-src 'self' blob:", $response->headers->get('Content-Security-Policy'));
         $this->getJson($data)->assertOk()->assertJsonPath('vehicles', []);
     }

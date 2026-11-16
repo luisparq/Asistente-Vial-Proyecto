@@ -44,8 +44,17 @@ class SyncEngine @Inject constructor(
 
     // No network lock is held by local trip writes. Leases coordinate concurrent workers.
     suspend fun drain(): Boolean {
+        val account = session.state.value ?: return false
+        if (account.token == null) return false
+        // Queue alerts retained by Driver before Fleet supported receiving them.
+        db.withTransaction {
+            val dao = db.syncDao()
+            for (alert in dao.unqueuedManeuverAlerts(account.ownerKey)) {
+                OutboxWriter.maneuverAlert(db, alert, checkNotNull(dao.trip(alert.tripId)).clientTripId)
+            }
+        }
         repeat(50) {
-            val current = session.state.value ?: return false
+            val current = session.state.value?.takeIf { it.ownerKey == account.ownerKey } ?: return false
             val token = current.token ?: return false
             val lease = UUID.randomUUID().toString()
             val operation = db.withTransaction {
@@ -90,6 +99,14 @@ class SyncEngine @Inject constructor(
                 Contract.json.decodeFromString<TrackPointDto>(op.payload)
         }
         val meta = checkNotNull(db.syncDao().trip(op.localTripId))
+        if (op.revision == OutboxWriter.MANEUVER_ALERT_REVISION) {
+            val sent = Contract.json.decodeFromString<ManeuverAlertDto>(op.payload)
+            val receipt = Contract.json.decodeFromString<Receipt<ManeuverAlertReceipt>>(body)
+            return receipt.sync.disposition in listOf("created", "already_applied") &&
+                receipt.data.client_alert_id == op.operationId &&
+                receipt.data.client_trip_id == meta.clientTripId &&
+                receipt.data.payload() == sent
+        }
         if (op.eventUuid != null) {
             val sent = Contract.json.decodeFromString<EventDto>(op.payload)
             val receipt = Contract.json.decodeFromString<Receipt<EventReceipt>>(body)

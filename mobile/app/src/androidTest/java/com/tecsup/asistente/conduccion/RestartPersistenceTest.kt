@@ -49,12 +49,12 @@ class RestartPersistenceTest {
         compose.waitForText(text(R.string.trip_active))
         val trip = runBlocking { repository.observeActiveTrip().first()!! }
         val beforeCount = runBlocking { repository.observeTrip(trip.id).first()!!.events.size }
-        val button = text(R.string.simulate_event, text(R.string.event_braking))
-        compose.onNodeWithTag("trip_list").performScrollToNode(hasText(button))
-        compose.clickText(button)
-        compose.waitForText(text(R.string.event_count, beforeCount + 1))
+        // La pantalla activa ya no genera eventos de prueba; se guardan desde el repositorio.
+        runBlocking { repository.addSimulatedEvent(trip.id, DrivingEventType.HARSH_BRAKING) }
         // Esperar confirmación de Room; no se toma el estado del ViewModel como evidencia.
-        val snapshot = runBlocking { repository.observeTrip(trip.id).first()!! }
+        val snapshot = runBlocking {
+            repository.observeTrip(trip.id).first { it!!.events.size == beforeCount + 1 }!!
+        }
         assertEquals(DrivingEventType.HARSH_BRAKING, snapshot.events.last().type)
         assertTrue(fixture.edit().putLong("tripId", trip.id).putString("active", snapshotJson(snapshot)).commit())
     }
@@ -69,9 +69,8 @@ class RestartPersistenceTest {
         compose.clickText(text(R.string.explore))
         compose.clickText(text(R.string.resume_trip))
         compose.waitForText(text(R.string.trip_active))
-        val count = text(R.string.event_count, persisted.events.size)
-        compose.waitForText(count)
-        compose.onNodeWithTag("trip_list").performScrollToNode(hasText(text(R.string.finish_trip)))
+        // El evento guardado es simulado: no aparece en la pantalla activa.
+        compose.waitForText(text(R.string.event_count, 0))
         compose.clickText(text(R.string.finish_trip))
         compose.waitForText(text(R.string.history_title))
         val completed = runBlocking { repository.observeTrip(id).first()!! }

@@ -34,6 +34,8 @@ class DashboardController extends Controller
         return view('dashboard.overview', ['metrics' => $metrics,
             'trips' => $this->withTripDetails($trips, $user)->orderByDesc('first_received_at')->orderByDesc('id')->limit(5)->get(),
             'notifications' => $this->notificationData($request),
+            'alertNotifications' => $this->alertNotifications($request),
+            'pendingAlerts' => $this->query->alerts($user, ['alert_status' => 'pending'])->count(),
             'driverLeaders' => $scores->leaders($user->company_id),
             'drivers' => Driver::where('company_id', $user->company_id)->orderBy('full_name')->get(['id', 'full_name']),
             'vehicles' => Vehicle::where('company_id', $user->company_id)->orderBy('plate')->get(['id', 'plate']),
@@ -44,7 +46,14 @@ class DashboardController extends Controller
     {
         return response()->view('dashboard.partials.notifications', [
             'notifications' => $this->notificationData($request),
+            'alertNotifications' => $this->alertNotifications($request),
         ])->header('X-Fleet-Notifications', '1');
+    }
+
+    private function alertNotifications(DashboardFilterRequest $request): Collection
+    {
+        return $this->query->alerts($request->user('web'), $request->validated())
+            ->orderByDesc('first_received_at')->orderByDesc('id')->limit(5)->get();
     }
 
     private function notificationData(DashboardFilterRequest $request): Collection

@@ -211,7 +211,9 @@
         map = new maplibregl.Map({ container: 'live-canvas', style: cartography.initial, center: [-71.54, -16.40], zoom: 11 });
         new ResizeObserver(() => map.resize()).observe(map.getContainer());
         map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
-        map.on('error', () => {
+        map.on('error', event => {
+            // Las capas viales informan sus propios fallos; no cuentan como fallo de la cartografía base.
+            if (String(event?.sourceId ?? '').startsWith('catalog-')) return;
             mapError = true;
             updateMapMessage();
         });

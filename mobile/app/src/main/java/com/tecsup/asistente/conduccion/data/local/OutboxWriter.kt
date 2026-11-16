@@ -2,10 +2,23 @@ package com.tecsup.asistente.conduccion.data.local
 
 import com.tecsup.asistente.conduccion.data.network.Contract
 import com.tecsup.asistente.conduccion.data.network.EventDto
+import com.tecsup.asistente.conduccion.data.network.ManeuverAlertDto
 import com.tecsup.asistente.conduccion.data.network.TripDto
 import kotlinx.serialization.encodeToString
 
 object OutboxWriter {
+    const val MANEUVER_ALERT_REVISION = -2
+
+    suspend fun maneuverAlert(db: AsistenteVialDatabase, alert: ManeuverAlertEntity, tripUuid: String) {
+        val dto = ManeuverAlertDto(
+            Contract.json.decodeFromString<List<String>>(alert.eventIds).sorted(),
+            Contract.timestamp(alert.occurredAt), alert.testOnly, alert.latitude, alert.longitude,
+            alert.locationCapturedAt?.let(Contract::timestamp), alert.locationStatus,
+        )
+        db.syncDao().enqueue(OutboxEntity(alert.id, alert.tripId, null, MANEUVER_ALERT_REVISION,
+            "api/v1/trips/$tripUuid/alerts/${alert.id}", Contract.json.encodeToString(dto)))
+    }
+
     suspend fun trip(db: AsistenteVialDatabase, trip: TripEntity, meta: TripSyncEntity) {
         val dto = TripDto(Contract.timestamp(trip.startedAt), trip.endedAt?.let(Contract::timestamp), trip.status, meta.revision)
         db.syncDao().enqueue(OutboxEntity("${meta.clientTripId}:${meta.revision}", trip.id, null, meta.revision,

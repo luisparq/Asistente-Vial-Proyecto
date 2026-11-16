@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tecsup.asistente.conduccion.core.ui.LoadState
 import com.tecsup.asistente.conduccion.core.ui.asLoadState
+import com.tecsup.asistente.conduccion.domain.model.DataOrigin
 import com.tecsup.asistente.conduccion.domain.model.DrivingEventType
 import com.tecsup.asistente.conduccion.domain.model.TripWithEvents
 import com.tecsup.asistente.conduccion.domain.repository.TripRepository
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -31,14 +33,21 @@ class TripViewModel @Inject constructor(private val repository: TripRepository) 
     val trip = repository.observeActiveTrip()
         .flatMapLatest { active ->
             active?.let { repository.observeTrip(it.id) } ?: flowOf(null)
-        }.asLoadState()
+        }
+        // Los registros se conservan; solo se ocultan en la pantalla activa los eventos
+        // marcados como simulados para no mezclarlos con datos del recorrido en curso.
+        .map { detail -> detail?.copy(events = detail.events.filterNot { it.origin == DataOrigin.SIMULATED }) }
+        .asLoadState()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LoadState.Loading)
 
     private val _action = MutableStateFlow(TripActionState())
     val action = _action.asStateFlow()
 
-    fun simulate(type: DrivingEventType) = perform { id ->
-        repository.addSimulatedEvent(id, type)
+    private val _maneuverAlertId = MutableStateFlow<String?>(null)
+    val maneuverAlertId = _maneuverAlertId.asStateFlow()
+
+    fun simulateManeuver(type: DrivingEventType) = perform { id ->
+        repository.simulateManeuver(id, type)?.let { _maneuverAlertId.value = it }
     }
 
     fun finish() = perform(openHistory = true) { id -> repository.finishTrip(id) }

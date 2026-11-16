@@ -19,7 +19,7 @@
     ];
     $currentPage = match (true) {
         request()->routeIs('dashboard.trip') => 'trips',
-        request()->routeIs('dashboard.map') => 'events',
+        request()->routeIs('dashboard.map', 'dashboard.alerts.*') => 'events',
         request()->routeIs('dashboard.analytics') => 'index',
         request()->routeIs('dashboard.support.devices*') => 'support.devices',
         default => explode('.', request()->route()->getName())[1],
@@ -52,11 +52,13 @@
 <div class="fleet-workspace">
     <div class="fleet-rail">
         <div class="fleet-theme-switch" role="group" aria-label="Tema de Fleet" hidden>
-            <button type="button" data-fleet-theme="light" aria-label="Modo claro" title="Modo claro" aria-pressed="true">
+            <button type="button" data-fleet-theme="light" aria-pressed="true">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+                <span>Modo claro</span>
             </button>
-            <button type="button" data-fleet-theme="dark" aria-label="Modo oscuro" title="Modo oscuro" aria-pressed="false">
+            <button type="button" data-fleet-theme="dark" aria-pressed="false">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 13.4A9 9 0 0 1 10.6 3 9 9 0 1 0 21 13.4Z"/></svg>
+                <span>Modo oscuro</span>
             </button>
         </div>
         <nav class="fleet-subnav" aria-label="{{ $currentSection }}">

@@ -72,9 +72,33 @@ internal fun RoadAlertPanel(
             instance = TextToSpeech(context) { status ->
                 main.post {
                     if (active) {
-                        voiceAvailable = status == TextToSpeech.SUCCESS &&
-                            instance.setLanguage(Locale.forLanguageTag("es-PE")) >= TextToSpeech.LANG_AVAILABLE
-                        if (voiceAvailable == true) engine = instance
+                        val peResult = instance.setLanguage(Locale.forLanguageTag("es-PE"))
+                        val langOk = if (peResult >= TextToSpeech.LANG_AVAILABLE) true else {
+                            instance.setLanguage(Locale("es", "419")) >= TextToSpeech.LANG_AVAILABLE ||
+                            instance.setLanguage(Locale("es", "ES")) >= TextToSpeech.LANG_AVAILABLE ||
+                            instance.setLanguage(Locale("es")) >= TextToSpeech.LANG_AVAILABLE
+                        }
+                        voiceAvailable = status == TextToSpeech.SUCCESS && langOk
+                        if (voiceAvailable == true) {
+                            try {
+                                val spanishVoices = instance.voices?.filter { it.locale.language == "es" } ?: emptySet()
+                                // Detecta voz masculina con palabra completa para no coincidir con "female".
+                                val maleToken = Regex("(?:^|[-_])male(?:$|[-_])")
+                                val maleVoice = spanishVoices.firstOrNull { voice ->
+                                    val name = voice.name.lowercase(Locale.ROOT)
+                                    val features = voice.features?.map { it.lowercase(Locale.ROOT) } ?: emptyList()
+                                    maleToken.containsMatchIn(name) ||
+                                    features.any { maleToken.containsMatchIn(it) } ||
+                                    name.contains("-eed-") || name.contains("-sfb-")
+                                }
+                                if (maleVoice != null) {
+                                    instance.voice = maleVoice
+                                }
+                            } catch (_: Exception) { }
+                            instance.setPitch(0.88f)
+                            instance.setSpeechRate(0.98f)
+                            engine = instance
+                        }
                     }
                 }
             }

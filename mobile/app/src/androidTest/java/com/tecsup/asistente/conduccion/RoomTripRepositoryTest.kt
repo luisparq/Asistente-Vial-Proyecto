@@ -5,7 +5,10 @@ import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import com.tecsup.asistente.conduccion.data.local.AsistenteVialDatabase
 import com.tecsup.asistente.conduccion.data.local.DrivingEventEntity
+import com.tecsup.asistente.conduccion.data.network.Contract
 import com.tecsup.asistente.conduccion.data.repository.RoomTripRepository
+import com.tecsup.asistente.conduccion.domain.diagnostic.GpsStatus
+import com.tecsup.asistente.conduccion.domain.diagnostic.GpsTelemetry
 import com.tecsup.asistente.conduccion.domain.model.DataOrigin
 import com.tecsup.asistente.conduccion.domain.model.DrivingEventType
 import com.tecsup.asistente.conduccion.domain.model.TripStatus
@@ -130,9 +133,71 @@ class RoomTripRepositoryTest {
         assertTrue(repository.observeHistory().first().isEmpty())
     }
 
+    @Test
+    fun repeatedManeuversPersistWithoutNetworkAndStayWithinTheirTrip() = runBlocking {
+        val tripId = repository.startOrResumeTrip().id
+        val types = DrivingEventType.entries
+        repeat(3) {
+            clock.advance(3)
+            assertNull(repository.simulateManeuver(tripId, types[it]))
+        }
+        database.close()
+        openDatabase()
+        clock.advance(3)
+        val alertId = checkNotNull(repository.simulateManeuver(tripId, types.first()))
+        val saved = checkNotNull(database.tripDao().latestManeuverAlert(tripId))
+        assertEquals(alertId, saved.id)
+        assertEquals(tripId, saved.tripId)
+        assertEquals(clock.millis(), saved.occurredAt)
+        assertTrue(saved.testOnly)
+        assertEquals("MISSING", saved.locationStatus)
+        assertNull(saved.latitude)
+        val ids = database.tripDao().simulatedManeuvers(tripId).map { it.eventId }
+        assertEquals(ids, Contract.json.decodeFromString<List<String>>(saved.eventIds))
+
+        database.close()
+        openDatabase()
+        assertEquals(saved, database.tripDao().latestManeuverAlert(tripId))
+        clock.advance(3)
+        assertNull(repository.simulateManeuver(tripId, types.first()))
+        repository.finishTrip(tripId)
+        val newTrip = repository.startOrResumeTrip().id
+        clock.advance(3)
+        assertNull(repository.simulateManeuver(newTrip, types.first()))
+        assertNull(database.tripDao().latestManeuverAlert(newTrip))
+    }
+
+    @Test
+    fun repeatedManeuverAlertStoresTheMostRecentValidFix() = runBlocking {
+        val tripId = repository.startOrResumeTrip().id
+        val earlier = GpsTelemetry(
+            status = GpsStatus.VALID, latitude = -16.4, longitude = -71.5, ageMillis = 0,
+            receivedAtMillis = clock.millis(), receivedAtMonotonicMillis = System.nanoTime() / 1_000_000,
+        )
+        repository.recordTrackPoint(earlier)
+        clock.advance(2)
+        val latest = earlier.copy(
+            latitude = -16.5, receivedAtMillis = clock.millis(),
+            receivedAtMonotonicMillis = System.nanoTime() / 1_000_000,
+        )
+        repository.recordTrackPoint(latest)
+        repository.recordTrackPoint(GpsTelemetry(status = GpsStatus.NO_FIX))
+
+        repeat(4) {
+            clock.advance(3)
+            repository.simulateManeuver(tripId, DrivingEventType.SHARP_TURN)
+        }
+
+        val saved = checkNotNull(database.tripDao().latestManeuverAlert(tripId))
+        assertEquals("AVAILABLE", saved.locationStatus)
+        assertEquals(latest.latitude, saved.latitude)
+        assertEquals(latest.longitude, saved.longitude)
+        assertEquals(latest.receivedAtMillis, saved.locationCapturedAt)
+    }
+
     private class TestClock : Clock() {
         private var now = Instant.parse("2026-01-01T12:00:00Z")
-        fun advance() { now = now.plusSeconds(1) }
+        fun advance(seconds: Long = 1) { now = now.plusSeconds(seconds) }
         override fun instant(): Instant = now
         override fun getZone(): ZoneId = ZoneOffset.UTC
         override fun withZone(zone: ZoneId): Clock = Clock.fixed(now, zone)

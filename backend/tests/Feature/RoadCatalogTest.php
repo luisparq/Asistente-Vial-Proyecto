@@ -7,7 +7,7 @@ use Tests\TestCase;
 
 class RoadCatalogTest extends TestCase
 {
-    public function test_it_exposes_mapped_school_and_speed_and_keeps_traffic_unavailable_without_key(): void
+    public function test_it_exposes_mapped_school_and_speed_and_keeps_traffic_unconfigured_without_key(): void
     {
         config(['cache.default' => 'array', 'services.tomtom.key' => null]);
         Http::preventStrayRequests();
@@ -26,35 +26,45 @@ class RoadCatalogTest extends TestCase
         $this->getJson('/api/v1/road-catalog')->assertOk()
             ->assertJsonPath('zones.0.name', 'Colegio cerca')
             ->assertJsonPath('speedSections.0.kmh', 40)
+            ->assertJsonPath('speedSections.0.name', 'Tramo vial')
             ->assertJsonCount(1, 'speedSections')
-            ->assertJsonPath('osmAvailable', true)
-            ->assertJsonPath('trafficAvailable', false)->assertJsonPath('trafficConfigured', false);
+            ->assertJsonPath('osmAvailable', true)->assertJsonPath('trafficConfigured', false);
         $this->getJson('/api/v1/road-catalog')->assertOk();
         Http::assertSentCount(1);
         Http::assertSent(fn ($request) => $request->hasHeader('User-Agent', 'AVIGEM-RoadCatalog/1.0'));
     }
 
-    public function test_it_exposes_current_directional_traffic_and_skips_expired_reports(): void
+    public function test_it_reports_when_server_side_traffic_is_configured(): void
     {
-        config(['cache.default' => 'array', 'services.tomtom.key' => 'test-key']);
-        $this->freezeTime();
+        config([
+            'cache.default' => 'array',
+            'services.tomtom.key' => 'test-key',
+            'services.overpass.fallback_urls' => [],
+        ]);
         Http::preventStrayRequests();
-        $coordinates = ['type' => 'LineString', 'coordinates' => [[-71.53, -16.411], [-71.53, -16.41]]];
         Http::fake([
             config('services.overpass.url') => Http::response([], 503),
-            'https://api.tomtom.com/traffic/services/5/incidentDetails*' => Http::response(['incidents' => [
-                ['geometry' => $coordinates, 'properties' => ['id' => 'active']],
-                ['geometry' => $coordinates, 'properties' => ['id' => 'expired', 'endTime' => now()->subMinute()->toIso8601String()]],
-            ]]),
         ]);
 
         $this->getJson('/api/v1/road-catalog')->assertOk()
             ->assertJsonPath('osmAvailable', false)
-            ->assertJsonPath('trafficAvailable', true)
-            ->assertJsonPath('trafficConfigured', true)
-            ->assertJsonCount(1, 'traffic')
-            ->assertJsonPath('traffic.0.id', 'tomtom:active')
-            ->assertJsonPath('traffic.0.directionDegrees', 0)
-            ->assertJsonPath('traffic.0.expiresAt', now()->timestamp + 180);
+            ->assertJsonPath('trafficConfigured', true);
+    }
+
+    public function test_it_uses_a_configured_overpass_fallback_when_the_primary_is_unavailable(): void
+    {
+        config([
+            'cache.default' => 'array',
+            'services.overpass.url' => 'https://primary.example/interpreter',
+            'services.overpass.fallback_urls' => ['https://fallback.example/interpreter'],
+        ]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://primary.example/interpreter' => Http::response([], 503),
+            'https://fallback.example/interpreter' => Http::response(['elements' => []]),
+        ]);
+
+        $this->getJson('/api/v1/road-catalog')->assertOk()->assertJsonPath('osmAvailable', true);
+        Http::assertSentCount(2);
     }
 }

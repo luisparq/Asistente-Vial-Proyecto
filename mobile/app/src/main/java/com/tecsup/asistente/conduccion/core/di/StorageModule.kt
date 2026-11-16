@@ -11,6 +11,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import com.tecsup.asistente.conduccion.domain.processing.ManeuverAlertRule
 import java.time.Clock
 import javax.inject.Singleton
 
@@ -23,8 +24,12 @@ object StorageModule {
         Room.databaseBuilder(context, AsistenteVialDatabase::class.java, AsistenteVialDatabase.NAME)
             .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2,
                 com.tecsup.asistente.conduccion.data.local.MIGRATION_2_3,
-                com.tecsup.asistente.conduccion.data.local.MIGRATION_3_4)
+                com.tecsup.asistente.conduccion.data.local.MIGRATION_3_4,
+                com.tecsup.asistente.conduccion.data.local.MIGRATION_4_5)
             .build()
+
+    @Provides
+    fun maneuverAlertRule() = ManeuverAlertRule()
 
     @Provides
     fun diagnosticsUploadDao(db: AsistenteVialDatabase) = db.diagnosticsUploadDao()
@@ -38,6 +43,5 @@ object StorageModule {
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
     @Binds
-    @Singleton
     abstract fun tripRepository(implementation: RoomTripRepository): TripRepository
 }

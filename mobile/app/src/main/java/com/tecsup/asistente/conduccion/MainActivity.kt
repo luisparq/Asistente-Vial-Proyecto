@@ -2,6 +2,7 @@ package com.tecsup.asistente.conduccion
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.tecsup.asistente.conduccion.core.ui.AsistenteVialTheme
@@ -16,7 +17,10 @@ class MainActivity : ComponentActivity() {
     override fun onStop() { deviceMonitor.setForeground(false); ble.setForeground(false); super.onStop() }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         setContent {
             AsistenteVialTheme { AppNavHost() }
         }

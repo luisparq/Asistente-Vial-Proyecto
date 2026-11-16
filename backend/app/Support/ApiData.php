@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\DrivingEvent;
+use App\Models\ManeuverAlert;
 use App\Models\Trip;
 
 class ApiData
@@ -29,6 +30,16 @@ class ApiData
         }
 
         return $data;
+    }
+
+    public static function alert(ManeuverAlert $alert): array
+    {
+        return ['client_alert_id' => $alert->client_alert_id, 'client_trip_id' => $alert->trip->client_trip_id,
+            'event_ids' => $alert->events->pluck('client_event_id')->sort()->values()->all(),
+            'occurred_at' => UtcTimestamp::format($alert->occurred_at), 'test_only' => $alert->test_only,
+            'latitude' => $alert->latitude, 'longitude' => $alert->longitude,
+            'location_captured_at' => UtcTimestamp::format($alert->location_captured_at),
+            'location_status' => $alert->location_status];
     }
 
     public static function event(DrivingEvent $event): array

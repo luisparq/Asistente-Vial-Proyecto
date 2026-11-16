@@ -1,13 +1,11 @@
 package com.tecsup.asistente.conduccion.core.ui
 
 import android.provider.Settings
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
@@ -42,36 +40,6 @@ private val Archivo = FontFamily(
     Font(R.font.archivo_bold, FontWeight.Bold),
 )
 val ArchivoExpanded = FontFamily(Font(R.font.archivo_expanded_bold, FontWeight.Bold))
-
-private val LightColors = lightColorScheme(
-    primary = AvigemColors.Volcanic,
-    onPrimary = AvigemColors.Sillar50,
-    primaryContainer = AvigemColors.Citrine,
-    onPrimaryContainer = AvigemColors.Volcanic,
-    secondary = AvigemColors.Mineral600,
-    onSecondary = AvigemColors.Sillar50,
-    secondaryContainer = AvigemColors.Sillar200,
-    onSecondaryContainer = AvigemColors.Volcanic,
-    tertiary = Color(0xFF22507A),
-    onTertiary = AvigemColors.Sillar50,
-    background = AvigemColors.Sillar100,
-    onBackground = AvigemColors.Volcanic,
-    surface = AvigemColors.Sillar50,
-    onSurface = AvigemColors.Volcanic,
-    surfaceVariant = AvigemColors.Sillar200,
-    onSurfaceVariant = AvigemColors.Mineral600,
-    surfaceContainerLowest = AvigemColors.Sillar50,
-    surfaceContainerLow = AvigemColors.Sillar50,
-    surfaceContainer = AvigemColors.Sillar200,
-    surfaceContainerHigh = AvigemColors.Sillar200,
-    surfaceContainerHighest = AvigemColors.Sillar300,
-    outline = AvigemColors.Mineral400,
-    outlineVariant = AvigemColors.Sillar300,
-    error = Color(0xFF9C2F1B),
-    onError = AvigemColors.Sillar50,
-    errorContainer = Color(0xFFF9E1DA),
-    onErrorContainer = Color(0xFF6B1F11),
-)
 
 private val DarkColors = darkColorScheme(
     primary = AvigemColors.Citrine,
@@ -126,7 +94,7 @@ private val AppShapes = Shapes(small = RoundedCornerShape(10.dp), medium = Round
 @Composable
 fun AsistenteVialTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = DarkColors,
         typography = AppTypography,
         shapes = AppShapes,
         content = content,

@@ -8,7 +8,7 @@ object RetryPolicy {
     fun state(code: Int): String = when {
         code == 401 || code == 403 -> "BLOCKED_AUTH"
         code == 409 || code == 404 -> "BLOCKED_CONFLICT"
-        code == 408 || code == 429 || code >= 500 || code == 0 -> "RETRY_WAIT"
+        code == 408 || code == 425 || code == 429 || code >= 500 || code == 0 -> "RETRY_WAIT"
         else -> "BLOCKED_VALIDATION"
     }
     fun next(now: Long, attempts: Int, retryAfter: String?): Long {

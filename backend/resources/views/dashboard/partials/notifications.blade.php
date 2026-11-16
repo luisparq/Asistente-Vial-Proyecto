@@ -1,7 +1,11 @@
 @php($display = \App\Support\DashboardDisplay::class)
-@if($notifications->isEmpty())
+@if($alertNotifications->isNotEmpty())
+    @include('dashboard.partials.alert-list', ['alertRows' => $alertNotifications])
+    <a href="{{ route('dashboard.events', ['kind' => 'alerts'] + request()->only('notice_driver', 'notice_vehicle', 'from', 'to')) }}">Ver todas las alertas</a>
+@endif
+@if($notifications->isEmpty() && $alertNotifications->isEmpty())
     <p class="fleet-notification-empty">Aún no hay maniobras recibidas que coincidan con los filtros.</p>
-@else
+@elseif($notifications->isNotEmpty())
     <ul class="fleet-notification-list">
         @foreach($notifications as $event)
             <li>

@@ -18,7 +18,7 @@ class DashboardHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'same-origin');
         if (! $response->headers->has('Content-Security-Policy')) {
-            if ($request->routeIs('dashboard.map', 'dashboard.live-map', 'dashboard.trip', 'platform.analytics')) {
+            if ($request->routeIs('dashboard.map', 'dashboard.events', 'dashboard.live-map', 'dashboard.trip', 'platform.analytics')) {
                 $origins = implode(' ', config('maps.allowed_origins', []));
                 $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self'; worker-src 'self' blob:; connect-src 'self' $origins; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: $origins; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
             } else {

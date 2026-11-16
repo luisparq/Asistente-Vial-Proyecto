@@ -4,11 +4,12 @@
   const status = document.getElementById('map-status');
   const buttons = [document.getElementById('mode-markers'), document.getElementById('mode-heat')];
   const data = JSON.parse(document.getElementById('incident-data').textContent);
+  const focused = data.features.find(feature => feature.properties.uuid === container.dataset.focus);
   if (!window.maplibregl) { status.textContent = 'No se pudo iniciar el mapa. Comprueba soporte WebGL en este navegador.'; return; }
   const styleSelect = document.getElementById('incident-style');
   const cartography = styleSelect && window.fleetMapStyle(styleSelect, container.dataset);
   let map;
-  try { map = new maplibregl.Map({container, style:cartography?.initial ?? container.dataset.style, center:[0,0], zoom:1, attributionControl:true}); }
+  try { map = new maplibregl.Map({container, style:cartography?.initial ?? container.dataset.style, center:focused ? focused.geometry.coordinates : [0,0], zoom:focused ? 16 : 1, attributionControl:true}); }
   catch (_) { status.textContent = 'No se pudo iniciar el mapa. Los registros siguen disponibles en Eventos.'; return; }
   new ResizeObserver(() => map.resize()).observe(container);
   map.addControl(new maplibregl.NavigationControl());
@@ -22,13 +23,15 @@
     const node = document.getElementById('event-detail'); node.replaceChildren();
     const p = feature.properties, c = feature.geometry.coordinates;
     for (const text of [p.label, p.origin_label, 'Fecha · Lima: '+p.date,
-      'Latitud: '+c[1], 'Longitud: '+c[0], 'Origen GPS: '+(p.location_origin || 'No informado'),
+      'Latitud: '+c[1], 'Longitud: '+c[0], ...(!p.alert_url ? ['Origen GPS: '+(p.location_origin || 'No informado')] : []),
       ...(container.dataset.global === 'true' ? ['Empresa: '+p.company] : [p.vehicle ? 'Vehículo: '+p.vehicle : 'Sin vehículo asociado', 'UUID: '+p.uuid])]) {
       const line = document.createElement('p'); line.textContent = text; node.append(line);
     }
+    if (p.alert_url) { const link = document.createElement('a'); link.href = p.alert_url; link.textContent = 'Ver alerta'; node.append(link); }
     if (p.trip_url) { const link = document.createElement('a'); link.href = p.trip_url; link.textContent = 'Ver recorrido'; node.append(link); }
     if (select) select.value = String(data.features.findIndex(f => f.properties.uuid === p.uuid));
   }
+  if (focused) detail(focused);
   select?.addEventListener('change', () => { const f = data.features[Number(select.value)]; if (select.value !== '' && f) { detail(f); map.flyTo({center:f.geometry.coordinates, zoom:Math.max(map.getZoom(),15)}); } });
   let heat = false;
   function updateMode() {
@@ -58,7 +61,7 @@
     map.addLayer({id:'incident-hit', type:'circle', source:'incidents', paint:{'circle-radius':18,'circle-opacity':0,'circle-stroke-opacity':0}});
     updateMode();
     buttons.forEach(button => { button.disabled = false; });
-    if (!container.dataset.ready && data.features.length) {
+    if (!container.dataset.ready && !focused && data.features.length) {
       const bounds = new maplibregl.LngLatBounds(); data.features.forEach(f=>bounds.extend(f.geometry.coordinates));
       map.fitBounds(bounds,{padding:50,maxZoom:15,duration:0});
     }

@@ -22,12 +22,19 @@
         </select></label>
         <button id="live-fit" type="button" class="button" disabled>Centrar vehículos</button>
     </div>
-    <fieldset id="live-road-catalog" class="incident-catalog" data-url="{{ route('road-catalog', [], false) }}" disabled>
+    <fieldset id="live-road-catalog" class="incident-catalog" data-url="{{ route('road-catalog', [], false) }}"
+        data-traffic-url="{{ url('/api/v1/traffic-flow/{z}/{x}/{y}.png') }}"
+        data-incidents-url="{{ route('road.traffic-incidents', [], false) }}"
+        data-schools-url="{{ route('road.schools', [], false) }}"
+        data-assistance-url="{{ url('/api/v1/road/emergency-pois') }}"
+        data-traffic-configured="{{ filled(config('services.tomtom.key')) ? '1' : '0' }}" disabled>
         <legend>Capas viales de Arequipa</legend>
-        <label><input type="checkbox" value="speed"> <span class="catalog-dot speed"></span> Límites de velocidad</label>
-        <label><input type="checkbox" value="schools"> <span class="catalog-dot schools"></span> Colegios</label>
-        <label><input type="checkbox" value="traffic"> <span class="catalog-dot traffic"></span> Tráfico reciente</label>
-        <p  role="status">Activa una capa para consultar el catálogo vial.</p>
+        <label><input type="checkbox" value="traffic"> <span class="catalog-dot traffic"></span> Flujo de tráfico en vivo <small class="catalog-state" data-layer-state hidden></small></label>
+        <label><input type="checkbox" value="incidents"> <span class="catalog-dot incidents"></span> Incidentes y cierres <small class="catalog-state" data-layer-state hidden></small></label>
+        <label><input type="checkbox" value="speed"> <span class="catalog-dot speed"></span> Límites de velocidad <small class="catalog-state" data-layer-state hidden></small></label>
+        <label><input type="checkbox" value="schools"> <span class="catalog-dot schools"></span> Colegios cercanos <small class="catalog-state" data-layer-state hidden></small></label>
+        <label><input type="checkbox" value="assistance"> <span class="catalog-dot assistance"></span> Puntos de auxilio <small class="catalog-state" data-layer-state hidden></small></label>
+        <p role="status">Activa una capa para consultarla. Cada capa indica su propio estado.</p>
     </fieldset>
     <div class="live-map-grid">
         <section class="panel live-map-canvas" aria-label="Mapa de vehículos">

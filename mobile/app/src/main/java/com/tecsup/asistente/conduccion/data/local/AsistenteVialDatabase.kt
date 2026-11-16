@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 
 @Database(entities = [TripEntity::class, DrivingEventEntity::class, TripSyncEntity::class, EventSyncEntity::class, OutboxEntity::class,
     com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsUploadSessionEntity::class,
-    com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsUploadSampleEntity::class], version = 4, exportSchema = true)
+    com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsUploadSampleEntity::class, ManeuverAlertEntity::class], version = 5, exportSchema = true)
 abstract class AsistenteVialDatabase : RoomDatabase() {
     abstract fun tripDao(): TripDao
     abstract fun syncDao(): SyncDao

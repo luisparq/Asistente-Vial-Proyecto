@@ -43,7 +43,7 @@ class EventLocationRoomTest {
             sql.execSQL("INSERT INTO sync_outbox VALUES ('TEST-op',1,'TEST-event',0,'TEST-path',?,'PENDING',0,0,0,NULL,NULL)",arrayOf(payload))
             sql.version=2
         }
-        val db=Room.databaseBuilder(context,AsistenteVialDatabase::class.java,name).addMigrations(MIGRATION_2_3).build()
+        val db=Room.databaseBuilder(context,AsistenteVialDatabase::class.java,name).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
         try {
             val event=db.tripDao().events(1).single()
             assertEquals(1000L,event.occurredAt); assertNull(event.latitude); assertNull(event.gpsReceivedAt)

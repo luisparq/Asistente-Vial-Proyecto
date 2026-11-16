@@ -79,7 +79,9 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable(AppRoute.Home.path) {
             HomeScreen(
-                onTrip = { navController.open(AppRoute.Trip) },
+                onTrip = { startedNew ->
+                    navController.navigate(tripRoute(startedNew)) { launchSingleTop = true }
+                },
                 onBle = { navController.open(AppRoute.Ble) },
                 onHistory = { navController.open(AppRoute.History) },
                 onSettings = { navController.open(AppRoute.Settings) },
@@ -88,13 +90,20 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 name = name, company = session?.companyName, connection = connection,
             )
         }
-        composable(AppRoute.Trip.path) {
-            TripScreen(onBack, onFinished = {
-                navController.navigate(AppRoute.History.path) {
-                    popUpTo(AppRoute.Home.path)
-                    launchSingleTop = true
-                }
-            })
+        composable(
+            TRIP_ROUTE,
+            arguments = listOf(navArgument(STARTED_NEW_ARG) { type = NavType.BoolType; defaultValue = false }),
+        ) { entry ->
+            TripScreen(
+                onBack,
+                onFinished = {
+                    navController.navigate(AppRoute.History.path) {
+                        popUpTo(AppRoute.Home.path)
+                        launchSingleTop = true
+                    }
+                },
+                startedNew = entry.arguments?.getBoolean(STARTED_NEW_ARG) ?: false,
+            )
         }
         composable(AppRoute.Ble.path) { BleScreen(onBack, onDiagnostic = { navController.open(AppRoute.Diagnostic) }) }
         composable(AppRoute.Profile.path) {
@@ -121,6 +130,11 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
     }
     }
 }
+
+private const val STARTED_NEW_ARG = "startedNew"
+private const val TRIP_ROUTE = "trip?$STARTED_NEW_ARG={$STARTED_NEW_ARG}"
+
+private fun tripRoute(startedNew: Boolean) = "trip?$STARTED_NEW_ARG=$startedNew"
 
 private fun NavHostController.open(route: AppRoute) {
     navigate(route.path) { launchSingleTop = true }

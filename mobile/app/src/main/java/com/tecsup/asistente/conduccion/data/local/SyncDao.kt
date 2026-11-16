@@ -20,6 +20,15 @@ interface SyncDao {
     @Query("SELECT sync_outbox.state, COUNT(*) AS count FROM sync_outbox JOIN trip_sync ON trip_sync.localTripId = sync_outbox.localTripId WHERE ownerKey = :owner GROUP BY sync_outbox.state")
     fun statuses(owner: String?): Flow<List<QueueStatus>>
     @Query("SELECT * FROM sync_outbox ORDER BY localTripId, revision, operationId") suspend fun all(): List<OutboxEntity>
+    @Query("""
+        SELECT a.* FROM maneuver_alerts a
+        JOIN trip_sync t ON t.localTripId = a.tripId
+        WHERE t.ownerKey = :owner AND NOT EXISTS (
+            SELECT 1 FROM sync_outbox o WHERE o.operationId = a.id
+        )
+    """)
+    suspend fun unqueuedManeuverAlerts(owner: String): List<ManeuverAlertEntity>
+
     @Query("SELECT * FROM sync_outbox WHERE operationId = :id") suspend fun operation(id: String): OutboxEntity?
     @Query("SELECT * FROM sync_outbox WHERE localTripId = :tripId AND revision = :revision ORDER BY rowid DESC LIMIT 1")
     suspend fun lastTrackPoint(tripId: Long, revision: Int): OutboxEntity?
@@ -28,7 +37,8 @@ interface SyncDao {
     @Query("""SELECT o.* FROM sync_outbox o JOIN trip_sync m ON m.localTripId = o.localTripId
         WHERE m.ownerKey = :owner AND o.state IN ('PENDING','RETRY_WAIT') AND o.nextAttemptAt <= :now
         AND (o.revision > 0 OR EXISTS (SELECT 1 FROM sync_outbox p WHERE p.localTripId = o.localTripId AND p.revision > 0 AND p.state = 'ACKED'))
-        ORDER BY CASE WHEN o.revision > 0 THEN 0 WHEN o.eventUuid IS NOT NULL THEN 1 ELSE 2 END,
+        ORDER BY CASE WHEN o.revision > 0 THEN 0 WHEN o.eventUuid IS NOT NULL THEN 1
+            WHEN o.revision = -2 THEN 3 ELSE 2 END,
             o.revision, o.localTripId, o.rowid LIMIT 1""")
     suspend fun next(owner: String, now: Long): OutboxEntity?
     @Query("UPDATE sync_outbox SET state = 'IN_FLIGHT', leaseUntil = :until, leaseToken = :lease, attempts = attempts + 1 WHERE operationId = :id AND state IN ('PENDING','RETRY_WAIT')")

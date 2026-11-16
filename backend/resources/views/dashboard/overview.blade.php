@@ -13,6 +13,10 @@
                     <dd>{{ number_format($value, 0, ',', '.') }}</dd>
                 </div>
             @endforeach
+            <div>
+                <dt><a href="{{ route('dashboard.events', ['kind' => 'alerts', 'alert_status' => 'pending']) }}">Alertas pendientes de revisar</a></dt>
+                <dd>{{ number_format($pendingAlerts, 0, ',', '.') }}</dd>
+            </div>
         </dl>
     </section>
     <section class="fleet-notifications" id="notificaciones" aria-labelledby="fleet-notifications-title">

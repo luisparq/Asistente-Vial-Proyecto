@@ -48,6 +48,23 @@ fun DiagnosticScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hiltVi
                 if (res == android.speech.tts.TextToSpeech.LANG_MISSING_DATA || res == android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED) {
                     instance?.language = java.util.Locale.getDefault()
                 }
+                try {
+                    val spanishVoices = instance?.voices?.filter { it.locale.language == "es" } ?: emptySet()
+                    // Detecta voz masculina con palabra completa para no coincidir con "female".
+                    val maleToken = Regex("(?:^|[-_])male(?:$|[-_])")
+                    val maleVoice = spanishVoices.firstOrNull { voice ->
+                        val name = voice.name.lowercase(java.util.Locale.ROOT)
+                        val features = voice.features?.map { it.lowercase(java.util.Locale.ROOT) } ?: emptyList()
+                        maleToken.containsMatchIn(name) ||
+                        features.any { maleToken.containsMatchIn(it) } ||
+                        name.contains("-eed-") || name.contains("-sfb-")
+                    }
+                    if (maleVoice != null) {
+                        instance?.voice = maleVoice
+                    }
+                } catch (_: Exception) { }
+                instance?.setPitch(0.88f)
+                instance?.setSpeechRate(0.98f)
             }
         }
         tts = instance

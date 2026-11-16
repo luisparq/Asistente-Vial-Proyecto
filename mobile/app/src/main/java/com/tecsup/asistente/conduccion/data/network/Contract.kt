@@ -16,6 +16,20 @@ object Contract {
 @Serializable data class EventDto(val type: String, val occurred_at: String, val origin: String = "SIMULATED", val latitude: Double? = null, val longitude: Double? = null,
     val location_origin: String? = null, val gps_utc_seconds: Int? = null,
     val gps_received_at: String? = null, val gps_age_ms: Long? = null)
+@Serializable data class ManeuverAlertDto(
+    val event_ids: List<String>, val occurred_at: String, val test_only: Boolean,
+    val latitude: Double?, val longitude: Double?,
+    val location_captured_at: String?, val location_status: String,
+)
+@Serializable data class ManeuverAlertReceipt(
+    val client_alert_id: String, val client_trip_id: String,
+    val event_ids: List<String>, val occurred_at: String, val test_only: Boolean,
+    val latitude: Double?, val longitude: Double?,
+    val location_captured_at: String?, val location_status: String,
+) {
+    fun payload() = ManeuverAlertDto(event_ids, occurred_at, test_only, latitude, longitude,
+        location_captured_at, location_status)
+}
 @Serializable data class LoginDto(val email: String, val password: String)
 @Serializable data class TokenDto(val access_token: String, val token_type: String, val expires_at: String)
 @Serializable data class UserDto(val id: Long, val name: String, val email: String)

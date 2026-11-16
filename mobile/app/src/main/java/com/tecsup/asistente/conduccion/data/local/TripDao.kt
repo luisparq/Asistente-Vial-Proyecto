@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Relation
 import androidx.room.Transaction
+import com.tecsup.asistente.conduccion.domain.processing.IdentifiedManeuver
 import kotlinx.coroutines.flow.Flow
 
 data class TripWithEventsEntity(
@@ -39,6 +40,20 @@ interface TripDao {
         FROM trips ORDER BY startedAt DESC, id DESC
     """)
     fun observeHistory(): Flow<List<TripSummaryEntity>>
+
+    @Query("""
+        SELECT s.clientEventId AS eventId, e.occurredAt FROM driving_events e
+        JOIN event_sync s ON s.localEventId = e.id
+        WHERE e.tripId = :tripId AND e.origin = 'SIMULATED'
+        ORDER BY e.occurredAt, e.id
+    """)
+    suspend fun simulatedManeuvers(tripId: Long): List<IdentifiedManeuver>
+
+    @Query("SELECT * FROM maneuver_alerts WHERE tripId = :tripId ORDER BY occurredAt DESC, rowid DESC LIMIT 1")
+    suspend fun latestManeuverAlert(tripId: Long): ManeuverAlertEntity?
+
+    @Insert
+    suspend fun insertManeuverAlert(alert: ManeuverAlertEntity)
 
     @Insert
     suspend fun insertTrip(trip: TripEntity): Long

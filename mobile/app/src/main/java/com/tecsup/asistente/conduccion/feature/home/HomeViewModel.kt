@@ -18,6 +18,8 @@ data class StartTripState(
     val busy: Boolean = false,
     val failed: Boolean = false,
     val openTrip: Boolean = false,
+    /** Solo es verdadero cuando esta acción creó el recorrido; al retomarlo no debe saludarse. */
+    val startedNewTrip: Boolean = false,
 )
 
 @HiltViewModel
@@ -32,8 +34,8 @@ class HomeViewModel @Inject constructor(private val repository: TripRepository) 
         _action.value = StartTripState(busy = true)
         viewModelScope.launch {
             try {
-                repository.startOrResumeTrip()
-                _action.value = StartTripState(openTrip = true)
+                val started = repository.startOrResume()
+                _action.value = StartTripState(openTrip = true, startedNewTrip = started.created)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

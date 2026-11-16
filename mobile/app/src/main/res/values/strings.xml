@@ -38,6 +38,7 @@
     <string name="origin_sensor">SENSOR · sin validación física</string>
     <string name="event_count">Eventos guardados: %1$d</string>
     <string name="no_events">Este recorrido no tiene eventos guardados.</string>
+    <string name="active_no_events">Aún no hay eventos registrados.</string>
     <string name="empty_history">Todavía no hay recorridos guardados.</string>
     <string name="view_events">Consultar eventos</string>
     <string name="trip_detail_title">Detalle del recorrido</string>

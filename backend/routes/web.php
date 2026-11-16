@@ -58,6 +58,10 @@ Route::middleware(DashboardHeaders::class)->group(function () {
         Route::get('/events', [\App\Http\Controllers\Dashboard\IncidentMapController::class, 'show'])->name('events');
         Route::get('/map', \App\Http\Controllers\Dashboard\IncidentMapController::class)->name('map');
         Route::get('/analytics', [DashboardController::class, 'analytics'])->name('analytics');
+        Route::get('/alerts/{uuid}', [\App\Http\Controllers\Dashboard\ManeuverAlertController::class, 'show'])
+            ->whereUuid('uuid')->name('alerts.show');
+        Route::put('/alerts/{uuid}/review', [\App\Http\Controllers\Dashboard\ManeuverAlertController::class, 'review'])
+            ->whereUuid('uuid')->name('alerts.review');
         Route::get('/notifications', [DashboardController::class, 'notifications'])->name('notifications');
         Route::get('/settings', [DashboardController::class, 'settings'])->name('settings');
         Route::put('/settings', [DashboardController::class, 'updateSettings'])->name('settings.update');

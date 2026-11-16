@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Http;
 class RoadCatalogController extends Controller
 {
     private const AREA = '-16.51,-71.66,-16.29,-71.44';
-    private const TRAFFIC_AREA = '-71.66,-16.51,-71.44,-16.29';
 
     public function __invoke(): JsonResponse
     {
@@ -18,17 +17,10 @@ class RoadCatalogController extends Controller
 
         $key = config('services.tomtom.key');
         $trafficConfigured = is_string($key) && trim($key) !== '';
-        $traffic = $trafficConfigured
-            ? Cache::get('road-catalog:arequipa:traffic')
-                ?? Cache::lock('road-catalog:arequipa:traffic-refresh', 10)->get(fn () => $this->refreshTraffic($key))
-            : null;
-
         return response()->json([
             'zones' => $osm['zones'] ?? [],
             'speedSections' => $osm['speedSections'] ?? [],
-            'traffic' => is_array($traffic) ? $traffic : [],
             'osmAvailable' => !empty($osm),
-            'trafficAvailable' => is_array($traffic),
             'trafficConfigured' => $trafficConfigured,
         ]);
     }
@@ -50,18 +42,26 @@ class RoadCatalogController extends Controller
         OVERPASS;
 
         $elements = null;
-        try {
-            $response = Http::withUserAgent('AVIGEM-RoadCatalog/1.0')->acceptJson()->connectTimeout(3)->timeout(12)->asForm()
-                ->post(config('services.overpass.url'), ['data' => $query]);
-            if ($response->successful() && !$response->json('remark')) {
-                $elements = $response->json('elements');
+        $endpoints = array_unique(array_filter([
+            config('services.overpass.url'),
+            ...config('services.overpass.fallback_urls', []),
+        ]));
+        foreach ($endpoints as $endpoint) {
+            try {
+                $response = Http::withUserAgent('AVIGEM-RoadCatalog/1.0')->acceptJson()->connectTimeout(3)->timeout(12)->asForm()
+                    ->post($endpoint, ['data' => $query]);
+                if ($response->successful() && !$response->json('remark')) {
+                    $elements = $response->json('elements');
+                    break;
+                }
+            } catch (\Illuminate\Http\Client\ConnectionException) {
+                // Try the next configured endpoint; a later request retries all of them.
             }
-        } catch (\Illuminate\Http\Client\ConnectionException) {
-            // Retry on a later request.
         }
 
         $catalog = is_array($elements) ? $this->osmCatalog($elements) : [];
-        Cache::put('road-catalog:arequipa:osm', $catalog, $catalog ? now()->addHours(12) : now()->addMinutes(2));
+        // Si Overpass falla, se espera 5 minutos antes de reintentar: cada intento puede ocupar un proceso PHP ~25 s.
+        Cache::put('road-catalog:arequipa:osm', $catalog, $catalog ? now()->addHours(12) : now()->addMinutes(5));
 
         return $catalog;
     }
@@ -101,6 +101,7 @@ class RoadCatalogController extends Controller
                 }
                 $sections[] = [
                     'id' => "osm:$id:$index",
+                    'name' => $tags['name'] ?? 'Tramo vial',
                     'start' => $start,
                     'end' => $end,
                     'kmh' => (int) $match[1],
@@ -111,65 +112,4 @@ class RoadCatalogController extends Controller
         return ['zones' => $zones, 'speedSections' => $sections];
     }
 
-    private function refreshTraffic(string $key): array|false
-    {
-        $cached = Cache::get('road-catalog:arequipa:traffic');
-        if ($cached !== null) {
-            return $cached;
-        }
-
-        $reports = false;
-        try {
-            $response = Http::acceptJson()->connectTimeout(3)->timeout(6)
-                ->get('https://api.tomtom.com/traffic/services/5/incidentDetails', [
-                    'key' => $key,
-                    'bbox' => self::TRAFFIC_AREA,
-                    'categoryFilter' => 'Jam',
-                    'timeValidityFilter' => 'present',
-                    'fields' => '{incidents{geometry{type,coordinates},properties{id,endTime}}}',
-                ]);
-            if ($response->successful() && is_array($incidents = $response->json('incidents'))) {
-                $reports = $this->trafficCatalog($incidents);
-            }
-        } catch (\Illuminate\Http\Client\ConnectionException) {
-            // Expired traffic is never reused after a failed refresh.
-        }
-
-        Cache::put('road-catalog:arequipa:traffic', $reports, now()->addMinutes(2));
-
-        return $reports;
-    }
-
-    private function trafficCatalog(array $incidents): array
-    {
-        $reports = [];
-        $now = now()->timestamp;
-        foreach ($incidents as $incident) {
-            $geometry = $incident['geometry'] ?? [];
-            $id = $incident['properties']['id'] ?? null;
-            $start = $geometry['coordinates'][0] ?? [];
-            $next = $geometry['coordinates'][1] ?? [];
-            if (!$id || ($geometry['type'] ?? null) !== 'LineString'
-                || !isset($start[0], $start[1], $next[0], $next[1]) || $start === $next) {
-                continue;
-            }
-            $endTime = strtotime($incident['properties']['endTime'] ?? '');
-            $expiresAt = min($endTime ?: PHP_INT_MAX, $now + 180);
-            if ($expiresAt <= $now) {
-                continue;
-            }
-
-            $east = ($next[0] - $start[0]) * cos(deg2rad($start[1]));
-            $north = $next[1] - $start[1];
-            $direction = ((int) round(rad2deg(atan2($east, $north))) + 360) % 360;
-            $reports[] = [
-                'id' => "tomtom:$id",
-                'point' => ['lat' => $start[1], 'lon' => $start[0]],
-                'directionDegrees' => $direction,
-                'expiresAt' => $expiresAt,
-            ];
-        }
-
-        return $reports;
-    }
 }
