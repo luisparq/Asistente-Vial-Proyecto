@@ -36,7 +36,12 @@ class PlatformAnalytics {
             ->withCount($counts)->orderBy($f['sort']??'events_count',$f['direction']??'desc')->orderBy('id');
     }
     private function buckets(array $f,string $format): array {
-        return $this->events($f)->selectRaw("strftime('$format', occurred_at, '-5 hours') as bucket, origin, count(*) as total")
+        $events = $this->events($f);
+        $bucket = $events->getConnection()->getDriverName() === 'sqlite'
+            ? "strftime(?, occurred_at, '-5 hours')"
+            : 'date_format(date_sub(occurred_at, interval 5 hour), ?)';
+
+        return $events->selectRaw("{$bucket} as bucket, origin, count(*) as total", [$format])
             ->groupBy('bucket','origin')->get()->groupBy('bucket')->map(fn($rows)=>[
                 'simulated'=>(int)$rows->where('origin','SIMULATED')->sum('total'),'sensor'=>(int)$rows->where('origin','SENSOR')->sum('total')])->all();
     }

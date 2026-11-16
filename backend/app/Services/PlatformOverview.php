@@ -22,11 +22,18 @@ class PlatformOverview {
         $inventory=['companies'=>(int)$companyStates->sum(),'active'=>(int)($companyStates['ACTIVE']??0),'inactive'=>(int)($companyStates['INACTIVE']??0),
             'admins'=>User::where('role','fleet_admin')->count(),'drivers'=>Driver::count(),'vehicles'=>Vehicle::count(),
             'trips'=>Trip::count(),'events'=>(int)$eventOrigins->sum(),'simulated'=>(int)($eventOrigins['SIMULATED']??0),'sensor'=>(int)($eventOrigins['SENSOR']??0)];
-        // SQLite groups UTC persistence into Lima calendar days; fetch grouped counts, not individual records.
-        $tripDays=Trip::where('started_at','>=',$from)->where('started_at','<',$until)
-            ->selectRaw("date(started_at, '-5 hours') as day, count(*) as total")->groupBy('day')->pluck('total','day');
-        $eventDays=DrivingEvent::where('occurred_at','>=',$from)->where('occurred_at','<',$until)
-            ->selectRaw("date(occurred_at, '-5 hours') as day, origin, count(*) as total")->groupBy('day','origin')->get()->keyBy(fn($r)=>$r->day.'#'.$r->origin);
+        // Group UTC timestamps into Lima calendar days.
+        $trips = Trip::where('started_at', '>=', $from)->where('started_at', '<', $until);
+        $events = DrivingEvent::where('occurred_at', '>=', $from)->where('occurred_at', '<', $until);
+        $tripDay = $trips->getConnection()->getDriverName() === 'sqlite'
+            ? "date(started_at, '-5 hours')"
+            : 'date(date_sub(started_at, interval 5 hour))';
+        $eventDay = $events->getConnection()->getDriverName() === 'sqlite'
+            ? "date(occurred_at, '-5 hours')"
+            : 'date(date_sub(occurred_at, interval 5 hour))';
+        $tripDays = $trips->selectRaw("{$tripDay} as day, count(*) as total")->groupBy('day')->pluck('total', 'day');
+        $eventDays = $events->selectRaw("{$eventDay} as day, origin, count(*) as total")
+            ->groupBy('day', 'origin')->get()->keyBy(fn ($r) => $r->day.'#'.$r->origin);
         $series=[];
         for($i=0;$i<$days;$i++) {
             $date=$local->startOfDay()->subDays($days-1-$i);$key=$date->format('Y-m-d');
