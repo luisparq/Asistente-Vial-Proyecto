@@ -8,6 +8,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.tecsup.asistente.conduccion.core.ui.LocalDemoMode
+import com.tecsup.asistente.conduccion.core.ui.LocalMainNav
+import com.tecsup.asistente.conduccion.core.ui.MainNav
 import com.tecsup.asistente.conduccion.domain.profile.ProfileState
 import com.tecsup.asistente.conduccion.feature.login.AccessViewModel
 import com.tecsup.asistente.conduccion.feature.login.WelcomeScreen
@@ -49,7 +51,13 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         }
     }
     val onBack: () -> Unit = { navController.popBackStack() }
-    CompositionLocalProvider(LocalDemoMode provides demo) {
+    val mainNav = MainNav(entry?.destination?.route) { route ->
+        navController.navigate(route) {
+            popUpTo(AppRoute.Home.path)
+            launchSingleTop = true
+        }
+    }
+    CompositionLocalProvider(LocalDemoMode provides demo, LocalMainNav provides mainNav) {
     NavHost(navController = navController, startDestination = AppRoute.Splash.path) {
         composable(AppRoute.Splash.path) {
             SplashScreen(onReady = {
@@ -87,6 +95,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onSettings = { navController.open(AppRoute.Settings) },
                 onProfile = { navController.open(AppRoute.Profile) },
                 onMap = { navController.open(AppRoute.Map) },
+                onPresentation = { navController.open(AppRoute.Diagnostic) },
                 name = name, company = session?.companyName, connection = connection,
             )
         }
@@ -103,13 +112,16 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                     }
                 },
                 startedNew = entry.arguments?.getBoolean(STARTED_NEW_ARG) ?: false,
+                connection = connection,
             )
         }
         composable(AppRoute.Ble.path) { BleScreen(onBack, onDiagnostic = { navController.open(AppRoute.Diagnostic) }) }
         composable(AppRoute.Profile.path) {
             com.tecsup.asistente.conduccion.feature.profile.ProfileScreen(onBack, onSettings = { navController.open(AppRoute.Settings) })
         }
-        composable(AppRoute.Map.path) { com.tecsup.asistente.conduccion.feature.map.DriverMapScreen(onBack) }
+        composable(AppRoute.Map.path) {
+            com.tecsup.asistente.conduccion.feature.map.DriverMapScreen(onBack, onDevice = { navController.open(AppRoute.Ble) })
+        }
         composable(AppRoute.Diagnostic.path) { DiagnosticScreen(onBack) }
         composable(AppRoute.History.path) {
             HistoryScreen(onBack, onTripSelected = { id -> navController.navigate("history/$id") },

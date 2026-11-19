@@ -37,10 +37,12 @@ fun ScreenLayout(
     description: String,
     onBack: (() -> Unit)? = null,
     scrollable: Boolean = true,
+    mainNav: Boolean = false,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = { if (mainNav) LocalMainNav.current?.let { MainNavBar(it) } },
         topBar = {
             TopAppBar(
                 title = { Text(title, style = MaterialTheme.typography.titleLarge) },

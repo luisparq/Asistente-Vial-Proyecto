@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.tecsup.asistente.conduccion.core.ui.LoadState
 import com.tecsup.asistente.conduccion.core.ui.asLoadState
 import com.tecsup.asistente.conduccion.domain.model.DataOrigin
-import com.tecsup.asistente.conduccion.domain.model.DrivingEventType
 import com.tecsup.asistente.conduccion.domain.model.TripWithEvents
 import com.tecsup.asistente.conduccion.domain.repository.TripRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,10 +44,6 @@ class TripViewModel @Inject constructor(private val repository: TripRepository) 
 
     private val _maneuverAlertId = MutableStateFlow<String?>(null)
     val maneuverAlertId = _maneuverAlertId.asStateFlow()
-
-    fun simulateManeuver(type: DrivingEventType) = perform { id ->
-        repository.simulateManeuver(id, type)?.let { _maneuverAlertId.value = it }
-    }
 
     fun finish() = perform(openHistory = true) { id -> repository.finishTrip(id) }
 

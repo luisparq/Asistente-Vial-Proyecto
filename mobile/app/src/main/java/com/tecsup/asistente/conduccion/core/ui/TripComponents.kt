@@ -64,7 +64,7 @@ fun EventInfo(event: DrivingEvent) {
     Text("Fecha y hora del evento: " + formatTimestamp(event.occurredAt), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (event.locationOrigin == com.tecsup.asistente.conduccion.domain.model.LocationOrigin.GPS_NEO6M && event.latitude != null && event.longitude != null) {
         Text("Ubicación GPS disponible", style = MaterialTheme.typography.bodyMedium)
-        Text("El evento sigue siendo SIMULATED: dato de prueba, no detección física.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (event.origin == DataOrigin.SIMULATED) Text("Dato de prueba: no es una detección física.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = { gpsVisible = !gpsVisible }) { Text(if (gpsVisible) "Ocultar datos GPS" else "Ver datos GPS") }
         if (gpsVisible) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             val style = MaterialTheme.typography.bodySmall

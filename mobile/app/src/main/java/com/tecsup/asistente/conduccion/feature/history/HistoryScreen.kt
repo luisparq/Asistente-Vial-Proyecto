@@ -43,7 +43,7 @@ fun HistoryScreen(
     val state by viewModel.trips.collectAsStateWithLifecycle()
     ScreenLayout(
         stringResource(R.string.history_title), stringResource(R.string.history_description),
-        onBack, scrollable = false,
+        onBack, scrollable = false, mainNav = true,
     ) {
         when (val current = state) {
             LoadState.Loading -> CircularProgressIndicator()

@@ -49,7 +49,7 @@ fun SettingsScreen(onBack: () -> Unit, onReturnToLogin: () -> Unit, viewModel: S
           Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Configuración avanzada", style = MaterialTheme.typography.titleLarge)
         Text("Configuración del servidor", style = MaterialTheme.typography.titleMedium)
-        Text("Los recorridos funcionan sin Internet. Solo se envían eventos SIMULATED de prueba; no son detecciones físicas.")
+        Text("Los recorridos funcionan sin Internet y se sincronizan con tu empresa cuando hay conexión.")
         session?.let { Text("Servidor de la sesión actual: ${it.baseUrl}", style = MaterialTheme.typography.bodySmall) }
         if (session?.token == null) Text("Sin sesión de envío válida. Los registros permanecen en este dispositivo.")
         OutlinedTextField(url, { url = it }, label = { Text("URL base del servidor") }, singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())

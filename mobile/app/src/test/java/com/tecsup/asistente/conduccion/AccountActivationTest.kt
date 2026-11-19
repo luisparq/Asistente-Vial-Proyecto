@@ -22,8 +22,9 @@ import org.junit.Test
 class AccountActivationTest {
     @Test fun sendsPublicActivationContractWithoutBearerAndAcceptsNoContent() = runTest {
         MockWebServer().use { server ->
+            server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
             server.enqueue(MockResponse().setResponseCode(204))
-            LaravelAccountActivation(LaravelApi()).activate(server.url("/").toString(), "a".repeat(64), "TEST password 123", "TEST password 123")
+            LaravelAccountActivation(LaravelApi()).activate(server.url("/").newBuilder().host("127.0.0.1").build().toString(), "a".repeat(64), "TEST password 123", "TEST password 123")
             val request = server.takeRequest()
             assertEquals("POST", request.method)
             assertEquals("/api/v1/auth/activate", request.path)
@@ -36,6 +37,7 @@ class AccountActivationTest {
 
     @Test fun validationAndRateLimitHaveSafeMessages() = runTest {
         MockWebServer().use { server ->
+            server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
             val repository = LaravelAccountActivation(LaravelApi())
             for ((status, body, expected) in listOf(
                 Triple(422, "{\"error\":{\"fields\":{\"activation_code\":[\"invalid\"]}}}", "Código no válido"),
@@ -45,7 +47,7 @@ class AccountActivationTest {
             )) {
                 server.enqueue(MockResponse().setResponseCode(status).setBody(body))
                 try {
-                    repository.activate(server.url("/").toString(), "a".repeat(64), "TEST password 123", "TEST password 123")
+                    repository.activate(server.url("/").newBuilder().host("127.0.0.1").build().toString(), "a".repeat(64), "TEST password 123", "TEST password 123")
                     fail("Failure expected")
                 } catch (failure: ActivationFailure) {
                     assertTrue(failure.message!!.startsWith(expected))

@@ -25,7 +25,7 @@ class ActivationViewModel @Inject constructor(private val activation: AccountAct
         if (state.value.busy || state.value.activated) return
         val problem = when {
             baseUrl.isBlank() -> "Completa la configuración en Ajustes antes de activar tu cuenta."
-            !code.trim().matches(Regex("[a-f0-9]{64}")) -> "Introduce el código completo entregado por tu empresa."
+            !code.trim().let { it.matches(Regex("[a-fA-F0-9]{64}")) || it.replace(Regex("[\\s-]"), "").matches(Regex("[A-Za-z0-9]{12}")) } -> "Introduce el código completo (formato XXXX-XXXX-XXXX) entregado por tu empresa."
             password.length !in 12..255 -> "La contraseña debe tener entre 12 y 255 caracteres."
             password != confirmation -> "Las contraseñas no coinciden."
             else -> null

@@ -30,10 +30,10 @@ class DeviceReportTest {
         assertFalse(DeviceReportPolicy.eligible(e.copy(blocked="BLOCKED_VALIDATION"),200_000,"TEST"))
     }
     @Test fun persistent_latest_snapshot_uuid_retry_after_and_recovery()= runTest {
-        val server=MockWebServer();server.start()
+        val server=MockWebServer();server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
         try {
             val clock=MutableClock();val store=Store();val session=MemorySessionStore()
-            session.save(Session(server.url("/").toString(),1,2,"TEST","test@example.invalid","TEST TOKEN"))
+            session.save(Session(server.url("/").newBuilder().host("127.0.0.1").build().toString(),1,2,"TEST","test@example.invalid","TEST TOKEN"))
             val owner=session.state.value!!.ownerKey
             var sync=DeviceReportSync(store,session,LaravelApi(),clock)
             assertTrue(sync.capture(session.state.value!!.ownerKey,"TEST ADDRESS",report(clock.now)))
@@ -55,10 +55,10 @@ class DeviceReportTest {
         } finally { server.shutdown() }
     }
     @Test fun auth_failure_is_blocked_and_never_sent_for_another_account()=runTest {
-        val server=MockWebServer();server.start()
+        val server=MockWebServer();server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
         try {
             val clock=MutableClock();val store=Store();val session=MemorySessionStore()
-            val a=Session(server.url("/").toString(),1,2,"TEST","a@example.invalid","TEST TOKEN")
+            val a=Session(server.url("/").newBuilder().host("127.0.0.1").build().toString(),1,2,"TEST","a@example.invalid","TEST TOKEN")
             session.save(a);val sync=DeviceReportSync(store,session,LaravelApi(),clock)
             sync.capture(session.state.value!!.ownerKey,"TEST ADDRESS",report(clock.now));server.enqueue(MockResponse().setResponseCode(401))
             assertFalse(sync.flush());assertNull(session.state.value!!.token)

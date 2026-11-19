@@ -4,8 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -14,7 +12,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -40,6 +37,7 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onProfile: () -> Unit,
     onMap: () -> Unit = {},
+    onPresentation: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     name: String? = null,
     company: String? = null,
@@ -55,7 +53,7 @@ fun HomeScreen(
             onTrip(startedNew)
         }
     }
-    ScreenLayout(stringResource(R.string.home_title), "") {
+    ScreenLayout(stringResource(R.string.home_title), "", mainNav = true) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AvigemTile(size = 46.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -130,21 +128,14 @@ fun HomeScreen(
                 connection.device?.name?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = AvigemColors.Mineral600) }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            HomeShortcut(stringResource(R.string.history_title), Icons.Default.DateRange, onHistory, Modifier.weight(1f))
-            HomeShortcut(stringResource(R.string.profile_title), Icons.Default.Person, onProfile, Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun HomeShortcut(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Card(onClick = onClick, modifier = modifier.heightIn(min = 64.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = CardDefaults.cardColors(containerColor = HomeSlate, contentColor = AvigemColors.Sillar100)) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge)
+        Card(onClick = onPresentation, modifier = Modifier.fillMaxWidth(),
+            border = BorderStroke(1.dp, AvigemColors.Citrine),
+            colors = CardDefaults.cardColors(containerColor = HomeSlate, contentColor = AvigemColors.Sillar100)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Modo presentación", style = MaterialTheme.typography.titleMedium, color = AvigemColors.Citrine)
+                Text("Demostración guiada con AVIGEM One: mueve el módulo y mira la alerta en pantalla completa. Son datos de prueba y no se guardan como detecciones reales.",
+                    style = MaterialTheme.typography.bodySmall, color = AvigemColors.Sillar100)
+            }
         }
     }
 }

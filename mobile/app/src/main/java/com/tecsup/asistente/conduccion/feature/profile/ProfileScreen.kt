@@ -25,7 +25,7 @@ fun ProfileScreen(onBack: () -> Unit, onSettings: () -> Unit, viewModel: Profile
 
 @Composable
 fun ProfileContent(state: ProfileState, onBack: () -> Unit, onSettings: () -> Unit, onRefresh: () -> Unit) {
-    ScreenLayout(stringResource(R.string.profile_title), stringResource(R.string.profile_description), onBack) {
+    ScreenLayout(stringResource(R.string.profile_title), stringResource(R.string.profile_description), onBack, mainNav = true) {
         when (state) {
             ProfileState.Loading -> CircularProgressIndicator()
             is ProfileState.Ready -> {

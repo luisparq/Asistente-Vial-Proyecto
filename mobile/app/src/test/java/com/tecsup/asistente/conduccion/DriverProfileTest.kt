@@ -18,7 +18,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DriverProfileTest {
-    private fun session(server: MockWebServer) = Session(server.url("/").toString(), 1, 2, "TEST", "test@example.test", "TEST_ONLY_TOKEN")
+    private fun session(server: MockWebServer) = Session(server.url("/").newBuilder().host("127.0.0.1").build().toString(), 1, 2, "TEST", "test@example.test", "TEST_ONLY_TOKEN")
     private val emptyProfile = """{"data":{"name":"TEST Driver","email":"test@example.test","status":"ACTIVE","access_status":"ACTIVE","emergency_contact":null,"documents":[],"vehicle":null}}"""
 
     @Test fun contractMapsDateOnlyWithoutTimezoneAndMinimizesFields() {
@@ -30,6 +30,7 @@ class DriverProfileTest {
     }
     @Test fun getsOwnProfileUsingBearerAndHandlesEmptyFields() = runBlocking {
         MockWebServer().use { server ->
+            server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
             server.enqueue(MockResponse().setBody(emptyProfile))
             val store = MemorySessionStore().apply { save(session(server)) }
             val repository = LaravelDriverProfileRepository(LaravelApi(), store)
@@ -44,6 +45,7 @@ class DriverProfileTest {
     }
     @Test fun handlesHttpErrorsWithoutReturningPriorPersonalData() = runBlocking {
         MockWebServer().use { server ->
+            server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
             val store = MemorySessionStore().apply { save(session(server)) }
             val repository = LaravelDriverProfileRepository(LaravelApi(), store)
             for ((code, expected) in listOf(401 to ProfileState.SessionExpired, 403 to ProfileState.Forbidden, 404 to ProfileState.NotRegistered, 429 to ProfileState.ServerError, 500 to ProfileState.ServerError)) {
@@ -54,6 +56,7 @@ class DriverProfileTest {
     }
     @Test fun malformedServerDataDoesNotCrash() = runBlocking {
         MockWebServer().use { server ->
+            server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
             server.enqueue(MockResponse().setBody("invalid"))
             val store = MemorySessionStore().apply { save(session(server)) }
             assertEquals(ProfileState.ServerError, withTimeout(5000) { LaravelDriverProfileRepository(LaravelApi(), store).observe().first { it != ProfileState.Loading } })
@@ -67,7 +70,7 @@ class DriverProfileTest {
         assertEquals(ProfileState.SessionExpired, repository.observe().first { it != ProfileState.Loading })
     }
     @Test fun unavailableServerReportsOffline() = runBlocking {
-        val server = MockWebServer(); server.start()
+        val server = MockWebServer(); server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
         val store = MemorySessionStore().apply { save(session(server)) }; server.shutdown()
         assertEquals(ProfileState.Offline, withTimeout(5000) { LaravelDriverProfileRepository(LaravelApi(), store).observe().first { it != ProfileState.Loading } })
     }

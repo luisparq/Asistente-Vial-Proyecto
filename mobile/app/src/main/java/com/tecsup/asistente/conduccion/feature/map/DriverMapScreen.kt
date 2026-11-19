@@ -4,6 +4,8 @@ import android.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -17,7 +19,8 @@ import androidx.lifecycle.*
 import androidx.lifecycle.compose.*
 import com.tecsup.asistente.conduccion.BuildConfig
 import com.tecsup.asistente.conduccion.core.ui.AvigemColors
-import com.tecsup.asistente.conduccion.core.ui.ScreenLayout
+import com.tecsup.asistente.conduccion.core.ui.LocalMainNav
+import com.tecsup.asistente.conduccion.core.ui.MainNavBar
 import com.tecsup.asistente.conduccion.domain.diagnostic.GpsStatus
 import org.maplibre.android.MapLibre
 import org.maplibre.android.maps.*
@@ -33,37 +36,69 @@ import kotlinx.coroutines.delay
 private val ArequipaReference = LatLng(-16.3989, -71.5369)
 
 @Composable
-fun DriverMapScreen(onBack:()->Unit,viewModel:DriverMapViewModel=hiltViewModel()) {
+fun DriverMapScreen(onBack:()->Unit, onDevice:()->Unit = {}, viewModel:DriverMapViewModel=hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val registeredCatalog by rememberRoadCatalog(viewModel.catalogUrl)
     val now by rememberRoadTime()
     val catalog = registeredCatalog?.activeAt(now) ?: RoadCatalog(osmAvailable = false)
     var center by remember { mutableIntStateOf(0) }
     var mapError by remember { mutableStateOf<String?>(null) }
-    ScreenLayout("Mi mapa", "GPS del dispositivo BLE", onBack) {
-        Card(Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Text(when(state.gpsStatus) {
-                GpsStatus.VALID -> if(state.position!=null) "Posición GPS válida" else "Posición GPS no disponible"
-                GpsStatus.STALE -> "Posición GPS caducada"
-                GpsStatus.NO_FIX -> "GPS sin fix válido"
-                GpsStatus.NO_RECEPTION -> "GPS sin recepción"
-                GpsStatus.DISCONNECTED -> "Dispositivo BLE desconectado"
-                GpsStatus.UNAVAILABLE -> "GPS no disponible en el dispositivo"
-                GpsStatus.INVALID_FRAME -> "Datos GPS inválidos"
-                GpsStatus.WAITING -> "Esperando posición GPS"
-            },style=MaterialTheme.typography.titleMedium)
-            state.position?.let { Text("Latitud: ${it.latitude} · Longitud: ${it.longitude}", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant) }
-            Button(onClick={center++},enabled=state.position!=null,modifier=Modifier.fillMaxWidth().heightIn(min=50.dp),shape=MaterialTheme.shapes.small) { Text("Centrar posición") }
-        } }
-        Text("Punto grande citrino: posición actual · Punto ámbar: datos de prueba SIMULATED del recorrido activo", style=MaterialTheme.typography.labelMedium)
-        Text("${state.events.size} eventos de prueba con ubicación. No son detecciones físicas ni zonas de riesgo comprobadas.", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
-        mapError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
-        RoadAlertPanel(catalog, registeredCatalog != null, state.position?.let { RoadPoint(it.latitude, it.longitude) })
-        Text("Azul: límite · Violeta: colegio · Rojo: tráfico · Datos © OpenStreetMap y TomTom",
-            style = MaterialTheme.typography.labelMedium)
-        NativeDriverMap(state, catalog, center, Modifier.fillMaxWidth().height(420.dp).clip(MaterialTheme.shapes.large),
-            onError = { mapError = it })
-        Text("La cartografía requiere Internet. El monitoreo, los recorridos y la sincronización funcionan sin mantener este mapa abierto.", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
+    var showInfo by remember { mutableStateOf(false) }
+    val connected = state.gpsStatus != GpsStatus.DISCONNECTED
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = { LocalMainNav.current?.let { MainNavBar(it) } },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            // Mapa a pantalla completa, centrado en Arequipa hasta tener posición GPS.
+            NativeDriverMap(state, catalog, center, Modifier.fillMaxSize(), onError = { mapError = it })
+            Column(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    onClick = onDevice,
+                    shape = MaterialTheme.shapes.small,
+                    color = if (connected) androidx.compose.ui.graphics.Color(0xFF1E7F43) else androidx.compose.ui.graphics.Color(0xFFB3261E),
+                    contentColor = androidx.compose.ui.graphics.Color.White,
+                ) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.size(10.dp).clip(androidx.compose.foundation.shape.CircleShape).background(androidx.compose.ui.graphics.Color.White))
+                        Text(if (connected) "AVIGEM One conectado" else "AVIGEM One desconectado", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                mapError?.let {
+                    Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer) {
+                        Text(it, Modifier.padding(10.dp), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            Column(Modifier.align(Alignment.BottomEnd).padding(12.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (showInfo) {
+                    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                        Column(Modifier.widthIn(max = 360.dp).heightIn(max = 360.dp).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(when(state.gpsStatus) {
+                                GpsStatus.VALID -> if(state.position!=null) "Posición GPS válida" else "Posición GPS no disponible"
+                                GpsStatus.STALE -> "Posición GPS caducada"
+                                GpsStatus.NO_FIX -> "GPS sin fix válido"
+                                GpsStatus.NO_RECEPTION -> "GPS sin recepción"
+                                GpsStatus.DISCONNECTED -> "Dispositivo BLE desconectado"
+                                GpsStatus.UNAVAILABLE -> "GPS no disponible en el dispositivo"
+                                GpsStatus.INVALID_FRAME -> "Datos GPS inválidos"
+                                GpsStatus.WAITING -> "Esperando posición GPS"
+                            }, style = MaterialTheme.typography.titleSmall)
+                            state.position?.let { Text("Latitud: ${it.latitude} · Longitud: ${it.longitude}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            Text("Punto grande citrino: tu posición · Punto ámbar: maniobras del recorrido (${state.events.size}). Azul: límite · Violeta: colegio · Rojo: tráfico · Datos © OpenStreetMap y TomTom.", style = MaterialTheme.typography.labelMedium)
+                            RoadAlertPanel(catalog, registeredCatalog != null, state.position?.let { RoadPoint(it.latitude, it.longitude) })
+                            Text("La cartografía requiere Internet. El monitoreo, los recorridos y la sincronización funcionan sin mantener este mapa abierto.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(onClick = { showInfo = !showInfo }, shape = MaterialTheme.shapes.small) { Text(if (showInfo) "Ocultar detalles" else "Detalles y alertas") }
+                    Button(onClick = { center++ }, enabled = state.position != null, shape = MaterialTheme.shapes.small) { Text("Mi posición") }
+                }
+            }
+        }
     }
 }
 
@@ -176,6 +211,8 @@ private fun NativeDriverMap(
             if (preview) {
                 loaded.uiSettings.setAllGesturesEnabled(false)
                 loaded.moveCamera(CameraUpdateFactory.newLatLngZoom(ArequipaReference, 12.0))
+            } else {
+                loaded.moveCamera(CameraUpdateFactory.newLatLngZoom(ArequipaReference, 13.0))
             }
             loaded.setStyle(BuildConfig.MAP_STYLE_URL) { style ->
                 if(!alive) return@setStyle
@@ -201,7 +238,7 @@ private fun NativeDriverMap(
                     "road-zones-points", "road-traffic-points", "road-limit-lines").firstOrNull()
                 val id=hit?.getNumberProperty("event_id")?.toLong()
                 val event=currentState.events.firstOrNull { it.id==id }
-                selected=event?.let { "Evento SIMULATED · ${it.type}\n"+com.tecsup.asistente.conduccion.core.ui.formatTimestamp(it.occurredAt)+"\n${it.latitude}, ${it.longitude}" }
+                selected=event?.let { "Maniobra · ${it.type}\n"+com.tecsup.asistente.conduccion.core.ui.formatTimestamp(it.occurredAt)+"\n${it.latitude}, ${it.longitude}" }
                 if (event == null) selected = roadHit?.getStringProperty("road_label")
                 event != null || roadHit != null
             }
@@ -250,6 +287,13 @@ private fun NativeDriverMap(
     }
     LaunchedEffect(center,ready) { if(center>0 && ready)state.position?.let { map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude,it.longitude),15.0)) } }
     LaunchedEffect(state.tripId) { selected=null }
-    AndroidView(factory = { view }, modifier = modifier)
-    selected?.let { Text(it) }
+    Box(modifier) {
+        AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
+        selected?.let {
+            Surface(Modifier.align(Alignment.BottomStart).padding(12.dp), shape = MaterialTheme.shapes.small,
+                color = AvigemColors.Volcanic, contentColor = AvigemColors.Sillar100) {
+                Text(it, Modifier.padding(10.dp), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
 }

@@ -27,6 +27,7 @@ class ContractSyncTest {
     }
     @Test fun localHttpIsDebugOnlyAndRedirectCredentialsAreNotAccepted() {
         val api = LaravelApi()
+        assertEquals("http://[::1]:8000/", api.normalizeBase("http://[::1]:8000"))
         assertEquals("http://10.0.2.2:8000/", api.normalizeBase("http://10.0.2.2:8000"))
         assertThrows(IllegalArgumentException::class.java) { api.normalizeBase("http://example.com/") }
         assertThrows(IllegalArgumentException::class.java) { api.normalizeBase("https://secret@example.com/") }
