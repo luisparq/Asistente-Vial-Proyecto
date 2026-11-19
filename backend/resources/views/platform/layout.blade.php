@@ -12,12 +12,13 @@
 <div class="shell">
     <aside class="sidebar">
         <a class="brand" href="{{ route('platform.index') }}"><span class="brand-mark"><x-avigem-mark :size="26"/></span><span>Vialigent<small>Platform</small></span></a>
+        <a class="button new-company" href="{{ route('platform.companies.create') }}" @if(request()->routeIs('platform.companies.create')) aria-current="page" @endif>+ Nueva empresa</a>
         <nav aria-label="Plataforma">
-            @foreach(['index'=>'Resumen global','analytics'=>'Análisis global','companies'=>'Empresas','accounts'=>'Cuentas administrativas','devices'=>'Dispositivos','support'=>'Soporte técnico','reports'=>'Reportes','audits'=>'Auditoría','profile'=>'Mi perfil'] as $route=>$label)
+            @foreach(['index'=>'Resumen global','analytics'=>'Análisis global','companies'=>'Empresas','accounts'=>'Cuentas administrativas','devices'=>'Dispositivos','support'=>'Soporte técnico','reports'=>'Reportes','audits'=>'Auditoría'] as $route=>$label)
                 <a href="{{ route('platform.'.$route) }}" @if(request()->routeIs('platform.'.$route)) aria-current="page" @endif><x-nav-icon :name="$route"/><span>{{ $label }}</span></a>
             @endforeach
         </nav>
-        <div class="sidebar-note"><p>Gestión y soporte de la plataforma.</p><small>Datos personales de uso administrativo.</small></div>
+        <div class="sidebar-note"><p>Gestión y soporte de la plataforma.</p><small>Cada empresa se registra con su primer administrador.</small></div>
     </aside>
     <div class="workspace">
         <header class="topbar"><div class="topbar-context"><strong>Administración global</strong><span class="zone">America/Lima · UTC−05:00</span></div><div class="account"><span>{{ auth()->user()->name }}<small>Administrador general</small></span><form method="post" action="{{ route('platform.logout') }}">@csrf<button class="button quiet">Cerrar sesión</button></form></div></header>

@@ -98,7 +98,6 @@ Route::middleware(DashboardHeaders::class)->group(function () {
         Route::post('/companies/{id}/accounts/{user}/access', [$controller,'companyAccountAccess'])->whereNumber(['id','user'])->block(10,10)->name('companies.accounts.access');
         Route::post('/companies/{id}/state', [$controller, 'companyState'])->whereNumber('id')->name('companies.state');
         Route::get('/accounts', [$controller, 'users'])->name('accounts');
-        Route::get('/profile', [$controller, 'profile'])->name('profile');
         Route::get('/users', [$controller, 'users'])->name('users');
         Route::post('/users', [$controller, 'storeAdmin'])->name('users.store');
         Route::post('/users/{id}/access', [$controller, 'userAccess'])->whereNumber('id')->name('users.access');

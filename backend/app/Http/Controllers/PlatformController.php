@@ -49,7 +49,6 @@ class PlatformController extends Controller
     {
         return view('platform.users', ['users' => User::where('role','fleet_admin')->with('company')->orderBy('name')->paginate(20)]);
     }
-    public function profile(Request $r) { return view('platform.profile',['user'=>$r->user()]); }
     public function companyAccounts(int $id) {
         $company=Company::findOrFail($id);
         return view('platform.company-accounts',['company'=>$company,'users'=>$company->administrators()->paginate(20)]);
@@ -84,10 +83,10 @@ class PlatformController extends Controller
         $user = User::findOrFail($id);
         // Platform accounts are provisioned/recovered by an operator, never through another web account.
         abort_unless($user->role === 'fleet_admin', 403);
-        $data = $r->validate(['action' => ['required', Rule::in(['invite', 'enable', 'disable'])]]);
-        $allowed = match ($user->access_status) { 'PENDING' => 'invite', 'ACTIVE' => 'disable', 'DISABLED' => 'enable', default => null };
-        if ($allowed !== $data['action']) throw ValidationException::withMessages(['access'=>'La acción no corresponde al estado actual de la cuenta.']);
-        if ($data['action'] === 'invite') {
+        $data = $r->validate(['action' => ['required', Rule::in(['invite', 'enable', 'disable', 'reset'])]]);
+        $allowed = match ($user->access_status) { 'PENDING' => ['invite'], 'ACTIVE' => ['disable', 'reset'], 'DISABLED' => ['enable'], default => [] };
+        if (! in_array($data['action'], $allowed, true)) throw ValidationException::withMessages(['access'=>'La acción no corresponde al estado actual de la cuenta.']);
+        if (in_array($data['action'], ['invite', 'reset'], true)) {
             return back()->with('activation_code', $invitations->issue($r->user(), $user));
         }
         if ($data['action'] === 'enable' && $user->driver && $user->driver->status !== 'ACTIVE') {

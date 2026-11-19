@@ -30,6 +30,6 @@ class AccessController extends Controller
 
     private function rules(): array
     {
-        return ['activation_code' => 'required|string|size:64|regex:/^[a-f0-9]+$/', 'password' => 'required|string|min:12|max:255|confirmed'];
+        return ['activation_code' => ['required', 'string', 'min:12', 'max:64', 'regex:/^[A-Za-z0-9\s-]+$/'], 'password' => 'required|string|min:12|max:255|confirmed'];
     }
 }

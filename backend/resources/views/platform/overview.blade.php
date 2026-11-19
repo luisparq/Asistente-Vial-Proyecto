@@ -3,7 +3,7 @@
 @section('content')
 
 <div class="global-toolbar"><div><p class="muted">Datos disponibles al {{ \App\Support\DashboardDisplay::date($now) }} · America/Lima</p></div><form method="get" class="actions"><label>Actividad del periodo<select name="days"><option value="7" @selected($days===7)>Últimos 7 días</option><option value="30" @selected($days===30)>Últimos 30 días</option></select></label><button class="button quiet">Actualizar</button></form></div>
-<nav class="quick-actions" aria-label="Gestión de plataforma"><a class="button" href="{{ route('platform.companies') }}"><x-nav-icon name="companies"/>Empresas</a><a class="button quiet" href="{{ route('platform.devices') }}"><x-nav-icon name="devices"/>Dispositivos</a><a class="button quiet" href="{{ route('platform.support') }}"><x-nav-icon name="support"/>Soporte técnico</a><a class="button quiet" href="{{ route('platform.audits') }}"><x-nav-icon name="audits"/>Auditoría</a></nav>
+<nav class="quick-actions" aria-label="Gestión de plataforma"><a class="button" href="{{ route('platform.companies.create') }}">+ Nueva empresa</a><a class="button quiet" href="{{ route('platform.companies') }}"><x-nav-icon name="companies"/>Empresas</a><a class="button quiet" href="{{ route('platform.devices') }}"><x-nav-icon name="devices"/>Dispositivos</a><a class="button quiet" href="{{ route('platform.support') }}"><x-nav-icon name="support"/>Soporte técnico</a><a class="button quiet" href="{{ route('platform.audits') }}"><x-nav-icon name="audits"/>Auditoría</a></nav>
 <h2>Inventario y registros acumulados</h2><p>Totales históricos disponibles. El filtro de periodo se aplica a los gráficos y a la actividad empresarial.</p>
 <section class="global-metrics" aria-label="Indicadores globales">
 @foreach([

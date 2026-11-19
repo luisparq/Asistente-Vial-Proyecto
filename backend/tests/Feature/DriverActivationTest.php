@@ -36,7 +36,7 @@ class DriverActivationTest extends TestCase
         $user->createToken('TEST ONLY obsolete', ['trips:read']);
         $code = app(AccessInvitations::class)->issue($admin, $user);
         $invitation = AccessInvitation::firstOrFail();
-        $this->assertSame(hash('sha256', $code), $invitation->token_hash);
+        $this->assertSame(hash('sha256', \App\Services\AccessInvitations::normalize($code)), $invitation->token_hash);
         $this->assertSame(86400, $invitation->expires_at->timestamp - $invitation->created_at->timestamp);
         $this->postJson('/api/v1/auth/activate', $this->payload($code))->assertNoContent()->assertHeader('Cache-Control', 'no-store, private');
         $this->assertSame('ACTIVE', $user->fresh()->access_status);

@@ -22,18 +22,43 @@ class AccessInvitations
                 throw ValidationException::withMessages(['access' => 'Solo un conductor pendiente y con perfil activo puede recibir un código.']);
             }
             AccessInvitation::where('user_id', $user->id)->whereNull('consumed_at')->update(['consumed_at' => now()]);
-            $code = bin2hex(random_bytes(32));
-            AccessInvitation::create(['company_id' => $user->company_id, 'user_id' => $user->id, 'token_hash' => hash('sha256', $code), 'expires_at' => now()->addDay()]);
+            $code = self::generateCode();
+            $issuedAt = now();
+            AccessInvitation::create(['company_id' => $user->company_id, 'user_id' => $user->id, 'token_hash' => hash('sha256', self::normalize($code)), 'created_at' => $issuedAt, 'updated_at' => $issuedAt, 'expires_at' => $issuedAt->copy()->addDay()]);
             AdministrativeAudit::record($actor, $user->company_id, 'access.invitation', $user, ['password_reset']);
 
             return $code;
         }, 5);
     }
 
+    private const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+    /** Código corto de un solo uso (12 caracteres, sin 0/O/1/I), formato XXXX-XXXX-XXXX. */
+    public static function generateCode(): string
+    {
+        $raw = '';
+        for ($i = 0; $i < 12; $i++) {
+            $raw .= self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)];
+        }
+
+        return implode('-', str_split($raw, 4));
+    }
+
+    /** Ignora guiones, espacios y mayúsculas. Los códigos largos anteriores (64 hex) siguen siendo válidos. */
+    public static function normalize(string $code): string
+    {
+        $normalized = (string) preg_replace('/[\s-]+/', '', $code);
+        if (preg_match('/^[a-f0-9]{64}$/i', $normalized)) {
+            return strtolower($normalized);
+        }
+
+        return strtoupper($normalized);
+    }
+
     public function consume(string $code, string $password, ?string $channel = null): void
     {
         DB::transaction(function () use ($code, $password, $channel) {
-            $hash = hash('sha256', $code);
+            $hash = hash('sha256', self::normalize($code));
             $claimed = AccessInvitation::where('token_hash', $hash)->whereNull('consumed_at')->where('expires_at', '>', now())->update(['consumed_at' => now()]);
             if ($claimed !== 1) {
                 throw ValidationException::withMessages(['activation_code' => 'Código no válido o vencido.']);

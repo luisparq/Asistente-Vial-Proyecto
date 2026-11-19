@@ -677,3 +677,5 @@ a.fleet-service-queue-item:hover{background:var(--surface-2)}
 @media(max-width:460px){
     .trip-waypoints{grid-template-columns:minmax(0,1fr)}
 }
+.new-company{display:block;margin:0 var(--s2) var(--s2);text-align:center}
+.code-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3)}.code-row .activation-code{display:inline-block;padding:var(--s3) var(--s4);font-size:1.25rem;letter-spacing:.08em}

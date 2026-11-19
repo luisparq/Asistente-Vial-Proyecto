@@ -26,7 +26,7 @@ class CompanySubmissionTest extends TestCase {
         $company=Company::first();$user=User::where('role','fleet_admin')->first();
         $this->assertSame($company->id,$user->company_id);$this->assertSame('PENDING',$user->access_status);$this->assertSame('TEST ONLY trade',$company->trade_name);
         $this->assertDatabaseCount('access_invitations',1);$this->assertDatabaseCount('administrative_audits',3);
-        $code=session('activation_code');$this->assertSame(hash('sha256',$code),AccessInvitation::first()->token_hash);
+        $code=session('activation_code');$this->assertSame(hash('sha256',\App\Services\AccessInvitations::normalize($code)),AccessInvitation::first()->token_hash);
         $this->get('/admin/companies/'.$company->id)->assertOk();
         $this->post('/admin/companies',['submission_token'=>$token])->assertRedirect('/admin/companies/'.$company->id)->assertSessionMissing('activation_code');
         $this->assertDatabaseCount('companies',1);$this->assertDatabaseCount('users',2);
@@ -51,12 +51,12 @@ class CompanySubmissionTest extends TestCase {
         $this->post('/admin/companies',['submission_token'=>$token])->assertSessionHasErrors('access');
         $this->assertDatabaseCount('companies',0);$this->assertDatabaseCount('users',1);$this->assertDatabaseCount('access_invitations',0);$this->assertDatabaseCount('administrative_audits',0);
     }
-    public function test_existing_companies_accounts_and_profile_remain_accessible_without_drivers_in_directory(): void {
+    public function test_existing_companies_accounts_remain_accessible_without_drivers_in_directory(): void {
         $platform=$this->admin();$fleet=User::factory()->create(['role'=>'fleet_admin']);
         $driver=User::factory()->create(['role'=>'driver','company_id'=>$fleet->company_id,'name'=>'TEST ONLY excluded driver']);
         $this->actingAs($platform)->get('/admin/companies')->assertOk()->assertSee($fleet->email);
         $this->get('/admin/accounts')->assertOk()->assertSee($fleet->email)->assertDontSee($driver->name)->assertDontSee($platform->email);
-        $this->get('/admin/profile')->assertOk()->assertSee($platform->email);
+        $this->get('/admin/profile')->assertNotFound();
         $this->get('/admin/companies/'.$fleet->company_id)->assertOk()->assertSee($fleet->email);
         $this->get('/admin/companies/'.$fleet->company_id.'/accounts')->assertOk()->assertSee($fleet->email)->assertDontSee($driver->email);
         $this->put('/admin/companies/'.$fleet->company_id,['name'=>'TEST updated company','trade_name'=>null])->assertRedirect();
@@ -68,7 +68,9 @@ class CompanySubmissionTest extends TestCase {
     public function test_account_actions_are_contextual_scoped_and_preserve_other_company(): void {
         $platform=$this->admin();$a=User::factory()->create(['role'=>'fleet_admin','access_status'=>'ACTIVE']);$b=User::factory()->create(['role'=>'fleet_admin']);
         $base='/admin/companies/'.$a->company_id.'/accounts/';$this->actingAs($platform);
-        $this->get('/admin/companies/'.$a->company_id.'/accounts')->assertOk()->assertSee('Deshabilitar acceso')->assertDontSee('Permitir nueva activación');
+        $this->get('/admin/companies/'.$a->company_id.'/accounts')->assertOk()->assertSee('Deshabilitar acceso')->assertSee('Restablecer contraseña')->assertDontSee('Generar código de activación')->assertDontSee('Permitir nueva activación');
+        $this->post($base.$a->id.'/access',['action'=>'reset'])->assertRedirect()->assertSessionHas('activation_code');$this->assertSame('ACTIVE',$a->fresh()->access_status);
+        $this->assertMatchesRegularExpression('/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/',session('activation_code'));
         $this->post($base.$b->id.'/access',['action'=>'disable'])->assertNotFound();
         $this->post($base.$a->id.'/access',['action'=>'invite'])->assertSessionHasErrors('access');
         $this->post($base.$a->id.'/access',['action'=>'disable'])->assertRedirect();$this->assertSame('DISABLED',$a->fresh()->access_status);
@@ -78,4 +80,20 @@ class CompanySubmissionTest extends TestCase {
         $this->assertSame('ACTIVE',$b->fresh()->access_status);
         $this->post('/admin/users/'.$platform->id.'/access',['action'=>'disable'])->assertForbidden();
     }
+    public function test_codes_accept_format_variations_and_legacy_hex(): void {
+        $this->assertSame('ABCD2345EFGH', AccessInvitations::normalize(' abcd-2345 efgh '));
+        $this->assertSame(str_repeat('a', 64), AccessInvitations::normalize(str_repeat('A', 64)));
+        $actor = $this->admin();
+        $user = User::factory()->create(['role' => 'fleet_admin', 'access_status' => 'ACTIVE']);
+        $originalPassword = $user->password;
+        $code = app(AccessInvitations::class)->issue($actor, $user);
+        $this->assertSame($originalPassword, $user->fresh()->password);
+        $this->assertSame('ACTIVE', $user->fresh()->access_status);
+        $formatted = strtolower(str_replace('-', ' ', $code));
+        app(AccessInvitations::class)->consume($formatted, 'TEST-new-password-2026', 'web');
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('TEST-new-password-2026', $user->fresh()->password));
+        $this->expectException(ValidationException::class);
+        app(AccessInvitations::class)->consume($code, 'TEST-other-password-2026', 'web');
+    }
+
 }
