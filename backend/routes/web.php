@@ -53,6 +53,14 @@ Route::middleware(DashboardHeaders::class)->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('index');
         Route::get('/trips', [DashboardController::class, 'trips'])->name('trips');
         Route::get('/live-map', [LiveMapController::class, 'show'])->name('live-map');
+        Route::get('/road/traffic-flow/{z}/{x}/{y}.png', \App\Http\Controllers\TrafficFlowTileController::class)
+            ->whereNumber(['z', 'x', 'y'])->middleware('throttle:240,1')->name('road.traffic-flow');
+        Route::get('/road/traffic-incidents', [\App\Http\Controllers\RoadAssistanceController::class, 'trafficIncidents'])
+            ->middleware('throttle:60,1')->name('road.traffic-incidents');
+        Route::get('/road/schools', [\App\Http\Controllers\RoadAssistanceController::class, 'schools'])
+            ->middleware('throttle:60,1')->name('road.schools');
+        Route::get('/road/emergency-pois', [\App\Http\Controllers\RoadAssistanceController::class, 'emergencyPois'])
+            ->middleware('throttle:60,1')->name('road.emergency-pois');
         Route::get('/live-map/vehicles', [LiveMapController::class, 'vehicles'])->middleware('throttle:30,1')->name('live-map.vehicles');
         Route::get('/trips/{uuid}', [DashboardController::class, 'trip'])->whereUuid('uuid')->name('trip');
         Route::get('/events', [\App\Http\Controllers\Dashboard\IncidentMapController::class, 'show'])->name('events');

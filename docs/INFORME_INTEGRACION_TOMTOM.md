@@ -1,6 +1,7 @@
 # Informe de Integración: API de TomTom, Voz TTS y Frases Concientizadoras en AVIGEM
 
-**Para:** Codex / Equipo de Desarrollo AVIGEM  
+> Informe de implementación del 16/11. Consulte [el checkpoint vigente](CHECKPOINT_2026_11_18.md) para las verificaciones y los pendientes.
+
 **Fecha:** 15 de noviembre de 2026  
 **Estado:** Implementado y Verificado  
 
@@ -14,18 +15,18 @@ Se completó la integración de los servicios de movilidad inteligente mediante 
 ## 2. Cambios Implementados en el Backend (Laravel)
 
 ### 2.1. Configuración de Credenciales
-- Se validó y configuró la clave de API en el archivo `.env`:
+- La clave de API se configura localmente en el archivo `.env`:
   ```env
   TOMTOM_TRAFFIC_KEY=TU_CLAVE_TOMTOM
   ```
-- Probada con éxito contra los servidores oficiales de TomTom para el cuadrante geográfico de **Arequipa** (`HTTP 200 OK`).
+- La revisión del 18/11 utiliza respuestas simuladas mediante `Http::fake`. La comprobación en vivo para **Arequipa** queda pendiente de evidencia.
 
 ### 2.2. Nuevo Servicio: `TomTomService.php`
 Ubicación: `backend/app/Services/TomTomService.php`
 - **Geocodificación Inversa (`reverseGeocode`):** Traduce coordenadas GPS (`lat, lon`) a dirección legible (calle, distrito, ciudad) con caché automático de 7 días.
 - **Enrutamiento Dinámico con Tráfico (`calculateRoute`):** Calcula distancia, duración, tiempo de demora por congestión (`trafficDelaySeconds`), hora estimada de llegada (`eta`) y vector de coordenadas.
 - **Flujo de Tráfico por Segmento (`flowSegment`):** Consulta la velocidad real de circulación vs. velocidad libre y cierres viales en un punto específico.
-- **Puntos de Auxilio y Emergencia (`emergencyPois`):** Búsqueda en radio de 5 km de hospitales (`7321`), comisarías (`7322`), estaciones de servicio/grifos (`7311`) y talleres mecánicos (`7314`).
+- **Puntos de Auxilio y Emergencia (`emergencyPois`):** Búsqueda en radio de 5 km de hospitales (`7321`), comisarías (`7322`), estaciones de servicio/grifos (`7311`) y talleres mecánicos (`7310`).
 
 ### 2.3. Endpoints REST API Expuestos
 Controlador: `backend/app/Http/Controllers/RoadAssistanceController.php`  

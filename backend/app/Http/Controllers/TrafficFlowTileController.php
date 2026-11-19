@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class TrafficFlowTileController extends Controller
 {
@@ -27,9 +28,13 @@ class TrafficFlowTileController extends Controller
                     ['key' => $key],
                 );
             } catch (\Illuminate\Http\Client\ConnectionException) {
+                Log::warning('TomTom tile connection failure');
                 abort(503, 'Tráfico temporalmente indisponible.');
             }
 
+            if (!$upstream->successful()) {
+                Log::warning('TomTom tile HTTP failure', ['status' => $upstream->status()]);
+            }
             abort_unless($upstream->successful(), 503, 'Tráfico temporalmente indisponible.');
             $tile = $upstream->body();
             Cache::put($cacheKey, $tile, now()->addMinutes(1));
@@ -37,7 +42,7 @@ class TrafficFlowTileController extends Controller
 
         return response($tile, 200, [
             'Content-Type' => 'image/png',
-            'Cache-Control' => 'public, max-age=60',
+            'Cache-Control' => 'private, max-age=60',
         ]);
     }
 }

@@ -1,5 +1,7 @@
 # Vialigent Technologies / AVIGEM — decisiones estratégicas
 
+> Actualización del 18/11/2026. El responsable solicitó integrar los parches v2 y las correcciones de auditoría sobre el sistema que ya incorpora MQTT, voz y alertas demostrativas. Las restricciones del 01/11 se conservan como antecedentes históricos. La detección SENSOR en recorridos queda pendiente de criterios del equipo y validación física. Véase [checkpoint vigente](CHECKPOINT_2026_11_18.md).
+
 Decisiones del 31/10 y 01/11/2026. Consolidación documental: 01/11/2026.
 Fuente de decisiones: actualización expresa del responsable del proyecto. No autoriza implementar nuevas capacidades ni acredita disponibilidad legal de marcas.
 

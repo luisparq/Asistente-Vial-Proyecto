@@ -1,5 +1,7 @@
 # AVIGEM One Diagnostics — backend-spring-diagnostics
 
+> Servicio archivado de laboratorio desde el 15/11/2026. El backend vigente de AVIGEM es Laravel y su diagnóstico MQTT se describe en [la guía actual](../../docs/DIAGNOSTICO_MQTT.md). Las rutas generales y la interfaz de este laboratorio conservan acceso sin autenticación. El filtro Bearer solo cubre `/api/v1/diagnostics/real/*` y falta aislamiento por empresa.
+
 > **Estado: archivado, reemplazado por el módulo Diagnóstico de Laravel.**
 > La implementación del reemplazo está prevista para la fase 3. Este directorio conserva el proyecto Spring y sus instrucciones históricas.
 

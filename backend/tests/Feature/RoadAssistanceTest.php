@@ -7,6 +7,15 @@ use Tests\TestCase;
 
 class RoadAssistanceTest extends TestCase
 {
+    use \Illuminate\Foundation\Testing\RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $user = \App\Models\User::factory()->create(['role' => 'fleet_admin']);
+        $this->withToken($user->createToken('TEST ONLY road access', $user->capabilities(), now()->addHour())->plainTextToken);
+    }
+
     public function test_reverse_geocode_returns_address(): void
     {
         config(['cache.default' => 'array', 'services.tomtom.key' => 'test-key']);

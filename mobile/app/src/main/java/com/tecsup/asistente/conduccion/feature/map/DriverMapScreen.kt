@@ -87,7 +87,7 @@ fun DriverMapScreen(onBack:()->Unit, onDevice:()->Unit = {}, viewModel:DriverMap
                                 GpsStatus.WAITING -> "Esperando posición GPS"
                             }, style = MaterialTheme.typography.titleSmall)
                             state.position?.let { Text("Latitud: ${it.latitude} · Longitud: ${it.longitude}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            Text("Punto grande citrino: tu posición · Punto ámbar: maniobras del recorrido (${state.events.size}). Azul: límite · Violeta: colegio · Rojo: tráfico · Datos © OpenStreetMap y TomTom.", style = MaterialTheme.typography.labelMedium)
+                            Text("Punto grande citrino: tu posición · Punto ámbar: maniobras de prueba del recorrido (${state.events.size}). Azul: límite · Violeta: colegio · Rojo: tráfico · Datos © OpenStreetMap y TomTom.", style = MaterialTheme.typography.labelMedium)
                             RoadAlertPanel(catalog, registeredCatalog != null, state.position?.let { RoadPoint(it.latitude, it.longitude) })
                             Text("La cartografía requiere Internet. El monitoreo, los recorridos y la sincronización funcionan sin mantener este mapa abierto.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -238,7 +238,7 @@ private fun NativeDriverMap(
                     "road-zones-points", "road-traffic-points", "road-limit-lines").firstOrNull()
                 val id=hit?.getNumberProperty("event_id")?.toLong()
                 val event=currentState.events.firstOrNull { it.id==id }
-                selected=event?.let { "Maniobra · ${it.type}\n"+com.tecsup.asistente.conduccion.core.ui.formatTimestamp(it.occurredAt)+"\n${it.latitude}, ${it.longitude}" }
+                selected=event?.let { "Maniobra de prueba · ${it.type}\n"+com.tecsup.asistente.conduccion.core.ui.formatTimestamp(it.occurredAt)+"\n${it.latitude}, ${it.longitude}" }
                 if (event == null) selected = roadHit?.getStringProperty("road_label")
                 event != null || roadHit != null
             }

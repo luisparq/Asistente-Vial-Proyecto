@@ -7,6 +7,15 @@ use Tests\TestCase;
 
 class TrafficFlowTileTest extends TestCase
 {
+    use \Illuminate\Foundation\Testing\RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $user = \App\Models\User::factory()->create(['role' => 'fleet_admin']);
+        $this->withToken($user->createToken('TEST ONLY road access', $user->capabilities(), now()->addHour())->plainTextToken);
+    }
+
     public function test_it_proxies_and_caches_a_tomtom_flow_tile_without_exposing_the_key(): void
     {
         config(['cache.default' => 'array', 'services.tomtom.key' => 'secret-key']);

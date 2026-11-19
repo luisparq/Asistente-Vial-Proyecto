@@ -1,5 +1,7 @@
 # Estado actual del proyecto
 
+> Estado vigente al 18/11/2026 en [CHECKPOINT_2026_11_18.md](CHECKPOINT_2026_11_18.md), con Room v5, MQTT, mapa en vivo, TomTom y alertas demostrativas.
+
 Resumen histórico: **2026-10-03**, con ampliación 3C posterior. La actualización vigente (GPS, Room 3, mapas, administración y buzzer) está en [CHECKPOINT_2026_10_10.md](CHECKPOINT_2026_10_10.md); prevalece sobre las funciones pendientes de este resumen. La evidencia física procede del reporte del responsable del proyecto.
 
 ## Arquitectura y flujos actuales

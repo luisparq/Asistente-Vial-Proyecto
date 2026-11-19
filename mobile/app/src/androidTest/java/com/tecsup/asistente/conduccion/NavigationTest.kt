@@ -5,6 +5,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -22,21 +25,24 @@ class NavigationTest {
     fun opensOptionalDriverMapAndReturnsWithoutGpsOrAnActiveTrip() {
         compose.clickText(compose.activity.getString(R.string.explore))
         compose.waitForText("Mi mapa")
-        compose.onNodeWithText("Mi mapa").performScrollTo().performClick()
-        compose.onNodeWithText("Mi mapa").assertIsDisplayed()
-        compose.onNodeWithText("Dispositivo BLE desconectado").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText(compose.activity.getString(R.string.back)).performClick()
-        compose.onNodeWithText(compose.activity.getString(R.string.home_title)).assertIsDisplayed()
+        compose.onNodeWithText("Mapa").performClick()
+        compose.onNodeWithText("AVIGEM One desconectado").assertIsDisplayed()
+        compose.onNodeWithText("Detalles y alertas").performClick()
+        compose.onNodeWithText("Dispositivo BLE desconectado").assertIsDisplayed()
+        compose.onNodeWithText("Inicio").performClick()
+        compose.onAllNodesWithText(compose.activity.getString(R.string.home_title)).onFirst().assertIsDisplayed()
     }
 
     @Test
     fun opensActivationFromLoginAndReturnsWithoutRequiringWeb() {
+        compose.clickText("Iniciar sesión")
         compose.waitForText("Activar cuenta")
         compose.onNodeWithText("Activar cuenta").performScrollTo().performClick()
         compose.onNodeWithText("Código de activación").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Nueva contraseña").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Confirmar contraseña").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText(compose.activity.getString(R.string.back)).performClick()
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.back)).performClick()
+        compose.clickText("Iniciar sesión")
         compose.onNodeWithText("Activar cuenta").performScrollTo().assertIsDisplayed()
     }
 
@@ -44,25 +50,22 @@ class NavigationTest {
     fun exploresEveryScreenAndReturnsToAccess() {
         fun text(id: Int) = compose.activity.getString(id)
         compose.clickText(text(R.string.explore))
-        listOf(R.string.profile_title, R.string.ble_title,
-            R.string.history_title, R.string.settings_title).forEach { title ->
-            compose.waitForText(text(title))
-            compose.onNodeWithText(text(title)).performScrollTo().performClick()
-            compose.onNodeWithText(text(title)).assertIsDisplayed()
-            compose.onNodeWithText(text(R.string.back)).performClick()
-            compose.onNodeWithText(text(R.string.home_title)).assertIsDisplayed()
+        listOf("Perfil" to R.string.profile_title, "Historial" to R.string.history_title).forEach { (tab, title) ->
+            compose.clickText(tab)
+            compose.onAllNodesWithText(text(title)).onFirst().assertIsDisplayed()
+            compose.onNodeWithContentDescription(text(R.string.back)).performClick()
         }
         compose.onNodeWithText(text(R.string.ble_title)).performScrollTo().performClick()
         compose.onNodeWithTag("ble_list").performScrollToNode(hasText(text(R.string.diagnostic_title)))
         compose.onNodeWithText(text(R.string.diagnostic_title)).performClick()
         compose.onNodeWithText(text(R.string.diagnostic_title)).assertIsDisplayed()
-        compose.onNodeWithText(text(R.string.back)).performClick()
-        compose.onNodeWithText(text(R.string.back)).performClick()
-        compose.onNodeWithText(text(R.string.settings_title)).performScrollTo().performClick()
+        compose.onNodeWithContentDescription(text(R.string.back)).performClick()
+        compose.onNodeWithContentDescription(text(R.string.back)).performClick()
+        compose.onNodeWithContentDescription(text(R.string.settings_title)).performClick()
         compose.onNodeWithText(text(R.string.return_access)).performScrollTo().performClick()
         compose.onNodeWithText(text(R.string.explore)).performScrollTo().assertIsDisplayed()
         // Reentrar confirma que el retorno al acceso permite iniciar otra exploración.
         compose.onNodeWithText(text(R.string.explore)).performClick()
-        compose.onNodeWithText(text(R.string.home_title)).assertIsDisplayed()
+        compose.onAllNodesWithText(text(R.string.home_title)).onFirst().assertIsDisplayed()
     }
 }

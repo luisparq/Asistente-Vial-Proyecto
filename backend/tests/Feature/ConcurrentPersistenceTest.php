@@ -14,8 +14,9 @@ class ConcurrentPersistenceTest extends TestCase
     {
         // Dedicated disposable database: never migrate/fresh the user's local database.
         $path = tempnam(sys_get_temp_dir(), 'avi-api-test-');
+        $originalConnection = config('database.default');
         try {
-            config(['database.connections.sqlite.database' => $path]);
+            config(['database.default' => 'sqlite', 'database.connections.sqlite.database' => $path]);
             DB::purge('sqlite');
             $this->artisan('migrate', ['--force' => true])->assertSuccessful();
             $user = User::factory()->create();
@@ -62,6 +63,7 @@ class ConcurrentPersistenceTest extends TestCase
             $this->assertDatabaseCount('driving_events', 1);
         } finally {
             DB::purge('sqlite');
+            config(['database.default' => $originalConnection]);
             if (is_file($path)) {
                 unlink($path);
             }

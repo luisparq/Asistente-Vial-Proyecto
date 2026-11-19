@@ -98,3 +98,6 @@ Desktop.ini
 !/backend/public/vendor/maplibre/maplibre-gl.js
 !/backend/public/vendor/maplibre/maplibre-gl.css
 !/backend/public/vendor/maplibre/LICENSE.txt
+
+# Composer is installed separately.
+/backend/composer.phar

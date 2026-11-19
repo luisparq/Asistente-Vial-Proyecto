@@ -23,10 +23,10 @@
         <button id="live-fit" type="button" class="button" disabled>Centrar vehículos</button>
     </div>
     <fieldset id="live-road-catalog" class="incident-catalog" data-url="{{ route('road-catalog', [], false) }}"
-        data-traffic-url="{{ url('/api/v1/traffic-flow/{z}/{x}/{y}.png') }}"
-        data-incidents-url="{{ route('road.traffic-incidents', [], false) }}"
-        data-schools-url="{{ route('road.schools', [], false) }}"
-        data-assistance-url="{{ url('/api/v1/road/emergency-pois') }}"
+        data-traffic-url="{{ url('/dashboard/road/traffic-flow/{z}/{x}/{y}.png') }}"
+        data-incidents-url="{{ route('dashboard.road.traffic-incidents', [], false) }}"
+        data-schools-url="{{ route('dashboard.road.schools', [], false) }}"
+        data-assistance-url="{{ route('dashboard.road.emergency-pois', [], false) }}"
         data-traffic-configured="{{ filled(config('services.tomtom.key')) ? '1' : '0' }}" disabled>
         <legend>Capas viales de Arequipa</legend>
         <label><input type="checkbox" value="traffic"> <span class="catalog-dot traffic"></span> Flujo de tráfico en vivo <small class="catalog-state" data-layer-state hidden></small></label>

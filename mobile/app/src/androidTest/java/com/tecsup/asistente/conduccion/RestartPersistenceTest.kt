@@ -37,7 +37,7 @@ class RestartPersistenceTest {
 
     private fun <T> withRepository(block: (RoomTripRepository) -> T): T {
         val database = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, AsistenteVialDatabase.NAME)
-            .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2, com.tecsup.asistente.conduccion.data.local.MIGRATION_2_3).build()
+            .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2, com.tecsup.asistente.conduccion.data.local.MIGRATION_2_3, com.tecsup.asistente.conduccion.data.local.MIGRATION_3_4, com.tecsup.asistente.conduccion.data.local.MIGRATION_4_5).build()
         return try { block(RoomTripRepository(database, Clock.systemUTC())) } finally { database.close() }
     }
 
@@ -72,6 +72,7 @@ class RestartPersistenceTest {
         // El evento guardado es simulado: no aparece en la pantalla activa.
         compose.waitForText(text(R.string.event_count, 0))
         compose.clickText(text(R.string.finish_trip))
+            compose.clickText("Finalizar")
         compose.waitForText(text(R.string.history_title))
         val completed = runBlocking { repository.observeTrip(id).first()!! }
         assertEquals(TripStatus.COMPLETED, completed.trip.status)

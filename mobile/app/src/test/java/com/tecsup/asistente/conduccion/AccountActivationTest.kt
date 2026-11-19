@@ -95,4 +95,20 @@ class AccountActivationTest {
             assertFalse(model.state.value.activated)
         } finally { store.clear(); Dispatchers.resetMain() }
     }
+    @Test fun shortAndLegacyCodesReachActivation() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val store = ViewModelStore()
+        try {
+            listOf("ABCD-2345-EFGH", "abcd 2345 efgh", "ABCD2345EFGH", "A".repeat(64)).forEach { code ->
+                var submitted: String? = null
+                val model = ActivationViewModel(AccountActivation { _, value, _, _ -> submitted = value }, MemorySessionStore())
+                store.put(code, model)
+                model.activate("http://localhost/", code, "TEST password 123", "TEST password 123")
+                runCurrent()
+                assertEquals(code, submitted)
+                assertTrue(model.state.value.activated)
+            }
+        } finally { store.clear(); Dispatchers.resetMain() }
+    }
+
 }

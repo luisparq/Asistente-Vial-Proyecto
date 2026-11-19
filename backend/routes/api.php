@@ -15,17 +15,17 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->middleware(ApiBoundary::class)->group(function () {
     Route::get('road-catalog', RoadCatalogController::class)->middleware('throttle:60,1')->name('road-catalog');
-    Route::get('traffic-flow/{z}/{x}/{y}.png', TrafficFlowTileController::class)
-        ->whereNumber(['z', 'x', 'y'])->middleware('throttle:240,1')->name('traffic-flow.tile');
-    Route::get('road/reverse-geocode', [\App\Http\Controllers\RoadAssistanceController::class, 'reverseGeocode'])->middleware('throttle:60,1');
-    Route::get('road/route', [\App\Http\Controllers\RoadAssistanceController::class, 'calculateRoute'])->middleware('throttle:30,1');
-    Route::get('road/traffic-flow-segment', [\App\Http\Controllers\RoadAssistanceController::class, 'flowSegment'])->middleware('throttle:60,1');
-    Route::get('road/emergency-pois', [\App\Http\Controllers\RoadAssistanceController::class, 'emergencyPois'])->middleware('throttle:60,1');
-    Route::get('road/traffic-incidents', [\App\Http\Controllers\RoadAssistanceController::class, 'trafficIncidents'])->middleware('throttle:60,1')->name('road.traffic-incidents');
-    Route::get('road/schools', [\App\Http\Controllers\RoadAssistanceController::class, 'schools'])->middleware('throttle:60,1')->name('road.schools');
     Route::post('auth/token', [AuthController::class, 'issue'])->middleware('throttle:login');
     Route::post('auth/activate', [AccessController::class, 'activateDriver'])->middleware('throttle:activation');
     Route::middleware(['auth:sanctum', TenantContext::class, 'throttle:api', ResourceIds::class])->group(function () {
+        Route::get('traffic-flow/{z}/{x}/{y}.png', TrafficFlowTileController::class)
+            ->whereNumber(['z', 'x', 'y'])->middleware('throttle:240,1')->name('traffic-flow.tile');
+        Route::get('road/reverse-geocode', [\App\Http\Controllers\RoadAssistanceController::class, 'reverseGeocode'])->middleware('throttle:60,1');
+        Route::get('road/route', [\App\Http\Controllers\RoadAssistanceController::class, 'calculateRoute'])->middleware('throttle:30,1');
+        Route::get('road/traffic-flow-segment', [\App\Http\Controllers\RoadAssistanceController::class, 'flowSegment'])->middleware('throttle:60,1');
+        Route::get('road/emergency-pois', [\App\Http\Controllers\RoadAssistanceController::class, 'emergencyPois'])->middleware('throttle:60,1');
+        Route::get('road/traffic-incidents', [\App\Http\Controllers\RoadAssistanceController::class, 'trafficIncidents'])->middleware('throttle:60,1')->name('road.traffic-incidents');
+        Route::get('road/schools', [\App\Http\Controllers\RoadAssistanceController::class, 'schools'])->middleware('throttle:60,1')->name('road.schools');
         Route::put('devices/{client_device_id}/status', [\App\Http\Controllers\DeviceController::class, 'report']);
         Route::get('me', [AuthController::class, 'me']);
         Route::get('me/driver', [DriverProfileController::class, 'show']);

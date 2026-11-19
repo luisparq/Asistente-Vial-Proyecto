@@ -6,6 +6,8 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
 import androidx.room.Room
@@ -30,7 +32,7 @@ class TripFlowTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         fun text(id: Int, vararg args: Any) = context.getString(id, *args)
         val database = Room.databaseBuilder(context, AsistenteVialDatabase::class.java, AsistenteVialDatabase.NAME)
-            .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2, com.tecsup.asistente.conduccion.data.local.MIGRATION_2_3).build()
+            .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2, com.tecsup.asistente.conduccion.data.local.MIGRATION_2_3, com.tecsup.asistente.conduccion.data.local.MIGRATION_3_4, com.tecsup.asistente.conduccion.data.local.MIGRATION_4_5).build()
         val repository = RoomTripRepository(database, Clock.systemUTC())
         try {
             compose.clickText(text(R.string.explore))
@@ -58,6 +60,7 @@ class TripFlowTest {
             compose.waitForText(text(R.string.event_count, 0))
             assertEquals(active.id, runBlocking { repository.observeActiveTrip().first()!!.id })
             compose.clickText(text(R.string.finish_trip))
+            compose.clickText("Finalizar")
             compose.waitForText(text(R.string.history_title))
             val title = text(R.string.trip_number, active.id)
             compose.waitForText(title)
@@ -71,9 +74,9 @@ class TripFlowTest {
             assertEquals(TripStatus.COMPLETED, saved.trip.status)
             assertNotNull(saved.trip.endedAt)
             assertNull(runBlocking { repository.observeActiveTrip().first() })
-            compose.clickText(text(R.string.back))
+            compose.onNodeWithContentDescription(text(R.string.back)).performClick()
             compose.waitForText(text(R.string.history_title))
-            compose.clickText(text(R.string.back))
+            compose.onNodeWithContentDescription(text(R.string.back)).performClick()
             compose.waitForText(text(R.string.start_trip))
         } finally {
             database.close()

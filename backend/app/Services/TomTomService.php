@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class TomTomService
 {
@@ -39,6 +40,9 @@ class TomTomService
                     ['key' => $this->key]
                 );
 
+                if (! $response->successful()) {
+                    Log::warning('TomTom HTTP failure', ['operation' => 'reverseGeocode', 'status' => $response->status()]);
+                }
                 if ($response->successful()) {
                     $address = $response->json('addresses.0.address');
                     if ($address) {
@@ -51,8 +55,8 @@ class TomTomService
                         ];
                     }
                 }
-            } catch (\Exception) {
-                // Silencioso ante errores de red
+            } catch (\Exception $error) {
+                Log::warning('TomTom request failure', ['exception' => $error::class]);
             }
             return null;
         });
@@ -68,7 +72,9 @@ class TomTomService
             return null;
         }
 
-        $cacheKey = "tomtom:route:$origin:$destination";
+        $roundedOrigin = implode(',', array_map(fn ($value) => number_format((float) $value, 4, '.', ''), explode(',', $origin)));
+        $roundedDestination = implode(',', array_map(fn ($value) => number_format((float) $value, 4, '.', ''), explode(',', $destination)));
+        $cacheKey = "tomtom:route:$roundedOrigin:$roundedDestination";
 
         return Cache::remember($cacheKey, now()->addMinutes(2), function () use ($origin, $destination) {
             try {
@@ -82,6 +88,9 @@ class TomTomService
                     ]
                 );
 
+                if (! $response->successful()) {
+                    Log::warning('TomTom HTTP failure', ['operation' => 'calculateRoute', 'status' => $response->status()]);
+                }
                 if ($response->successful()) {
                     $route = $response->json('routes.0');
                     if ($route) {
@@ -97,8 +106,8 @@ class TomTomService
                         ];
                     }
                 }
-            } catch (\Exception) {
-                // Silencioso ante fallos
+            } catch (\Exception $error) {
+                Log::warning('TomTom request failure', ['exception' => $error::class]);
             }
             return null;
         });
@@ -128,6 +137,9 @@ class TomTomService
                     ]
                 );
 
+                if (! $response->successful()) {
+                    Log::warning('TomTom HTTP failure', ['operation' => 'flowSegment', 'status' => $response->status()]);
+                }
                 if ($response->successful()) {
                     $flow = $response->json('flowSegmentData');
                     if ($flow) {
@@ -141,8 +153,8 @@ class TomTomService
                         ];
                     }
                 }
-            } catch (\Exception) {
-                // Ignorar error
+            } catch (\Exception $error) {
+                Log::warning('TomTom request failure', ['exception' => $error::class]);
             }
             return null;
         });
@@ -234,10 +246,14 @@ class TomTomService
                     'fields' => '{incidents{type,geometry{type,coordinates},properties{id,iconCategory,events{description},from,to,endTime}}}',
                 ]
             );
-        } catch (\Illuminate\Http\Client\ConnectionException) {
+        } catch (\Illuminate\Http\Client\ConnectionException $error) {
+            Log::warning('TomTom connection failure', ['exception' => $error::class]);
             return null;
         }
 
+        if (! $response->successful()) {
+            Log::warning('TomTom HTTP failure', ['operation' => 'trafficIncidents', 'status' => $response->status()]);
+        }
         $incidents = $response->successful() ? $response->json('incidents') : null;
         if (!is_array($incidents)) {
             return null;
@@ -295,10 +311,12 @@ class TomTomService
                         'language' => 'es-419',
                     ]
                 );
-            } catch (\Illuminate\Http\Client\ConnectionException) {
+            } catch (\Illuminate\Http\Client\ConnectionException $error) {
+                Log::warning('TomTom connection failure', ['exception' => $error::class]);
                 continue;
             }
             if (!$response->successful()) {
+                Log::warning('TomTom HTTP failure', ['operation' => 'searchCategories', 'status' => $response->status()]);
                 continue;
             }
             $answered = true;
