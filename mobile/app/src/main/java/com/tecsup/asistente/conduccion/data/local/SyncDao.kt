@@ -29,6 +29,14 @@ interface SyncDao {
     """)
     suspend fun unqueuedManeuverAlerts(owner: String): List<ManeuverAlertEntity>
 
+    @Query("""
+        SELECT a.id FROM maneuver_alerts a
+        JOIN sync_outbox o ON o.operationId = a.id
+        WHERE a.tripId = :tripId AND NOT a.testOnly AND o.state = 'ACKED'
+        ORDER BY a.occurredAt DESC, a.rowid DESC LIMIT 1
+    """)
+    fun confirmedManeuverAlert(tripId: Long): Flow<String?>
+
     @Query("SELECT * FROM sync_outbox WHERE operationId = :id") suspend fun operation(id: String): OutboxEntity?
     @Query("SELECT * FROM sync_outbox WHERE localTripId = :tripId AND revision = :revision ORDER BY rowid DESC LIMIT 1")
     suspend fun lastTrackPoint(tripId: Long, revision: Int): OutboxEntity?

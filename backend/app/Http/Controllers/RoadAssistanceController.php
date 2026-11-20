@@ -20,9 +20,14 @@ class RoadAssistanceController extends Controller
         $validated = $request->validate([
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lon' => ['required', 'numeric', 'between:-180,180'],
+            'heading' => ['sometimes', 'integer', 'between:0,359'],
         ]);
 
-        $data = $this->tomtom->reverseGeocode((float) $validated['lat'], (float) $validated['lon']);
+        $data = $this->tomtom->reverseGeocode(
+            (float) $validated['lat'],
+            (float) $validated['lon'],
+            isset($validated['heading']) ? (int) $validated['heading'] : null,
+        );
 
         return response()->json([
             'success' => $data !== null,

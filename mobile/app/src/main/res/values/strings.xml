@@ -34,7 +34,7 @@
     <string name="event_acceleration">Aceleración brusca</string>
     <string name="event_turn">Giro brusco</string>
     <string name="simulate_event">Simular: %1$s</string>
-    <string name="origin_simulated">Dato de prueba · SIMULATED</string>
+    <string name="origin_simulated">Demostración · dato de prueba</string>
     <string name="origin_sensor">Detectado por AVIGEM One</string>
     <string name="event_count">Eventos guardados: %1$d</string>
     <string name="no_events">Este recorrido no tiene eventos guardados.</string>

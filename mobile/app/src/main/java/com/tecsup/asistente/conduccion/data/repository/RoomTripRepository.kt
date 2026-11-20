@@ -37,6 +37,11 @@ class RoomTripRepository @Inject constructor(
     private var latestTrackFix: Pair<Long, EventLocation>? = null
 
     override fun observeActiveTrip() = session.state.flatMapLatest { sync.active(it?.ownerKey) }.map { it?.toDomain() }
+    override fun observeConfirmedManeuverAlert(tripId: Long) = session.state.flatMapLatest { current ->
+        if (current != null && sync.trip(tripId)?.ownerKey == current.ownerKey) sync.confirmedManeuverAlert(tripId)
+        else kotlinx.coroutines.flow.flowOf(null)
+    }
+
     override fun observeHistory() = session.state.flatMapLatest { sync.history(it?.ownerKey) }
         .map { rows -> rows.map { TripSummary(it.trip.toDomain(), it.eventCount) } }
     override fun observeTrip(id: Long) = session.state.flatMapLatest { current ->
@@ -88,6 +93,26 @@ class RoomTripRepository @Inject constructor(
             }
         }
     }.also { scheduler.schedule() }
+
+    suspend fun recordDemonstration(type: DrivingEventType) {
+        session.gate.withLock {
+            val owner = checkNotNull(session.state.value?.takeIf { !it.token.isNullOrBlank() }?.ownerKey)
+            database.withTransaction {
+                val now = clock.millis()
+                val initial = TripEntity(startedAt = now, endedAt = now, status = TripStatus.COMPLETED.name, activeSlot = null)
+                val trip = initial.copy(id = dao.insertTrip(initial))
+                val meta = TripSyncEntity(trip.id, UUID.randomUUID().toString(), owner, 2)
+                sync.insertTrip(meta)
+                OutboxWriter.trip(database, trip, meta)
+                val candidate = DrivingEventEntity(tripId = trip.id, type = type.name, occurredAt = now, origin = DataOrigin.SIMULATED.name)
+                val event = candidate.copy(id = dao.insertEvent(candidate))
+                val uuid = UUID.randomUUID().toString()
+                sync.insertEvent(EventSyncEntity(event.id, uuid))
+                OutboxWriter.event(database, event, meta.clientTripId, uuid)
+            }
+        }
+        scheduler.schedule()
+    }
 
     override suspend fun addSimulatedEvent(tripId: Long, type: DrivingEventType): DrivingEvent =
         recordSimulatedManeuver(tripId, type).first

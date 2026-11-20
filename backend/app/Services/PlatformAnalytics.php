@@ -68,7 +68,11 @@ class PlatformAnalytics {
                 'type'=>'Feature','id'=>'point-'.$i,'geometry'=>['type'=>'Point','coordinates'=>[$e->longitude,$e->latitude]],
                 'properties'=>['uuid'=>'point-'.$i,'label'=>DashboardDisplay::type($e->type),'origin'=>$e->origin,'origin_label'=>DashboardDisplay::origin($e->origin),
                     'date'=>DashboardDisplay::date($e->occurred_at),'company'=>$e->company->name,'location_origin'=>$e->location_origin]])->values()->all();
-        return compact('summary','daily','monthly','hourly','weekly','types','geoCount')+
+        $demonstrations = (clone $events)->where('origin', 'SIMULATED')->with('company:id,name')
+            ->orderByDesc('occurred_at')->orderByDesc('id')->limit(20)
+            ->get(['id', 'company_id', 'type', 'origin', 'occurred_at']);
+
+        return compact('summary','daily','monthly','hourly','weekly','types','geoCount','demonstrations')+
             ['comparison'=>$this->comparison($f)->paginate(20)->withQueryString(),'geojson'=>['type'=>'FeatureCollection','features'=>$features],
                 'companies'=>Company::orderBy('name')->get(['id','name']),'mapStyle'=>config('maps.style_url'),'filters'=>$f];
     }

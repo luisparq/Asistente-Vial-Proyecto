@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.*
@@ -35,12 +37,24 @@ import kotlinx.coroutines.delay
 
 private val ArequipaReference = LatLng(-16.3989, -71.5369)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriverMapScreen(onBack:()->Unit, onDevice:()->Unit = {}, viewModel:DriverMapViewModel=hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val registeredCatalog by rememberRoadCatalog(viewModel.catalogUrl)
+    val layers by viewModel.layers.collectAsStateWithLifecycle()
+    val selectedLayers by viewModel.selectedLayers.collectAsStateWithLifecycle()
+    val session by viewModel.session.collectAsStateWithLifecycle()
+    val tileStatus by viewModel.tiles.status.collectAsStateWithLifecycle()
     val now by rememberRoadTime()
-    val catalog = registeredCatalog?.activeAt(now) ?: RoadCatalog(osmAvailable = false)
+    val catalog = layers[RoadLayer.SPEED]?.catalog ?: RoadCatalog(osmAvailable = false)
+    val trafficTemplate = if (RoadLayer.FLOW in selectedLayers) viewModel.tiles.template(session, now / 60) else null
+    val trafficMessage = when {
+        RoadLayer.FLOW !in selectedLayers -> "Tráfico desactivado"
+        session?.token.isNullOrBlank() -> "Inicia sesión para consultar TomTom"
+        tileStatus.ownerKey == session?.ownerKey -> tileStatus.message
+        else -> "Cargando tráfico…"
+    }
+    var showLayers by remember { mutableStateOf(false) }
     var center by remember { mutableIntStateOf(0) }
     var mapError by remember { mutableStateOf<String?>(null) }
     var showInfo by remember { mutableStateOf(false) }
@@ -52,18 +66,27 @@ fun DriverMapScreen(onBack:()->Unit, onDevice:()->Unit = {}, viewModel:DriverMap
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             // Mapa a pantalla completa, centrado en Arequipa hasta tener posición GPS.
-            NativeDriverMap(state, catalog, center, Modifier.fillMaxSize(), onError = { mapError = it })
-            Column(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(
-                    onClick = onDevice,
-                    shape = MaterialTheme.shapes.small,
-                    color = if (connected) androidx.compose.ui.graphics.Color(0xFF1E7F43) else androidx.compose.ui.graphics.Color(0xFFB3261E),
-                    contentColor = androidx.compose.ui.graphics.Color.White,
-                ) {
-                    Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.size(10.dp).clip(androidx.compose.foundation.shape.CircleShape).background(androidx.compose.ui.graphics.Color.White))
-                        Text(if (connected) "AVIGEM One conectado" else "AVIGEM One desconectado", style = MaterialTheme.typography.labelLarge)
+            key(session) {
+                NativeDriverMap(state, center, Modifier.fillMaxSize(),
+                    roadLayers = layers, selectedLayers = selectedLayers, trafficTemplate = trafficTemplate,
+                    tileClient = viewModel.tiles, onAreaChanged = viewModel::viewArea,
+                    onError = { mapError = it })
+            }
+            Column(Modifier.align(Alignment.TopStart).fillMaxWidth().statusBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        onClick = onDevice,
+                        modifier = Modifier.weight(1f, fill = false),
+                        shape = MaterialTheme.shapes.small,
+                        color = if (connected) androidx.compose.ui.graphics.Color(0xFF1E7F43) else androidx.compose.ui.graphics.Color(0xFFB3261E),
+                        contentColor = androidx.compose.ui.graphics.Color.White,
+                    ) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(Modifier.size(10.dp).clip(androidx.compose.foundation.shape.CircleShape).background(androidx.compose.ui.graphics.Color.White))
+                            Text(if (connected) "AVIGEM One conectado" else "AVIGEM One desconectado", style = MaterialTheme.typography.labelLarge)
+                        }
                     }
+                    FilledTonalButton(onClick = { showLayers = true }, shape = MaterialTheme.shapes.small) { Text("Capas") }
                 }
                 mapError?.let {
                     Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer) {
@@ -87,8 +110,11 @@ fun DriverMapScreen(onBack:()->Unit, onDevice:()->Unit = {}, viewModel:DriverMap
                                 GpsStatus.WAITING -> "Esperando posición GPS"
                             }, style = MaterialTheme.typography.titleSmall)
                             state.position?.let { Text("Latitud: ${it.latitude} · Longitud: ${it.longitude}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            Text("Punto grande citrino: tu posición · Punto ámbar: maniobras de prueba del recorrido (${state.events.size}). Azul: límite · Violeta: colegio · Rojo: tráfico · Datos © OpenStreetMap y TomTom.", style = MaterialTheme.typography.labelMedium)
-                            RoadAlertPanel(catalog, registeredCatalog != null, state.position?.let { RoadPoint(it.latitude, it.longitude) })
+                            Text("Citrino: tu posición · Ámbar: maniobras de prueba (${state.events.size}). Toca puntos y tramos para ver sus datos. © OpenStreetMap y TomTom.", style = MaterialTheme.typography.labelMedium)
+                            RoadAlertPanel(catalog, layers[RoadLayer.SPEED]?.catalog != null,
+                                state.position?.let { RoadPoint(it.latitude, it.longitude) },
+                                catalogMessage = layers[RoadLayer.SPEED]?.message ?: "Cargando límites de velocidad…",
+                                trafficMessage = trafficMessage, speak = state.tripId == null)
                             Text("La cartografía requiere Internet. El monitoreo, los recorridos y la sincronización funcionan sin mantener este mapa abierto.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -96,6 +122,26 @@ fun DriverMapScreen(onBack:()->Unit, onDevice:()->Unit = {}, viewModel:DriverMap
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilledTonalButton(onClick = { showInfo = !showInfo }, shape = MaterialTheme.shapes.small) { Text(if (showInfo) "Ocultar detalles" else "Detalles y alertas") }
                     Button(onClick = { center++ }, enabled = state.position != null, shape = MaterialTheme.shapes.small) { Text("Mi posición") }
+                }
+            }
+        }
+    }
+    if (showLayers) {
+        ModalBottomSheet(onDismissRequest = { showLayers = false }) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+                Text("Capas del mapa", style = MaterialTheme.typography.titleLarge)
+                Text("Colegios y auxilio se buscan alrededor del centro del mapa.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                RoadLayer.entries.forEach { layer ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(layer.label, style = MaterialTheme.typography.titleSmall)
+                            Text(if (layer == RoadLayer.FLOW) trafficMessage else layers[layer]?.message ?: "Desactivado",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = layer in selectedLayers, onCheckedChange = { viewModel.toggleLayer(layer) },
+                            modifier = Modifier.semantics { contentDescription = layer.label })
+                    }
                 }
             }
         }
@@ -120,7 +166,6 @@ internal fun DriverMapPreview(
     Box(modifier.background(colors.surfaceVariant)) {
         NativeDriverMap(
             state = state.copy(events = emptyList()),
-            catalog = RoadCatalog(osmAvailable = false),
             center = 0,
             modifier = Modifier.matchParentSize(),
             preview = true,
@@ -159,10 +204,14 @@ internal fun DriverMapPreview(
 @Composable
 private fun NativeDriverMap(
     state: DriverMapState,
-    catalog: RoadCatalog,
     center: Int,
     modifier: Modifier,
     preview: Boolean = false,
+    roadLayers: Map<RoadLayer, RoadLayerData> = emptyMap(),
+    selectedLayers: Set<RoadLayer> = emptySet(),
+    trafficTemplate: String? = null,
+    tileClient: RoadTileClient? = null,
+    onAreaChanged: (RoadPoint) -> Unit = {},
     onReady: () -> Unit = {},
     onError: (String) -> Unit,
 ) {
@@ -171,11 +220,13 @@ private fun NativeDriverMap(
     val currentState by rememberUpdatedState(state)
     val error by rememberUpdatedState(onError)
     val showMap by rememberUpdatedState(onReady)
+    val areaChanged by rememberUpdatedState(onAreaChanged)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var ready by remember { mutableStateOf(false) }
     var firstCenter by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<String?>(null) }
     val view = remember(context, preview) {
+        tileClient?.install()
         MapLibre.getInstance(context)
         val options = MapLibreMapOptions.createFromAttributes(context).textureMode(preview)
         MapView(context, options).apply { onCreate(null) }
@@ -218,12 +269,7 @@ private fun NativeDriverMap(
                 if(!alive) return@setStyle
                 style.addSource(GeoJsonSource("current-gps","{\"type\":\"FeatureCollection\",\"features\":[]}"))
                 style.addSource(GeoJsonSource("trip-events","{\"type\":\"FeatureCollection\",\"features\":[]}"))
-                for ((id, color) in listOf("road-zones" to Color.rgb(138, 79, 202), "road-traffic" to Color.rgb(205, 55, 58))) {
-                    style.addSource(GeoJsonSource(id, "{\"type\":\"FeatureCollection\",\"features\":[]}"))
-                    style.addLayer(CircleLayer("$id-points", id).withProperties(
-                        circleColor(color), circleRadius(8f), circleStrokeColor(Color.WHITE), circleStrokeWidth(2f)
-                    ))
-                }
+                addRoadMapLayers(style)
                 style.addSource(GeoJsonSource("road-limits", "{\"type\":\"FeatureCollection\",\"features\":[]}"))
                 style.addLayer(LineLayer("road-limit-lines", "road-limits").withProperties(
                     lineColor(Color.rgb(42, 117, 224)), lineWidth(5f)
@@ -232,10 +278,13 @@ private fun NativeDriverMap(
                 style.addLayer(CircleLayer("gps-point","current-gps").withProperties(circleColor(Color.rgb(212,242,58)),circleRadius(9f),circleStrokeColor(Color.rgb(21,22,26)),circleStrokeWidth(3f)))
                 ready=true
             }
+            loaded.addOnCameraIdleListener {
+                if (!preview) loaded.cameraPosition.target?.let { areaChanged(RoadPoint(it.latitude, it.longitude)) }
+            }
             loaded.addOnMapClickListener { coordinate ->
                 val hit=loaded.queryRenderedFeatures(loaded.projection.toScreenLocation(coordinate),"event-points").firstOrNull()
-                val roadHit = loaded.queryRenderedFeatures(loaded.projection.toScreenLocation(coordinate),
-                    "road-zones-points", "road-traffic-points", "road-limit-lines").firstOrNull()
+                val roadIds = RoadLayer.entries.filter { it != RoadLayer.FLOW }.flatMap { roadLayerIds(it).toList() }
+                val roadHit = loaded.queryRenderedFeatures(loaded.projection.toScreenLocation(coordinate), *roadIds.toTypedArray()).firstOrNull()
                 val id=hit?.getNumberProperty("event_id")?.toLong()
                 val event=currentState.events.firstOrNull { it.id==id }
                 selected=event?.let { "Maniobra de prueba · ${it.type}\n"+com.tecsup.asistente.conduccion.core.ui.formatTimestamp(it.occurredAt)+"\n${it.latitude}, ${it.longitude}" }
@@ -245,7 +294,7 @@ private fun NativeDriverMap(
         }
         onDispose { alive=false;lifecycle.removeObserver(observer);if(resumed)view.onPause();if(started)view.onStop();ready=false;map=null;view.onDestroy() }
     }
-    LaunchedEffect(state,catalog,ready) {
+    LaunchedEffect(state,ready) {
         if(!ready) return@LaunchedEffect
         fun feature(lat:Double,lon:Double,id:Long?=null)=JSONObject().put("type","Feature")
             .put("geometry",JSONObject().put("type","Point").put("coordinates",JSONArray().put(lon).put(lat)))
@@ -255,29 +304,16 @@ private fun NativeDriverMap(
         val events=JSONArray();state.events.forEach { events.put(feature(it.latitude!!,it.longitude!!,it.id)) }
         map?.style?.getSourceAs<GeoJsonSource>("current-gps")?.setGeoJson(collection(gps))
         map?.style?.getSourceAs<GeoJsonSource>("trip-events")?.setGeoJson(collection(events))
-        val zones = JSONArray()
-        catalog.zones.forEach {
-            zones.put(feature(it.point.lat, it.point.lon).put("properties", JSONObject().put("road_label", it.name)))
-        }
-        val traffic = JSONArray()
-        catalog.traffic.forEach {
-            traffic.put(feature(it.point.lat, it.point.lon).put("properties", JSONObject().put("road_label", "Tráfico reportado")))
-        }
-        val limits = JSONArray()
-        catalog.speedSections.forEach {
-            val coordinates = JSONArray().put(JSONArray().put(it.start.lon).put(it.start.lat))
-                .put(JSONArray().put(it.end.lon).put(it.end.lat))
-            limits.put(JSONObject().put("type", "Feature")
-                .put("geometry", JSONObject().put("type", "LineString").put("coordinates", coordinates))
-                .put("properties", JSONObject().put("road_label", "Límite: ${it.kmh} km/h")))
-        }
-        map?.style?.getSourceAs<GeoJsonSource>("road-zones")?.setGeoJson(collection(zones))
-        map?.style?.getSourceAs<GeoJsonSource>("road-traffic")?.setGeoJson(collection(traffic))
-        map?.style?.getSourceAs<GeoJsonSource>("road-limits")?.setGeoJson(collection(limits))
         if (!preview && !firstCenter && state.position != null) {
             map?.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(state.position.latitude, state.position.longitude), 15.0))
             firstCenter = true
         }
+    }
+    LaunchedEffect(roadLayers, selectedLayers, ready) {
+        if (ready) map?.style?.let { updateRoadMapLayers(it, roadLayers, selectedLayers) }
+    }
+    LaunchedEffect(trafficTemplate, ready) {
+        if (ready) map?.style?.let { updateTrafficLayer(it, trafficTemplate) }
     }
     LaunchedEffect(state.position, ready, preview) {
         if (!preview || !ready) return@LaunchedEffect

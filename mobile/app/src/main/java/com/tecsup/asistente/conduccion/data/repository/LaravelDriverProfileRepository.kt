@@ -24,6 +24,17 @@ class LaravelDriverProfileRepository @Inject constructor(
     private val refreshVersion = MutableStateFlow(0L)
     override fun refresh() { refreshVersion.update { it + 1 } }
 
+    override suspend fun update(phone: String, address: String, photo: ByteArray?) {
+        val session = checkNotNull(sessions.state.value) { "Inicia sesión nuevamente." }
+        val token = checkNotNull(session.token) { "Inicia sesión nuevamente." }
+        when (api.updateDriver(session.baseUrl, token, phone, address, photo)) {
+            204 -> if (sessions.state.value == session) refresh()
+            422 -> error("Revisa los datos y elige una imagen JPG o PNG de hasta 2 MiB y 5000 × 5000 px.")
+            401, 403 -> error("Inicia sesión nuevamente para actualizar tu perfil.")
+            else -> error("No se pudo guardar el perfil. Inténtalo de nuevo.")
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observe() = combine(sessions.state, refreshVersion) { session, _ -> session }
         .transformLatest { session ->
@@ -34,7 +45,17 @@ class LaravelDriverProfileRepository @Inject constructor(
             val result = try {
                 val response = api.request(session.baseUrl, "api/v1/me/driver", session.token, method = "GET")
                 when (response.code) {
-                    200 -> ProfileState.Ready(Contract.json.decodeFromString<Envelope<DriverProfileDto>>(response.body).data.toDomain())
+                    200 -> {
+                        val dto = Contract.json.decodeFromString<Envelope<DriverProfileDto>>(response.body).data
+                        val photo = if (dto.has_photo) try {
+                            api.driverPhoto(session.baseUrl, session.token)
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (_: IOException) {
+                            null
+                        } else null
+                        ProfileState.Ready(dto.toDomain().copy(photo = photo))
+                    }
                     401 -> ProfileState.SessionExpired
                     403 -> ProfileState.Forbidden
                     404 -> ProfileState.NotRegistered

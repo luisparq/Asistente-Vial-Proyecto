@@ -43,6 +43,26 @@ class RoadAssistanceTest extends TestCase
             ->assertJsonPath('address.district', 'Yanahuara');
     }
 
+    public function test_directional_reverse_geocode_returns_posted_limit_and_position(): void
+    {
+        config(['cache.default' => 'array', 'services.tomtom.key' => 'test-key']);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.tomtom.com/search/2/reverseGeocode/*' => Http::response([
+                'addresses' => [[
+                    'address' => ['streetName' => 'Avenida Ejército', 'speedLimit' => '40.00KPH'],
+                    'position' => '-16.398,-71.536',
+                ]],
+            ]),
+        ]);
+
+        $this->getJson('/api/v1/road/reverse-geocode?lat=-16.398&lon=-71.536&heading=90')
+            ->assertOk()->assertJsonPath('address.speedLimitKmh', 40)
+            ->assertJsonPath('address.roadPosition', '-16.398,-71.536');
+        Http::assertSent(fn ($request) => $request['returnSpeedLimit'] === 'true'
+            && (int) $request['heading'] === 90);
+    }
+
     public function test_route_calculation_returns_eta_and_distance(): void
     {
         config(['cache.default' => 'array', 'services.tomtom.key' => 'test-key']);
@@ -91,6 +111,10 @@ class RoadAssistanceTest extends TestCase
                     'freeFlowTravelTime' => 100,
                     'confidence' => 0.95,
                     'roadClosure' => false,
+                    'coordinates' => ['coordinate' => [
+                        ['latitude' => -16.398, 'longitude' => -71.536],
+                        ['latitude' => -16.397, 'longitude' => -71.536],
+                    ]],
                 ],
             ]),
         ]);
@@ -99,7 +123,8 @@ class RoadAssistanceTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('flow.currentSpeedKmh', 28)
-            ->assertJsonPath('flow.freeFlowSpeedKmh', 45);
+            ->assertJsonPath('flow.freeFlowSpeedKmh', 45)
+            ->assertJsonCount(2, 'flow.coordinates');
     }
 
     public function test_emergency_pois_returns_places(): void

@@ -2,6 +2,13 @@ package com.tecsup.asistente.conduccion.feature.history
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import com.tecsup.asistente.conduccion.core.ui.rememberReducedMotion
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -40,6 +47,7 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel(),
     excludedTripIds: Set<Long>? = emptySet(),
 ) {
+    val reducedMotion = rememberReducedMotion()
     val state by viewModel.trips.collectAsStateWithLifecycle()
     ScreenLayout(
         stringResource(R.string.history_title), stringResource(R.string.history_description),
@@ -52,13 +60,21 @@ fun HistoryScreen(
                 val visible = if (excludedTripIds == null) emptyList() else current.value.filterNot { it.trip.id in excludedTripIds }
                 if (excludedTripIds == null) CircularProgressIndicator()
                 else if (visible.isEmpty()) Text(stringResource(R.string.empty_history))
-                LazyColumn(modifier = Modifier.weight(1f).testTag("history_list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AnimatedVisibility(visible = visible.isNotEmpty(), modifier = Modifier.weight(1f),
+                    enter = fadeIn(tween(if (reducedMotion) 0 else 180))) {
+                LazyColumn(modifier = Modifier.testTag("history_list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(visible, key = { it.trip.id }) { summary ->
                         Card(onClick = { onTripSelected(summary.trip.id) }, modifier = Modifier.fillMaxWidth(),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                            Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(Modifier.fillMaxWidth()
+                                .background(Brush.horizontalGradient(listOf(Color(0xFF14263E), Color(0xFF1D304C))))
+                                .padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 TripInfo(summary.trip)
+                                summary.trip.endedAt?.let { ended ->
+                                    val duration = java.time.Duration.between(summary.trip.startedAt, ended).seconds.coerceAtLeast(0)
+                                    Text("Duración · ${duration / 60} min ${duration % 60} s")
+                                }
                                 Text(stringResource(R.string.event_count, summary.eventCount))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(stringResource(R.string.view_events), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -68,6 +84,7 @@ fun HistoryScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }

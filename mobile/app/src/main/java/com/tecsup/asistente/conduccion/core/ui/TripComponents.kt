@@ -1,6 +1,13 @@
 package com.tecsup.asistente.conduccion.core.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateContentSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -37,7 +44,8 @@ fun DrivingEventType.labelResource(): Int = when (this) {
 /** Tarjeta visual común de recorridos y eventos. */
 @Composable
 fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth(), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    val motion = if (rememberReducedMotion()) Modifier else Modifier.animateContentSize()
+    Card(Modifier.fillMaxWidth().then(motion), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
 }
@@ -57,7 +65,15 @@ fun TripInfo(trip: Trip) {
 @Composable
 fun EventInfo(event: DrivingEvent) {
     var gpsVisible by remember(event.id) { mutableStateOf(false) }
-    Text(stringResource(event.type.labelResource()), style = MaterialTheme.typography.titleSmall)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        val icon = when (event.type) {
+            DrivingEventType.HARSH_BRAKING -> Icons.Filled.KeyboardArrowDown
+            DrivingEventType.HARSH_ACCELERATION -> Icons.Filled.KeyboardArrowUp
+            DrivingEventType.SHARP_TURN -> Icons.AutoMirrored.Filled.ArrowForward
+        }
+        Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+        Text(stringResource(event.type.labelResource()), style = MaterialTheme.typography.titleSmall)
+    }
     EvidenceLabel(stringResource(
         if (event.origin == DataOrigin.SIMULATED) R.string.origin_simulated else R.string.origin_sensor,
     ))

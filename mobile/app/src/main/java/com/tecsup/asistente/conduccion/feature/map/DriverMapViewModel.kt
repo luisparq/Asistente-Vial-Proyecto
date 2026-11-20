@@ -6,7 +6,7 @@ import com.tecsup.asistente.conduccion.domain.ble.*
 import com.tecsup.asistente.conduccion.domain.diagnostic.*
 import com.tecsup.asistente.conduccion.domain.model.*
 import com.tecsup.asistente.conduccion.domain.repository.TripRepository
-import com.tecsup.asistente.conduccion.feature.login.ServerConfiguration
+import com.tecsup.asistente.conduccion.domain.sync.SessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,9 +28,22 @@ fun driverMapState(connection: BleConnectionState,gps: GpsTelemetry,trip: TripWi
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DriverMapViewModel @Inject constructor(ble: BleRepository,source: SensorDataSource,trips: TripRepository,
-    private val server: ServerConfiguration): ViewModel() {
-    val catalogUrl: String get() = server.baseUrl.takeIf(String::isNotBlank)
-        ?.let { "${it.trimEnd('/')}/api/v1/road-catalog" }.orEmpty()
+    sessions: SessionStore, repository: RoadLayerRepository, val tiles: RoadTileClient): ViewModel() {
+    val session = sessions.state
+    val selectedLayers = MutableStateFlow(setOf(RoadLayer.SPEED))
+    private val area = MutableStateFlow(RoadPoint(-16.3989, -71.5369))
+    val layers = combine(RoadLayer.entries.filter { it != RoadLayer.FLOW }.map { layer ->
+        repository.observe(layer, selectedLayers, area).map { layer to it }
+    }) { values -> values.toMap() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0, replayExpirationMillis = 0), emptyMap())
+
+    fun toggleLayer(layer: RoadLayer) {
+        selectedLayers.update { selected -> if (layer in selected) selected - layer else selected + layer }
+    }
+
+    fun viewArea(point: RoadPoint) {
+        if (point.valid() && area.value.distanceTo(point) >= 500) area.value = point
+    }
     private val active = trips.observeActiveTrip().flatMapLatest { trip -> if(trip==null) flowOf(null) else trips.observeTrip(trip.id) }
     val state=combine(ble.connection,source.gps,active,::driverMapState)
         .stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000,replayExpirationMillis=0),DriverMapState())

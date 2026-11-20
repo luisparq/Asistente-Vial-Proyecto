@@ -96,7 +96,7 @@ class DemonstrativeTestFlowTest {
             assertTrue(buzzerPending)
             assertFalse(buzzerDoneConfirmed)
             assertEquals("Giro brusco detectado", alertTitle)
-            assertEquals("Ey, noté un giro brusco. Vamos con calma.", alertMessage)
+            assertEquals("Hey, detecté un giro brusco. Gira con suavidad.", alertMessage)
             assertTrue(alertObserved, alertObserved.contains("GIRO_BRUSCO_TEST"))
             assertEquals("|gz| > 45.0 °/s", alertThreshold)
         }
@@ -121,7 +121,7 @@ class DemonstrativeTestFlowTest {
         val diagnostic = fixture.diagnostic
         repeat(2) { feed(fixture, accelFrame) }
         assertEquals("Aceleración brusca detectada", diagnostic.demo.value.alertTitle)
-        assertEquals("Ey, noté una aceleración brusca. Acelera con suavidad.", diagnostic.demo.value.alertMessage)
+        assertEquals("Hey, detecté una aceleración brusca. Acelera poco a poco.", diagnostic.demo.value.alertMessage)
         assertEquals("ax corregido > +0.25 g", diagnostic.demo.value.alertThreshold)
         fixture.transport.latest.listener.buzzerDone(); runCurrent()
         diagnostic.dismissDemoAlert(); runCurrent()
@@ -132,7 +132,7 @@ class DemonstrativeTestFlowTest {
         repeat(9) { feed(fixture, restFrame) }
         repeat(2) { feed(fixture, brakeFrame) }
         assertEquals("Frenado brusco detectado", diagnostic.demo.value.alertTitle)
-        assertEquals("Ey, noté un frenado brusco. Mantengamos una conducción suave.", diagnostic.demo.value.alertMessage)
+        assertEquals("Hey, detecté un frenado brusco. Mantén tu distancia.", diagnostic.demo.value.alertMessage)
         assertEquals("ax corregido < -0.25 g", diagnostic.demo.value.alertThreshold)
         assertEquals(2, fixture.transport.latest.buzzerWrites.size)
     }

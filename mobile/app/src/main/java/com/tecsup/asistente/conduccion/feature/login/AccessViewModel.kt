@@ -71,6 +71,11 @@ class AccessViewModel @Inject constructor(
         "home"
     }
 
+    fun logout() = perform {
+        account.logout()
+        "login"
+    }
+
     fun continueSession() { if (session.value != null && !state.value.busy) mutableState.value = AccessState(destination = "welcome") }
     fun navigationHandled() { mutableState.value = AccessState() }
 }

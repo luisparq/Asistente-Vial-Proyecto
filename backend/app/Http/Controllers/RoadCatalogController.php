@@ -13,7 +13,11 @@ class RoadCatalogController extends Controller
     public function __invoke(): JsonResponse
     {
         $osm = Cache::get('road-catalog:arequipa:osm')
-            ?? Cache::lock('road-catalog:arequipa:osm-refresh', 20)->get(fn () => $this->refreshOsm());
+            ?? Cache::lock('road-catalog:arequipa:osm-refresh', 60)->get(fn () => $this->refreshOsm());
+        $stale = empty($osm);
+        if ($stale) {
+            $osm = Cache::get('road-catalog:arequipa:osm-last-good', []);
+        }
 
         $key = config('services.tomtom.key');
         $trafficConfigured = is_string($key) && trim($key) !== '';
@@ -21,6 +25,7 @@ class RoadCatalogController extends Controller
             'zones' => $osm['zones'] ?? [],
             'speedSections' => $osm['speedSections'] ?? [],
             'osmAvailable' => !empty($osm),
+            'osmStale' => $stale && !empty($osm),
             'trafficConfigured' => $trafficConfigured,
         ]);
     }
@@ -50,8 +55,9 @@ class RoadCatalogController extends Controller
             try {
                 $response = Http::withUserAgent('AVIGEM-RoadCatalog/1.0')->acceptJson()->connectTimeout(3)->timeout(12)->asForm()
                     ->post($endpoint, ['data' => $query]);
-                if ($response->successful() && !$response->json('remark')) {
-                    $elements = $response->json('elements');
+                $candidate = $response->json('elements');
+                if ($response->successful() && !$response->json('remark') && is_array($candidate)) {
+                    $elements = $candidate;
                     break;
                 }
             } catch (\Illuminate\Http\Client\ConnectionException) {
@@ -62,6 +68,10 @@ class RoadCatalogController extends Controller
         $catalog = is_array($elements) ? $this->osmCatalog($elements) : [];
         // Si Overpass falla, se espera 5 minutos antes de reintentar: cada intento puede ocupar un proceso PHP ~25 s.
         Cache::put('road-catalog:arequipa:osm', $catalog, $catalog ? now()->addHours(12) : now()->addMinutes(5));
+
+        if ($catalog) {
+            Cache::put('road-catalog:arequipa:osm-last-good', $catalog, now()->addDays(7));
+        }
 
         return $catalog;
     }

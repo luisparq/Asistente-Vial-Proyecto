@@ -3,6 +3,8 @@ package com.tecsup.asistente.conduccion.feature.trip
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -15,9 +17,9 @@ import androidx.compose.ui.platform.LocalContext
 import java.util.Locale
 
 private const val START_GREETING =
-    "Hola, soy Abigem. Te acompañaré durante tu recorrido."
+    "Iniciando tu recorrido"
 internal const val MANEUVER_ALERT_MESSAGE =
-    "Se registraron varias maniobras bruscas. Conduce con precaución"
+    "Se registraron varias maniobras bruscas. Se envió una alerta a su administrador."
 private const val START_GREETING_UTTERANCE = "start_trip_greeting"
 
 /**
@@ -29,12 +31,20 @@ private const val START_GREETING_UTTERANCE = "start_trip_greeting"
  * reproduce nada y el recorrido continúa con normalidad.
  */
 @Composable
-internal fun TripVoice(greetOnStart: Boolean, maneuverAlertId: String?) {
-    if (!greetOnStart && maneuverAlertId == null) return
+internal fun TripVoice(
+    greetOnStart: Boolean,
+    maneuverAlertId: String?,
+    alertMessage: String = MANEUVER_ALERT_MESSAGE,
+    greeting: String = START_GREETING,
+    prepare: Boolean = false,
+    onAlertDone: (String) -> Unit = {},
+) {
+    if (!prepare && !greetOnStart && maneuverAlertId == null) return
     val context = LocalContext.current
+    val completion by rememberUpdatedState(onAlertDone)
     var engine by remember { mutableStateOf<TextToSpeech?>(null) }
     var greeted by rememberSaveable { mutableStateOf(false) }
-    var spokenAlertId by rememberSaveable { mutableStateOf<String?>(null) }
+    var spokenAlertId by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(context) {
         var active = true
@@ -47,6 +57,15 @@ internal fun TripVoice(greetOnStart: Boolean, maneuverAlertId: String?) {
                     if (status == TextToSpeech.SUCCESS && instance.selectSpanishVoice()) {
                         instance.setPitch(0.88f)
                         instance.setSpeechRate(0.98f)
+                        instance.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                            override fun onStart(utteranceId: String) = Unit
+                            override fun onError(utteranceId: String) = Unit
+                            override fun onDone(utteranceId: String) {
+                                main.post {
+                                    if (active && utteranceId != START_GREETING_UTTERANCE) completion(utteranceId)
+                                }
+                            }
+                        })
                         engine = instance
                     } else {
                         instance.shutdown()
@@ -68,11 +87,10 @@ internal fun TripVoice(greetOnStart: Boolean, maneuverAlertId: String?) {
         val speaker = engine ?: return@LaunchedEffect
         if (greetOnStart && !greeted) {
             greeted = true
-            speaker.speak(START_GREETING, TextToSpeech.QUEUE_ADD, null, START_GREETING_UTTERANCE)
+            speaker.speak(greeting, TextToSpeech.QUEUE_ADD, null, START_GREETING_UTTERANCE)
         }
         if (maneuverAlertId != null && spokenAlertId != maneuverAlertId &&
-            speaker.selectSpanishVoice(offlineOnly = true) &&
-            speaker.speak(MANEUVER_ALERT_MESSAGE, TextToSpeech.QUEUE_ADD, null, maneuverAlertId) == TextToSpeech.SUCCESS
+            speaker.speak(alertMessage, TextToSpeech.QUEUE_ADD, null, maneuverAlertId) == TextToSpeech.SUCCESS
         ) spokenAlertId = maneuverAlertId
     }
 }
@@ -86,7 +104,7 @@ internal fun TripVoice(greetOnStart: Boolean, maneuverAlertId: String?) {
  * Prioridad: masculina es-PE → masculina en español → cualquier es-PE → cualquier español.
  * Si ninguna voz es aplicable, cae al setLanguage con locales de fallback.
  */
-private fun TextToSpeech.selectSpanishVoice(offlineOnly: Boolean = false): Boolean {
+internal fun TextToSpeech.selectSpanishVoice(offlineOnly: Boolean = false): Boolean {
     val spanishVoices = runCatching {
         voices?.filter { it.locale.language == "es" && (!offlineOnly || !it.isNetworkConnectionRequired) }.orEmpty()
     }.getOrDefault(emptyList())

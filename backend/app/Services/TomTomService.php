@@ -23,7 +23,7 @@ class TomTomService
     /**
      * Convierte coordenadas (lat, lon) a una dirección legible.
      */
-    public function reverseGeocode(float $lat, float $lon): ?array
+    public function reverseGeocode(float $lat, float $lon, ?int $heading = null): ?array
     {
         if (!$this->isConfigured()) {
             return null;
@@ -33,11 +33,17 @@ class TomTomService
         $roundedLon = round($lon, 4);
         $cacheKey = "tomtom:geocode:$roundedLat:$roundedLon";
 
-        return Cache::remember($cacheKey, now()->addDays(7), function () use ($lat, $lon) {
+        if ($heading !== null) {
+            $cacheKey .= ':speed:'.(int) (round($heading / 15) * 15 % 360);
+        }
+
+        return Cache::remember($cacheKey, now()->addDays($heading === null ? 7 : 1), function () use ($lat, $lon, $heading) {
             try {
                 $response = Http::acceptJson()->connectTimeout(3)->timeout(6)->get(
                     "https://api.tomtom.com/search/2/reverseGeocode/{$lat},{$lon}.json",
-                    ['key' => $this->key]
+                    ['key' => $this->key] + ($heading === null ? [] : [
+                        'returnSpeedLimit' => 'true', 'heading' => $heading, 'radius' => 25,
+                    ])
                 );
 
                 if (! $response->successful()) {
@@ -52,7 +58,10 @@ class TomTomService
                             'district' => $address['municipalitySubdivision'] ?? '',
                             'city' => $address['municipality'] ?? 'Arequipa',
                             'country' => $address['country'] ?? 'Perú',
-                        ];
+                        ] + ($heading === null ? [] : [
+                            'speedLimitKmh' => $this->postedSpeed($address['speedLimit'] ?? null),
+                            'roadPosition' => $response->json('addresses.0.position'),
+                        ]);
                     }
                 }
             } catch (\Exception $error) {
@@ -60,6 +69,16 @@ class TomTomService
             }
             return null;
         });
+    }
+
+    private function postedSpeed(mixed $raw): ?int
+    {
+        if (! is_string($raw) || ! preg_match('/^([0-9]+(?:\.[0-9]+)?)(KPH|MPH)$/D', $raw, $match)) {
+            return null;
+        }
+        $kmh = (int) round((float) $match[1] * ($match[2] === 'MPH' ? 1.609344 : 1));
+
+        return $kmh >= 5 && $kmh <= 150 ? $kmh : null;
     }
 
     /**
@@ -124,12 +143,12 @@ class TomTomService
 
         $roundedLat = round($lat, 4);
         $roundedLon = round($lon, 4);
-        $cacheKey = "tomtom:flow_seg:$roundedLat:$roundedLon";
+        $cacheKey = "tomtom:flow_seg:v3:$roundedLat:$roundedLon";
 
         return Cache::remember($cacheKey, now()->addMinutes(1), function () use ($lat, $lon) {
             try {
                 $response = Http::acceptJson()->connectTimeout(3)->timeout(6)->get(
-                    "https://api.tomtom.com/traffic/services/4/flowSegmentData/relative0/10/json",
+                    "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/18/json",
                     [
                         'key' => $this->key,
                         'point' => "{$lat},{$lon}",
@@ -150,6 +169,7 @@ class TomTomService
                             'freeFlowTravelTimeSec' => $flow['freeFlowTravelTime'] ?? null,
                             'confidence' => $flow['confidence'] ?? 0,
                             'roadClosure' => $flow['roadClosure'] ?? false,
+                            'coordinates' => $flow['coordinates']['coordinate'] ?? [],
                         ];
                     }
                 }

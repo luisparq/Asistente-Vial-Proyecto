@@ -33,6 +33,6 @@ class DashboardDisplay
 
     public static function origin(string $origin): string
     {
-        return $origin === 'SIMULATED' ? 'Simulado · dato de prueba' : 'SENSOR · reservado, sin validación física';
+        return $origin === 'SIMULATED' ? 'Demostración · Dato de prueba' : 'SENSOR · reservado, sin validación física';
     }
 }

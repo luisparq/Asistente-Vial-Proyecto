@@ -4,6 +4,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -20,6 +21,20 @@ import org.junit.runner.RunWith
 class NavigationTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun mapLayersAllowSelectionAndExplainWhenLoginIsRequired() {
+        compose.clickText(compose.activity.getString(R.string.explore))
+        compose.waitForText("Mi mapa")
+        compose.clickText("Mapa")
+        compose.clickText("Capas")
+        compose.onNodeWithText("Capas del mapa").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Tráfico en vivo").performScrollTo().performClick().assertIsOn()
+        compose.onAllNodesWithText("Inicia sesión para consultar TomTom").onFirst().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Colegios").performScrollTo().performClick().assertIsOn()
+        compose.onNodeWithContentDescription("Talleres").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Límites de velocidad · OSM").performScrollTo().assertIsOn()
+    }
 
     @Test
     fun opensOptionalDriverMapAndReturnsWithoutGpsOrAnActiveTrip() {

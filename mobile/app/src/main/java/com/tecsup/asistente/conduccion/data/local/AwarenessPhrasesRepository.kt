@@ -15,7 +15,7 @@ class AwarenessPhrasesRepository @Inject constructor(
 
     companion object {
         const val DATABASE_NAME = "awareness_phrases.db"
-        const val DATABASE_VERSION = 2
+        const val DATABASE_VERSION = 3
         const val TABLE_NAME = "awareness_phrases"
 
         const val COL_ID = "id"
@@ -48,29 +48,20 @@ class AwarenessPhrasesRepository @Inject constructor(
                 arrayOf("Hola, soy AVIGEM. Te acompañaré durante tu recorrido.")
             )
         }
+        if (oldVersion < 3) {
+            for ((type, phrases) in maneuverPhrases) {
+                db.delete(TABLE_NAME, "$COL_EVENT_TYPE = ?", arrayOf(type))
+                insertPhrases(db, phrases.map { type to it })
+            }
+        }
     }
 
     private fun seedPhrases(db: SQLiteDatabase) {
-        val initialPhrases = listOf(
-            // Frenado Brusco (HARSH_BRAKING)
-            "HARSH_BRAKING" to "Recuerda mantener tu distancia. Anticipar la frenada protege tu vida y la de los demás.",
-            "HARSH_BRAKING" to "Frenar con suavidad cuida a tus pasajeros y evita choques por alcance. Conduce con calma.",
-            "HARSH_BRAKING" to "Mira más allá del auto de adelante para reducir la marcha progresivamente sin sobresaltos.",
+        insertPhrases(db, maneuverPhrases.flatMap { (type, phrases) -> phrases.map { type to it } } +
+            listOf("START_TRIP" to "Hola, soy AVIGEM. Te acompañaré durante tu recorrido."))
+    }
 
-            // Aceleración Brusca (HARSH_ACCELERATION)
-            "HARSH_ACCELERATION" to "Acelerar de forma gradual optimiza el combustible y te da el control total de tu vehículo.",
-            "HARSH_ACCELERATION" to "Apurar la marcha en ciudad no ahorra tiempo, solo aumenta el riesgo. Mantén un ritmo seguro.",
-            "HARSH_ACCELERATION" to "Presiona el pedal con suavidad. Llegar a salvo siempre es la prioridad.",
-
-            // Giro Brusco (SHARP_TURN)
-            "SHARP_TURN" to "Reduce la velocidad antes de entrar a la curva, no dentro de ella. Mantendrás la estabilidad.",
-            "SHARP_TURN" to "Toma los virajes con espacio y señaliza a tiempo. La suavidad en el volante evita derrapes.",
-            "SHARP_TURN" to "Evita maniobras repentinas al doblar. Tu estabilidad garantiza la seguridad de la vía.",
-
-            // Inicio de Recorrido (START_TRIP)
-            "START_TRIP" to "Hola, soy AVIGEM. Te acompañaré durante tu recorrido."
-        )
-
+    private fun insertPhrases(db: SQLiteDatabase, initialPhrases: List<Pair<String, String>>) {
         for ((type, phrase) in initialPhrases) {
             val values = ContentValues().apply {
                 put(COL_EVENT_TYPE, type)
@@ -118,11 +109,19 @@ class AwarenessPhrasesRepository @Inject constructor(
 
         return if (selectedPhrase.isNotEmpty()) selectedPhrase else defaultFallback(eventType)
     }
-
-    private fun defaultFallback(eventType: String): String = when (eventType) {
-        "HARSH_BRAKING" -> "Mantengamos una conducción suave."
-        "HARSH_ACCELERATION" -> "Acelera con suavidad."
-        "SHARP_TURN" -> "Vamos con calma en las curvas."
-        else -> "Hola, soy AVIGEM. Te acompañaré durante tu recorrido."
-    }
 }
+
+internal fun defaultFallback(eventType: String): String =
+    maneuverPhrases[eventType]?.first() ?: "Hola, soy AVIGEM. Te acompañaré durante tu recorrido."
+
+private val maneuverPhrases = mapOf(
+    "SHARP_TURN" to listOf(
+        "Gira con suavidad.", "Reduce antes de la curva.", "Mueve el volante con calma.",
+    ).map { "Hey, detecté un giro brusco. $it" },
+    "HARSH_ACCELERATION" to listOf(
+        "Acelera poco a poco.", "Pisa el pedal con suavidad.", "Mantén un ritmo constante.",
+    ).map { "Hey, detecté una aceleración brusca. $it" },
+    "HARSH_BRAKING" to listOf(
+        "Mantén tu distancia.", "Anticipa la frenada.", "Frena de forma gradual.",
+    ).map { "Hey, detecté un frenado brusco. $it" },
+)

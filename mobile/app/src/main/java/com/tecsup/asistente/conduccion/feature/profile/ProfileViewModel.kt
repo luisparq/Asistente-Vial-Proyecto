@@ -14,4 +14,7 @@ class ProfileViewModel @Inject constructor(private val repository: DriverProfile
     val state = repository.observe().stateIn(viewModelScope,
         SharingStarted.WhileSubscribed(stopTimeoutMillis = 0, replayExpirationMillis = 0), ProfileState.Loading)
     fun refresh() = repository.refresh()
+
+    suspend fun update(phone: String, address: String, photo: ByteArray?) =
+        repository.update(phone.trim(), address.trim(), photo)
 }

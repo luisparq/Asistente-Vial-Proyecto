@@ -80,6 +80,31 @@ class RoomTripRepositoryTest {
     }
 
     @Test
+    fun authenticatedDemonstrationQueuesATestEventOutsideTheActiveTrip() = runBlocking {
+        val session = com.tecsup.asistente.conduccion.domain.sync.MemorySessionStore()
+        val account = com.tecsup.asistente.conduccion.domain.sync.Session(
+            "http://127.0.0.1/", 1, 2, "TEST", "test@example.invalid", "TEST-token",
+        )
+        session.save(account)
+        val trips = RoomTripRepository(database, clock, session)
+        val active = trips.startOrResumeTrip()
+        clock.advance()
+        trips.recordDemonstration(DrivingEventType.SHARP_TURN)
+
+        assertEquals(active, trips.observeActiveTrip().first())
+        assertTrue(trips.observeTrip(active.id).first()!!.events.isEmpty())
+        val demo = trips.observeHistory().first().single { it.trip.status == TripStatus.COMPLETED }
+        assertEquals(account.ownerKey, database.syncDao().trip(demo.trip.id)?.ownerKey)
+        val event = trips.observeTrip(demo.trip.id).first()!!.events.single()
+        assertEquals(DataOrigin.SIMULATED, event.origin)
+        assertEquals(DrivingEventType.SHARP_TURN, event.type)
+        val queue = database.syncDao().all().filter { it.localTripId == demo.trip.id }
+        assertEquals(2, queue.size)
+        assertTrue(queue.any { it.revision == 2 })
+        assertTrue(queue.any { it.eventUuid != null })
+    }
+
+    @Test
     fun concurrentStartsResumeOneTripAndFinishIsIdempotent() = runBlocking {
         withTimeout(15_000) {
             val ids = (1..12).map {

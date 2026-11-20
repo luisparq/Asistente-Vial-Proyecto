@@ -1,5 +1,7 @@
 package com.tecsup.asistente.conduccion.feature.diagnostic
 
+import com.tecsup.asistente.conduccion.data.local.defaultFallback
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tecsup.asistente.conduccion.domain.ble.BleConnectionState
@@ -63,13 +65,13 @@ private data class DemoAlertText(val title: String, val voice: String, val obser
 
 private fun ManeuverDemoDetection.alertText(awarenessPhrases: com.tecsup.asistente.conduccion.data.local.AwarenessPhrasesRepository? = null): DemoAlertText {
     fun text(format: String, value: Double) = format.format(java.util.Locale.ROOT, value)
-    val phrase = awarenessPhrases?.getNextPhrase(type.name)
+    val phrase = awarenessPhrases?.getNextPhrase(type.name) ?: defaultFallback(type.name)
     return when (type) {
-        DrivingEventType.SHARP_TURN -> DemoAlertText("Giro brusco detectado", phrase ?: "Ey, noté un giro brusco. Vamos con calma.",
+        DrivingEventType.SHARP_TURN -> DemoAlertText("Giro brusco detectado", phrase,
             text("GIRO_BRUSCO_TEST · |gz| %.1f °/s", observed), text("|gz| > %.1f °/s", ManeuverDemoTestOnly.TURN_THRESHOLD_TEST_ONLY_DPS))
-        DrivingEventType.HARSH_ACCELERATION -> DemoAlertText("Aceleración brusca detectada", phrase ?: "Ey, noté una aceleración brusca. Acelera con suavidad.",
+        DrivingEventType.HARSH_ACCELERATION -> DemoAlertText("Aceleración brusca detectada", phrase,
             text("ACELERACION_BRUSCA_TEST · ax corregido %+.2f g", observed), text("ax corregido > %+.2f g", ManeuverDemoTestOnly.ACCELERATION_THRESHOLD_TEST_ONLY_G))
-        DrivingEventType.HARSH_BRAKING -> DemoAlertText("Frenado brusco detectado", phrase ?: "Ey, noté un frenado brusco. Mantengamos una conducción suave.",
+        DrivingEventType.HARSH_BRAKING -> DemoAlertText("Frenado brusco detectado", phrase,
             text("FRENADO_BRUSCO_TEST · ax corregido %+.2f g", observed), text("ax corregido < %+.2f g", ManeuverDemoTestOnly.BRAKING_THRESHOLD_TEST_ONLY_G))
     }
 }
@@ -91,12 +93,17 @@ data class LaboratoryUiState(val history: List<PhysicalImuSample> = emptyList(),
 class DiagnosticViewModel @Inject constructor(private val repository: BleRepository, private val source: SensorDataSource,
     private val diagnosticsCapture: com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureRepository? = null,
     private val awarenessPhrases: com.tecsup.asistente.conduccion.data.local.AwarenessPhrasesRepository? = null,
-    private val clock: Clock = Clock.systemUTC()) : ViewModel() {
+    private val clock: Clock = Clock.systemUTC(),
+    private val trips: com.tecsup.asistente.conduccion.data.repository.RoomTripRepository? = null,
+) : ViewModel() {
     val realBleUpload = diagnosticsCapture?.state ?: MutableStateFlow(com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureState()).asStateFlow()
     private val mutableLab = MutableStateFlow(LaboratoryUiState())
     val laboratory = mutableLab.asStateFlow()
     private val mutableDemo = MutableStateFlow(DemoTestUiState())
     val demo = mutableDemo.asStateFlow()
+    private var publishDemonstration = false
+    private val mutablePublishError = MutableStateFlow(false)
+    val publishError = mutablePublishError.asStateFlow()
     private var demoJob: Job? = null
     private var demoConfirmationJob: Job? = null
     private val demoTracker = ManeuverDemoTracker()
@@ -272,7 +279,7 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
         }
     }
 
-    fun startDemoTest() {
+    fun startDemoTest(publish: Boolean = false) {
         if (mutableDemo.value.active) return
         val conn = repository.connection.value
         val sensStatus = source.status.value
@@ -280,6 +287,8 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
             mutableDemo.value = DemoTestUiState(statusText = "Conecta el dispositivo y espera recepción IMU antes de iniciar.")
             return
         }
+        publishDemonstration = publish
+        mutablePublishError.value = false
         demoTracker.reset()
         demoProcessor = ImuProcessor()
         mutableDemo.value = DemoTestUiState(
@@ -345,6 +354,15 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
             return
         }
         val alert = detection.alertText(awarenessPhrases)
+        if (publishDemonstration) viewModelScope.launch {
+            try {
+                checkNotNull(trips).recordDemonstration(detection.type)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                mutablePublishError.value = true
+            }
+        }
         // Alerta y voz primero; pending antes de escribir para impedir una segunda orden GATT.
         mutableDemo.value = updated.copy(
             alertVisible = true,

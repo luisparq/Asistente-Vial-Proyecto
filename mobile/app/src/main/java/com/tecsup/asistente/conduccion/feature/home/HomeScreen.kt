@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -73,6 +75,21 @@ fun HomeScreen(
                 Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
             }
         }
+        Card(onClick = onBle, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
+            containerColor = AvigemColors.Sillar100, contentColor = AvigemColors.Volcanic,
+        )) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AvigemTile(size = 30.dp)
+                    Text("AVIGEM One", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.ble_title), style = MaterialTheme.typography.labelMedium, color = AvigemColors.Mineral600)
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(18.dp), tint = AvigemColors.Mineral600)
+                }
+                StatusBadge(stringResource(connection.status.labelResource()), connection.status.tone())
+                if (connection.device == null) Text("Buscar dispositivos", style = MaterialTheme.typography.labelLarge)
+                connection.device?.name?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = AvigemColors.Mineral600) }
+            }
+        }
         Card(
             Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = AvigemColors.Sillar100, contentColor = AvigemColors.Volcanic),
@@ -94,7 +111,8 @@ fun HomeScreen(
             DriverMapPreview(Modifier.fillMaxWidth().height(218.dp))
         }
         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = HomeSlate, contentColor = AvigemColors.Sillar100)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(HomeSlate, Color(0xFF14233B))))
+                .padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 when (val current = active) {
                     LoadState.Loading -> CircularProgressIndicator(color = AvigemColors.Citrine)
                     LoadState.Error -> Text(stringResource(R.string.read_error), color = AvigemColors.Sillar100)
@@ -115,27 +133,7 @@ fun HomeScreen(
                 if (action.busy) CircularProgressIndicator(color = AvigemColors.Citrine)
             }
         }
-        Card(onClick = onBle, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
-            containerColor = AvigemColors.Sillar100, contentColor = AvigemColors.Volcanic,
-        )) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("AVIGEM One", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.ble_title), style = MaterialTheme.typography.labelMedium, color = AvigemColors.Mineral600)
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(18.dp), tint = AvigemColors.Mineral600)
-                }
-                StatusBadge(stringResource(connection.status.labelResource()), connection.status.tone())
-                connection.device?.name?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = AvigemColors.Mineral600) }
-            }
-        }
-        Card(onClick = onPresentation, modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, AvigemColors.Citrine),
-            colors = CardDefaults.cardColors(containerColor = HomeSlate, contentColor = AvigemColors.Sillar100)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Modo presentación", style = MaterialTheme.typography.titleMedium, color = AvigemColors.Citrine)
-                Text("Demostración guiada con AVIGEM One: mueve el módulo y mira la alerta en pantalla completa. Son datos de prueba y no se guardan como detecciones reales.",
-                    style = MaterialTheme.typography.bodySmall, color = AvigemColors.Sillar100)
-            }
-        }
+
+
     }
 }

@@ -69,8 +69,13 @@ fun TripScreen(
             onFinished()
         }
     }
-    // El saludo pertenece a esta pantalla: el motor de voz se libera al salir del recorrido.
-    TripVoice(greetOnStart = startedNew, maneuverAlertId = maneuverAlertId)
+    TripVoice(greetOnStart = startedNew, maneuverAlertId = maneuverAlertId, onAlertDone = viewModel::dismissAlert)
+    maneuverAlertId?.let { id ->
+        com.tecsup.asistente.conduccion.feature.diagnostic.DemoAlertOverlay(
+            "Maniobras bruscas", "", "", { viewModel.dismissAlert(id) },
+            message = MANEUVER_ALERT_MESSAGE, demonstration = false,
+        )
+    }
     ScreenLayout(
         stringResource(R.string.trip_title), "", onBack, scrollable = false,
     ) {
@@ -84,12 +89,6 @@ fun TripScreen(
                     Text(stringResource(R.string.no_active_trip))
                 } else {
                     TripHero(detail, connection)
-                    if (maneuverAlertId != null) {
-                        InfoCard {
-                            StatusBadge("Alerta de conducción", StatusTone.WARNING)
-                            Text(MANEUVER_ALERT_MESSAGE, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
                     Text(stringResource(R.string.event_count, detail.events.size), style = MaterialTheme.typography.titleSmall)
                     LazyColumn(
                         modifier = Modifier.weight(1f).testTag("trip_list"),

@@ -32,7 +32,7 @@ return [
         'url' => env('OVERPASS_URL', 'https://overpass-api.de/api/interpreter'),
         'fallback_urls' => array_filter(array_map('trim', explode(',', env(
             'OVERPASS_FALLBACK_URLS',
-            'https://overpass.kumi.systems/api/interpreter',
+            'https://overpass.private.coffee/api/interpreter',
         )))),
     ],
 

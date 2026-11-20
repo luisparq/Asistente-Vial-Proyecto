@@ -12,6 +12,7 @@ data class StartedTrip(val trip: Trip, val created: Boolean)
 
 interface TripRepository {
     fun observeActiveTrip(): Flow<Trip?>
+    fun observeConfirmedManeuverAlert(tripId: Long): Flow<String?> = kotlinx.coroutines.flow.flowOf(null)
     fun observeHistory(): Flow<List<TripSummary>>
     fun observeTrip(id: Long): Flow<TripWithEvents?>
     /** Atómico e idempotente: recupera el activo o crea uno nuevo e indica cuál ocurrió. */

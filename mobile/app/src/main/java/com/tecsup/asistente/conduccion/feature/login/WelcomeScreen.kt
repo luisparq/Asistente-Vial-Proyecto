@@ -129,7 +129,7 @@ fun WelcomeScreen(name: String?, onContinue: () -> Unit) {
                             containerColor = AvigemColors.Sillar100,
                             contentColor = AvigemColors.Volcanic,
                         ),
-                    ) { Text("Comenzar", style = typography.titleSmall) }
+                    ) { Text("Continuar", style = typography.titleSmall) }
                 }
             }
         }

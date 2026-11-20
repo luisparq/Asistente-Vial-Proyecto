@@ -19,17 +19,19 @@ Route::prefix('v1')->middleware(ApiBoundary::class)->group(function () {
     Route::post('auth/activate', [AccessController::class, 'activateDriver'])->middleware('throttle:activation');
     Route::middleware(['auth:sanctum', TenantContext::class, 'throttle:api', ResourceIds::class])->group(function () {
         Route::get('traffic-flow/{z}/{x}/{y}.png', TrafficFlowTileController::class)
-            ->whereNumber(['z', 'x', 'y'])->middleware('throttle:240,1')->name('traffic-flow.tile');
+            ->whereNumber(['z', 'x', 'y'])->withoutMiddleware('throttle:api')->middleware('throttle:240,1,traffic-tiles:')->name('traffic-flow.tile');
         Route::get('road/reverse-geocode', [\App\Http\Controllers\RoadAssistanceController::class, 'reverseGeocode'])->middleware('throttle:60,1');
         Route::get('road/route', [\App\Http\Controllers\RoadAssistanceController::class, 'calculateRoute'])->middleware('throttle:30,1');
         Route::get('road/traffic-flow-segment', [\App\Http\Controllers\RoadAssistanceController::class, 'flowSegment'])->middleware('throttle:60,1');
-        Route::get('road/emergency-pois', [\App\Http\Controllers\RoadAssistanceController::class, 'emergencyPois'])->middleware('throttle:60,1');
-        Route::get('road/traffic-incidents', [\App\Http\Controllers\RoadAssistanceController::class, 'trafficIncidents'])->middleware('throttle:60,1')->name('road.traffic-incidents');
-        Route::get('road/schools', [\App\Http\Controllers\RoadAssistanceController::class, 'schools'])->middleware('throttle:60,1')->name('road.schools');
+        Route::get('road/emergency-pois', [\App\Http\Controllers\RoadAssistanceController::class, 'emergencyPois'])->middleware('throttle:60,1,road-pois:');
+        Route::get('road/traffic-incidents', [\App\Http\Controllers\RoadAssistanceController::class, 'trafficIncidents'])->middleware('throttle:60,1,road-incidents:')->name('road.traffic-incidents');
+        Route::get('road/schools', [\App\Http\Controllers\RoadAssistanceController::class, 'schools'])->middleware('throttle:60,1,road-schools:')->name('road.schools');
         Route::put('devices/{client_device_id}/status', [\App\Http\Controllers\DeviceController::class, 'report']);
         Route::post('sensor-samples', [\App\Http\Controllers\SensorRelayController::class, 'store'])->name('sensor-samples.store');
         Route::get('me', [AuthController::class, 'me']);
         Route::get('me/driver', [DriverProfileController::class, 'show']);
+        Route::get('me/driver/photo', [DriverProfileController::class, 'photo']);
+        Route::post('me/driver', [DriverProfileController::class, 'update'])->name('driver-profile.update');
         Route::delete('auth/token', [AuthController::class, 'revoke']);
         Route::put('trips/{client_trip_id}', [TripController::class, 'put']);
         Route::get('trips', [TripController::class, 'index'])->name('trips.index');

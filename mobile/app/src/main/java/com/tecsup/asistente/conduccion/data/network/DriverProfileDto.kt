@@ -16,11 +16,18 @@ data class DriverProfileDto(
     val emergency_contact: EmergencyContactDto?,
     val documents: List<DriverDocumentDto>,
     val vehicle: AssignedVehicleDto?,
+    val phone: String? = null,
+    val address: String? = null,
+    val has_photo: Boolean = false,
+    val missing_documents: List<String> = emptyList(),
+    val monthly_maneuvers: Map<String, Int> = emptyMap(),
+    val monthly_score: Int? = null,
 ) {
     fun toDomain() = DriverProfile(name, email, status, access_status,
         emergency_contact?.let { EmergencyContact(it.name, it.relationship, it.phone) },
         documents.map { DriverDocument(it.id, it.type_name, it.review_status, it.expires_on?.let(LocalDate::parse), it.expired) },
-        vehicle?.let { AssignedVehicle(it.plate, it.brand, it.model, it.status) })
+        vehicle?.let { AssignedVehicle(it.plate, it.brand, it.model, it.status) },
+        phone, address, missing_documents, monthly_maneuvers, monthly_score)
 }
 @Serializable data class EmergencyContactDto(val name: String, val relationship: String, val phone: String)
 @Serializable data class DriverDocumentDto(val id: Long, val type: String, val type_name: String, val review_status: String, val expires_on: String?, val expired: Boolean)

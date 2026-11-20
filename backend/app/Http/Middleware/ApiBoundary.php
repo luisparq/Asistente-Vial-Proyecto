@@ -14,6 +14,14 @@ class ApiBoundary
         if (app()->environment('production') && ! $request->secure()) {
             throw new ApiProblem(400, 'https_required', 'Se requiere HTTPS.');
         }
+        if ($request->routeIs('driver-profile.update')
+            && str_starts_with(strtolower($request->header('Content-Type', '')), 'multipart/form-data;')) {
+            if ((int) $request->header('Content-Length', 0) > 2_113_536) {
+                throw new ApiProblem(413, 'payload_too_large', 'La petición excede el límite permitido.');
+            }
+
+            return $next($request);
+        }
         if (strlen($request->getContent()) > ($request->routeIs('sensor-samples.store') ? 65536 : 16384)) {
             throw new ApiProblem(413, 'payload_too_large', 'La petición excede el límite permitido.');
         }

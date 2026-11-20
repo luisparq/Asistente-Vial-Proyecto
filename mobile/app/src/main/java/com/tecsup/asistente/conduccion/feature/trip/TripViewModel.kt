@@ -1,5 +1,6 @@
 package com.tecsup.asistente.conduccion.feature.trip
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tecsup.asistente.conduccion.core.ui.LoadState
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -28,7 +30,10 @@ data class TripActionState(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class TripViewModel @Inject constructor(private val repository: TripRepository) : ViewModel() {
+class TripViewModel @Inject constructor(
+    private val repository: TripRepository,
+    private val savedState: SavedStateHandle = SavedStateHandle(),
+) : ViewModel() {
     val trip = repository.observeActiveTrip()
         .flatMapLatest { active ->
             active?.let { repository.observeTrip(it.id) } ?: flowOf(null)
@@ -42,8 +47,16 @@ class TripViewModel @Inject constructor(private val repository: TripRepository) 
     private val _action = MutableStateFlow(TripActionState())
     val action = _action.asStateFlow()
 
-    private val _maneuverAlertId = MutableStateFlow<String?>(null)
-    val maneuverAlertId = _maneuverAlertId.asStateFlow()
+    private val dismissedAlert = savedState.getStateFlow<String?>("dismissed_maneuver_alert", null)
+    val maneuverAlertId = repository.observeActiveTrip().flatMapLatest { active ->
+        if (active == null) flowOf(null) else repository.observeConfirmedManeuverAlert(active.id)
+    }.combine(dismissedAlert) { confirmed, dismissed ->
+        confirmed?.takeUnless { it == dismissed }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun dismissAlert(id: String) {
+        if (maneuverAlertId.value == id) savedState["dismissed_maneuver_alert"] = id
+    }
 
     fun finish() = perform(openHistory = true) { id -> repository.finishTrip(id) }
 

@@ -12,7 +12,7 @@
                 <div class="fleet-notification-heading">
                     <a href="{{ route('dashboard.trip', ['uuid' => $event->trip->client_trip_id, 'from_view' => 'summary'] + request()->only('from', 'to', 'notice_driver', 'notice_vehicle')) }}">{{ $display::type($event->type) }}</a>
                     @if($event->origin === 'SIMULATED')
-                        <span class="badge simulated">Dato de prueba</span>
+                        <span class="badge simulated">Demostración · Dato de prueba</span>
                     @endif
                 </div>
                 <small>{{ $event->trip->vehicle?->plate ?? 'Vehículo sin asignar' }} · {{ $event->trip->driver?->full_name ?? 'Conductor sin asignar' }}</small>

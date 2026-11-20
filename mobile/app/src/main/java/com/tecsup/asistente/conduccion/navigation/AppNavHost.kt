@@ -1,9 +1,17 @@
 package com.tecsup.asistente.conduccion.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import com.tecsup.asistente.conduccion.feature.trip.TripVoice
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -41,15 +49,22 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
     val entry by navController.currentBackStackEntryAsState()
     val name = if (session != null) (profile as? ProfileState.Ready)?.profile?.name else null
     val demo = session == null && entry?.destination?.route !in listOf(null, "splash", "login", "activation", "welcome")
+    var welcomeRequested by remember { mutableStateOf(false) }
     LaunchedEffect(accessState.destination) {
         accessState.destination?.let { destination ->
+            welcomeRequested = false
             navController.navigate(destination) {
-                popUpTo(AppRoute.Login.path) { inclusive = true }
+                popUpTo(navController.graph.id) { inclusive = false }
                 launchSingleTop = true
             }
             access.navigationHandled()
         }
     }
+    TripVoice(
+        welcomeRequested, null,
+        greeting = "Hola, soy avigem, tu asistente vial inteligente.",
+        prepare = entry?.destination?.route == AppRoute.Welcome.path,
+    )
     val onBack: () -> Unit = { navController.popBackStack() }
     val mainNav = MainNav(entry?.destination?.route) { route ->
         navController.navigate(route) {
@@ -58,7 +73,11 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         }
     }
     CompositionLocalProvider(LocalDemoMode provides demo, LocalMainNav provides mainNav) {
-    NavHost(navController = navController, startDestination = AppRoute.Splash.path) {
+    val reducedMotion = com.tecsup.asistente.conduccion.core.ui.rememberReducedMotion()
+    NavHost(navController = navController, startDestination = AppRoute.Splash.path,
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+    ) {
         composable(AppRoute.Splash.path) {
             SplashScreen(onReady = {
                 navController.navigate(AppRoute.Login.path) {
@@ -79,13 +98,16 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable(AppRoute.Welcome.path) {
             WelcomeScreen(name) {
+                welcomeRequested = true
                 navController.navigate(AppRoute.Home.path) {
                     popUpTo(AppRoute.Welcome.path) { inclusive = true }
                     launchSingleTop = true
                 }
             }
         }
-        composable(AppRoute.Home.path) {
+        composable(AppRoute.Home.path, enterTransition = {
+            fadeIn(tween(if (reducedMotion) 0 else 180))
+        }) {
             HomeScreen(
                 onTrip = { startedNew ->
                     navController.navigate(tripRoute(startedNew)) { launchSingleTop = true }
@@ -117,7 +139,15 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable(AppRoute.Ble.path) { BleScreen(onBack, onDiagnostic = { navController.open(AppRoute.Diagnostic) }) }
         composable(AppRoute.Profile.path) {
-            com.tecsup.asistente.conduccion.feature.profile.ProfileScreen(onBack, onSettings = { navController.open(AppRoute.Settings) })
+            com.tecsup.asistente.conduccion.feature.profile.ProfileScreen(
+                onBack, onSettings = { navController.open(AppRoute.Settings) },
+                onDemonstration = if (session?.token != null) ({ navController.navigate("demonstration") }) else null,
+                onLogout = if (session != null) access::logout else null,
+                accessMessage = accessState.message,
+            )
+        }
+        composable("demonstration") {
+            if (session != null) com.tecsup.asistente.conduccion.feature.diagnostic.DemonstrationScreen(onBack)
         }
         composable(AppRoute.Map.path) {
             com.tecsup.asistente.conduccion.feature.map.DriverMapScreen(onBack, onDevice = { navController.open(AppRoute.Ble) })

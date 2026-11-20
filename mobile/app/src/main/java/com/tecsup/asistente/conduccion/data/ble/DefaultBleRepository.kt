@@ -31,7 +31,18 @@ class DefaultBleRepository @Inject constructor(
     override val buzzerDone = connector.buzzerDone
     override fun triggerBuzzer(): Boolean = connector.triggerBuzzer()
     override val reconnection = reconnect?.state ?: com.tecsup.asistente.conduccion.domain.ble.noBleReconnect
-    override fun setForeground(value: Boolean) { reconnect?.foreground(value) }
+    private var activityForeground = false
+    private var tripMonitoring = false
+
+    override fun setForeground(value: Boolean) {
+        activityForeground = value
+        reconnect?.foreground(activityForeground || tripMonitoring)
+    }
+
+    override fun setTripMonitoring(value: Boolean) {
+        tripMonitoring = value
+        reconnect?.foreground(activityForeground || tripMonitoring)
+    }
     override fun enableReconnection() { reconnect?.enable() }
     override fun disconnectManual() { if (reconnect != null) reconnect.disconnect() else connector.clear() }
     private var session: ScanSession? = null

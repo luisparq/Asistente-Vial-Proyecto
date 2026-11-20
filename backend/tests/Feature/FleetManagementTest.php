@@ -391,6 +391,33 @@ class FleetManagementTest extends TestCase
         $this->withToken($this->token($a))->getJson('/api/v1/me/driver')->assertForbidden();
     }
 
+    public function test_driver_can_update_own_contact_details_and_private_profile_photo(): void
+    {
+        Storage::fake('driver_documents');
+        $admin = $this->admin();
+        $driver = $this->driver($admin);
+        $other = $this->driver($admin);
+        $photo = UploadedFile::fake()->image('profile.png', 32, 32);
+        $this->withToken($this->token($driver->user));
+        $this->post('/api/v1/me/driver', [
+            'phone' => '987654321', 'address' => 'Arequipa', 'photo' => $photo,
+            'driver_id' => $other->id, 'status' => 'DISABLED',
+        ], ['Content-Type' => 'multipart/form-data; boundary=test'])->assertNoContent();
+
+        $driver->refresh();
+        Storage::disk('driver_documents')->assertExists($driver->photo_path);
+        $this->assertNull($other->fresh()->photo_path);
+        $this->assertSame('ACTIVE', $driver->status);
+        $this->getJson('/api/v1/me/driver')->assertOk()->assertJsonPath('data.phone', '987654321')
+            ->assertJsonPath('data.address', 'Arequipa')->assertJsonPath('data.has_photo', true)
+            ->assertDontSee($driver->photo_path);
+        $this->get('/api/v1/me/driver/photo')->assertOk()->assertHeader('Content-Type', 'image/png');
+        $this->post('/api/v1/me/driver', [
+            'photo' => UploadedFile::fake()->create('invalid.pdf', 4, 'application/pdf'),
+        ], ['Content-Type' => 'multipart/form-data; boundary=test'])->assertUnprocessable();
+        $this->assertSame($driver->photo_path, $driver->fresh()->photo_path);
+    }
+
     public function test_profile_company_foreign_key_prevents_cross_company_user(): void
     {
         $a = $this->admin();

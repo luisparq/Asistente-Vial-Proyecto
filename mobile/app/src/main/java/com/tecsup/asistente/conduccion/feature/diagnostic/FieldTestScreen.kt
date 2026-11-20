@@ -162,7 +162,7 @@ fun SensorRelayContent(
     onBack: () -> Unit
 ) {
     ScreenLayout(
-        "Enviar muestras a administrador",
+        "Envío de muestras",
         "El ESP32 conserva su calibración y detecta las maniobras. La calibración se administra desde Vialigent.",
         onBack
     ) {

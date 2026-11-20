@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
@@ -33,7 +34,9 @@ private val EaseOut = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
 
 /** Solo presentación: el buzzer y la voz siguen controlados por DiagnosticScreen y su ViewModel. */
 @Composable
-fun DemoAlertOverlay(title: String, observed: String, threshold: String, onDismiss: () -> Unit) {
+fun DemoAlertOverlay(title: String, observed: String, threshold: String, onDismiss: () -> Unit,
+    message: String = "", demonstration: Boolean = true,
+) {
     val reducedMotion = rememberReducedMotion()
     val entrance = remember { Animatable(if (reducedMotion) 1f else 0f) }
     val ring = remember { Animatable(if (reducedMotion) 1f else 0f) }
@@ -43,7 +46,7 @@ fun DemoAlertOverlay(title: String, observed: String, threshold: String, onDismi
         ring.animateTo(1f, tween(520, easing = EaseOut))
     }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize().background(AvigemColors.Volcanic)) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF800F22))) {
             Column(
                 Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 40.dp)
                     .graphicsLayer {
@@ -69,15 +72,16 @@ fun DemoAlertOverlay(title: String, observed: String, threshold: String, onDismi
                     }
                 }
                 Spacer(Modifier.height(28.dp))
-                Text("PRUEBA DEMOSTRATIVA · TEST_ONLY", style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = AvigemColors.Mineral400)
+                Text(if (demonstration) "Demostración" else "Alerta de conducción", style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = AvigemColors.Mineral400)
                 Spacer(Modifier.height(10.dp))
                 Text(title, style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center, color = AvigemColors.Sillar100)
                 Spacer(Modifier.height(16.dp))
-                Text(observed, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, color = AvigemColors.Sillar100)
+                if (message.isNotBlank()) Text(message, textAlign = TextAlign.Center, color = AvigemColors.Sillar100)
+                if (observed.isNotBlank()) Text(observed, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, color = AvigemColors.Sillar100)
                 Spacer(Modifier.height(4.dp))
-                Text("Umbral: $threshold", style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, color = AvigemColors.Sillar200)
+                if (threshold.isNotBlank()) Text("Umbral: $threshold", style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, color = AvigemColors.Sillar200)
                 Spacer(Modifier.weight(1f))
-                Surface(color = AvigemColors.Graphite, shape = MaterialTheme.shapes.small) {
+                if (demonstration && threshold.isNotBlank()) Surface(color = AvigemColors.Graphite, shape = MaterialTheme.shapes.small) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Prueba demostrativa · Umbral TEST_ONLY", style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = AvigemColors.Citrine300)
                         Text("No representa una maniobra vehicular validada", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, color = AvigemColors.Sillar200)

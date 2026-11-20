@@ -161,7 +161,7 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
         val visibleLab = if (state.connection.status == ConnectionStatus.CONNECTED && state.sensorStatus == SensorDataStatus.RECEIVING)
             laboratory else laboratory.copy(history = emptyList(), observing = false, corrected = false)
         ImuLaboratoryContent(visibleLab, calibration, onSynthetic, onObserve, onStopObservation, demo.triggerTimestampMillis)
-        if (demo.alertVisible) DemoAlertOverlay(demo.alertTitle, demo.alertObserved, demo.alertThreshold, onDismissDemoAlert)
+        DemonstrationAlert(demo, onDismissDemoAlert, technicalDetails = true)
         PresentationSection("Calibración experimental") {
         Text("Solo desarrollo y mantenimiento. Mantén la IMU inmóvil durante 30 segundos. La inmovilidad no se comprueba automáticamente.")
         Text("Promedios y offsets estimados experimentales: no se aplican ni se guardan permanentemente. WHO_AM_I = 0x75; identidad no confirmada.")

@@ -47,6 +47,7 @@ data class RoadCatalog(
     val traffic: List<RoadTraffic> = emptyList(),
     val osmAvailable: Boolean = true,
     val trafficAvailable: Boolean = false,
+    val osmStale: Boolean = false,
 ) {
     fun validated() = copy(
         zones = zones.filter { it.id.isNotBlank() && it.name.isNotBlank() && it.point.valid() && it.radiusM in 20..500 }
@@ -67,8 +68,10 @@ data class RoadCatalog(
             put("zone:${it.id}", "Atención, ${it.name}")
         }
 
-        val limits = speedSections.filter { it.distanceTo(position) <= 16 }.map { it.kmh }.distinct()
-        limits.singleOrNull()?.let { put("speed:$it", "Límite de velocidad en esta vía: $it kilómetros por hora") }
+        if (!osmStale) {
+            val limits = speedSections.filter { it.distanceTo(position) <= 16 }.map { it.kmh }.distinct()
+            limits.singleOrNull()?.let { put("speed:$it", "Límite de velocidad en esta vía: $it kilómetros por hora") }
+        }
 
         if (previous != null) {
             val (dx, dy) = position.offsetFrom(previous)

@@ -31,7 +31,7 @@
         @endif
         <label>Número de celular (opcional)<input name="phone" type="tel" maxlength="40" autocomplete="tel" value="{{ old('phone', $driver?->phone) }}"></label>
         <label>Dirección (opcional)<input name="address" maxlength="255" autocomplete="street-address" value="{{ old('address', $driver?->address) }}"></label>
-        <label>Foto de perfil o tamaño carnet (opcional)<input type="file" name="photo" accept=".jpg,.jpeg,.png"><small>JPG o PNG · hasta 2 MiB</small></label>
+        <label>Adjuntar foto de perfil (opcional)<input type="file" name="photo" accept=".jpg,.jpeg,.png"><small>JPG o PNG · hasta 2 MiB</small></label>
     </fieldset>
     <fieldset>
         <legend>Contacto de emergencia (opcional)</legend>
