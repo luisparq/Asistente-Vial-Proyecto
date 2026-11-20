@@ -23,9 +23,9 @@ class ManeuverDemoTrackerTest {
     fun eachPatternNeedsTwoConsecutiveSamplesStrictlyAboveItsThreshold() {
         data class Case(val ax: Double, val gz: Double, val type: DrivingEventType, val observed: Double)
         listOf(
-            Case(0.0, -46.0, DrivingEventType.SHARP_TURN, 46.0),
-            Case(0.3, 0.0, DrivingEventType.HARSH_ACCELERATION, 0.3),
-            Case(-0.3, 0.0, DrivingEventType.HARSH_BRAKING, -0.3),
+            Case(0.0, -75.0, DrivingEventType.SHARP_TURN, 75.0),
+            Case(0.5, 0.0, DrivingEventType.HARSH_ACCELERATION, 0.5),
+            Case(-0.5, 0.0, DrivingEventType.HARSH_BRAKING, -0.5),
         ).forEach { case ->
             tracker.reset()
             rest()
@@ -39,9 +39,9 @@ class ManeuverDemoTrackerTest {
     @Test
     fun exactThresholdValuesDoNotAlert() {
         rest()
-        repeat(4) { assertNull(feed(gz = 45.0).detection) }
-        repeat(4) { assertNull(feed(ax = 0.25).detection) }
-        repeat(4) { assertNull(feed(ax = -0.25).detection) }
+        repeat(4) { assertNull(feed(gz = 70.0).detection) }
+        repeat(4) { assertNull(feed(ax = 0.40).detection) }
+        repeat(4) { assertNull(feed(ax = -0.40).detection) }
     }
 
     @Test
@@ -50,8 +50,8 @@ class ManeuverDemoTrackerTest {
         assertEquals(0.2, feed(ax = 0.3).axCorrectedG!!, 1e-9)
         assertNull(feed(ax = 0.3).detection) // +0.20 g corregido sigue bajo el umbral.
         feed(ax = 0.1)
-        feed(ax = 0.4)
-        assertEquals(DrivingEventType.HARSH_ACCELERATION, feed(ax = 0.4).detection?.type)
+        feed(ax = 0.6)
+        assertEquals(DrivingEventType.HARSH_ACCELERATION, feed(ax = 0.6).detection?.type)
     }
 
     @Test
@@ -67,60 +67,60 @@ class ManeuverDemoTrackerTest {
     @Test
     fun aSampleBelowThresholdBreaksTheConsecutiveCount() {
         rest()
-        assertEquals(1, feed(gz = 50.0).consecutiveSamples)
+        assertEquals(1, feed(gz = 75.0).consecutiveSamples)
         assertEquals(0, feed(gz = 10.0).consecutiveSamples)
-        assertNull(feed(gz = 50.0).detection)
-        assertNotNull(feed(gz = 50.0).detection)
+        assertNull(feed(gz = 75.0).detection)
+        assertNotNull(feed(gz = 75.0).detection)
     }
 
     @Test
     fun aLostSampleBreaksTheConsecutiveCount() {
         rest()
-        assertNull(feed(gz = 50.0, stepMillis = 500).detection) // Falta la muestra intermedia.
-        assertNull(feed(gz = 50.0).detection)
-        assertNotNull(feed(gz = 50.0).detection)
+        assertNull(feed(gz = 75.0, stepMillis = 500).detection) // Falta la muestra intermedia.
+        assertNull(feed(gz = 75.0).detection)
+        assertNotNull(feed(gz = 75.0).detection)
     }
 
     @Test
     fun cooldownIsThreeSecondsAndSharedBetweenPatterns() {
         rest()
-        feed(gz = 50.0)
-        val first = feed(gz = 50.0)
+        feed(gz = 75.0)
+        val first = feed(gz = 75.0)
         assertNotNull(first.detection)
         assertEquals(ManeuverDemoTestOnly.COOLDOWN_TEST_ONLY_MILLIS, first.cooldownRemainingMillis)
         feed() // Libera el giro.
-        assertNull(feed(ax = 0.4).detection) // Otro patrón dentro del cooldown.
-        assertNull(feed(ax = 0.4).detection)
+        assertNull(feed(ax = 0.6).detection) // Otro patrón dentro del cooldown.
+        assertNull(feed(ax = 0.6).detection)
         feed()
         while (feed().cooldownRemainingMillis > 0) Unit
-        feed(gz = 50.0)
-        assertNotNull(feed(gz = 50.0).detection)
+        feed(gz = 75.0)
+        assertNotNull(feed(gz = 75.0).detection)
     }
 
     @Test
     fun aSustainedMovementAlertsOnlyOnceUntilItIsReleased() {
         rest()
-        feed(gz = 50.0)
-        assertNotNull(feed(gz = 50.0).detection)
-        repeat(20) { assertNull(feed(gz = 50.0).detection) }
+        feed(gz = 75.0)
+        assertNotNull(feed(gz = 75.0).detection)
+        repeat(20) { assertNull(feed(gz = 75.0).detection) }
     }
 
     @Test
     fun noAlertStartsWhileBlockedByPendingConfirmationOrOpenAlert() {
         rest()
-        feed(gz = 50.0, blocked = true)
-        assertNull(feed(gz = 50.0, blocked = true).detection)
+        feed(gz = 75.0, blocked = true)
+        assertNull(feed(gz = 75.0, blocked = true).detection)
         assertEquals(0L, feed(blocked = true).cooldownRemainingMillis)
     }
 
     @Test
     fun resetClearsCountersCooldownAndRestReference() {
         rest()
-        feed(gz = 50.0)
+        feed(gz = 75.0)
         tracker.reset()
-        assertFalse(feed(gz = 50.0).restReady)
+        assertFalse(feed(gz = 75.0).restReady)
         rest()
-        assertNull(feed(gz = 50.0).detection) // La muestra previa a reset no cuenta.
-        assertNotNull(feed(gz = 50.0).detection)
+        assertNull(feed(gz = 75.0).detection) // La muestra previa a reset no cuenta.
+        assertNotNull(feed(gz = 75.0).detection)
     }
 }

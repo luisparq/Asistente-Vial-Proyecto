@@ -8,11 +8,11 @@ import kotlin.math.abs
  * No representan maniobras peligrosas reales ni generan eventos SENSOR.
  */
 object ManeuverDemoTestOnly {
-    /** 5895 cuentas a 131 LSB/(°/s). */
-    const val TURN_THRESHOLD_TEST_ONLY_DPS = 45.0
-    /** 4096 cuentas a 16384 LSB/g. */
-    const val ACCELERATION_THRESHOLD_TEST_ONLY_G = 0.25
-    const val BRAKING_THRESHOLD_TEST_ONLY_G = -0.25
+    /** 9170 cuentas a 131 LSB/(°/s). */
+    const val TURN_THRESHOLD_TEST_ONLY_DPS = 70.0
+    /** 6554 cuentas aprox. a 16384 LSB/g. */
+    const val ACCELERATION_THRESHOLD_TEST_ONLY_G = 0.40
+    const val BRAKING_THRESHOLD_TEST_ONLY_G = -0.40
     const val CONSECUTIVE_SAMPLES_TEST_ONLY = 2
     const val COOLDOWN_TEST_ONLY_MILLIS = 3_000L
     /** A 4 Hz, 450 ms descarta dos muestras separadas por una muestra perdida. */
