@@ -9,6 +9,7 @@ enum class AppRoute(val path: String) {
     Trip("trip"),
     Ble("ble"),
     Diagnostic("diagnostic"),
+    DetectorLaboratory("detector-laboratory"),
     History("history"),
     TripDetail("history/{tripId}"),
     Settings("settings"),

@@ -28,6 +28,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tecsup.asistente.conduccion.feature.ble.BleScreen
+import com.tecsup.asistente.conduccion.feature.diagnostic.DetectorLaboratoryScreen
 import com.tecsup.asistente.conduccion.feature.diagnostic.DiagnosticScreen
 import com.tecsup.asistente.conduccion.feature.history.HistoryScreen
 import com.tecsup.asistente.conduccion.feature.history.TripDetailScreen
@@ -137,7 +138,13 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 connection = connection,
             )
         }
-        composable(AppRoute.Ble.path) { BleScreen(onBack, onDiagnostic = { navController.open(AppRoute.Diagnostic) }) }
+        composable(AppRoute.Ble.path) {
+            BleScreen(
+                onBack,
+                onDiagnostic = { navController.open(AppRoute.Diagnostic) },
+                onLaboratory = { navController.open(AppRoute.DetectorLaboratory) },
+            )
+        }
         composable(AppRoute.Profile.path) {
             com.tecsup.asistente.conduccion.feature.profile.ProfileScreen(
                 onBack, onSettings = { navController.open(AppRoute.Settings) },
@@ -153,6 +160,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             com.tecsup.asistente.conduccion.feature.map.DriverMapScreen(onBack, onDevice = { navController.open(AppRoute.Ble) })
         }
         composable(AppRoute.Diagnostic.path) { DiagnosticScreen(onBack) }
+        composable(AppRoute.DetectorLaboratory.path) { DetectorLaboratoryScreen(onBack) }
         composable(AppRoute.History.path) {
             HistoryScreen(onBack, onTripSelected = { id -> navController.navigate("history/$id") },
                 excludedTripIds = if (session == null) emptySet() else demoTripIds)

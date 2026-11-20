@@ -47,6 +47,7 @@ fun BleContent(
     onDiagnostic: () -> Unit = {},
     onDisconnect: () -> Unit = {},
     onReconnect: () -> Unit = {},
+    onLaboratory: () -> Unit = {},
 ) {
     ScreenLayout(stringResource(R.string.ble_title), stringResource(R.string.ble_description),
         onBack, scrollable = false) {
@@ -73,6 +74,9 @@ fun BleContent(
                     Text(if (state.reconnection.enabled) "Reconexión automática habilitada para esta cuenta." else "Reconexión automática suspendida.")
                     state.connection.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Text(stringResource(R.string.ble_not_verified))
+                    OutlinedButton(onClick = onLaboratory, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.detector_lab_title))
+                    }
                 }
             }
             item {

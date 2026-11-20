@@ -11,7 +11,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -28,6 +27,42 @@ import java.util.Locale
 import com.tecsup.asistente.conduccion.domain.processing.isStableForLab
 import com.tecsup.asistente.conduccion.core.ui.labelResource
 import com.tecsup.asistente.conduccion.core.ui.tone
+
+@Composable
+fun DetectorLaboratoryScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hiltViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val calibration by viewModel.calibration.collectAsStateWithLifecycle()
+    val laboratory by viewModel.laboratory.collectAsStateWithLifecycle()
+    val demo by viewModel.demo.collectAsStateWithLifecycle()
+
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.startCharts() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        viewModel.cancelIfMeasuring()
+        viewModel.stopCharts()
+    }
+    DisposableEffect(viewModel) {
+        onDispose {
+            viewModel.cancelIfMeasuring()
+            viewModel.stopCharts()
+        }
+    }
+
+    DiagnosticContent(
+        state = state,
+        onBack = onBack,
+        calibration = calibration,
+        onStartMeasurement = viewModel::startMeasurement,
+        onCancelMeasurement = viewModel::cancelMeasurement,
+        laboratory = laboratory,
+        onSynthetic = viewModel::runSynthetic,
+        onObserve = viewModel::observeBle,
+        onStopObservation = viewModel::stopObservation,
+        demo = demo,
+        onStartDemoTest = { viewModel.startDemoTest() },
+        onStopDemoTest = { viewModel.stopDemoTest() },
+        onDismissDemoAlert = viewModel::dismissDemoAlert,
+    )
+}
 
 /** Observaciones en memoria de la prueba demostrativa; no son eventos oficiales. */
 @Composable
@@ -58,7 +93,7 @@ fun DiagnosticContent(state: DiagnosticUiState, onBack: () -> Unit,
     onStopObservation: () -> Unit = {},
     demo: DemoTestUiState = DemoTestUiState(),
     onStartDemoTest: () -> Unit = {}, onStopDemoTest: () -> Unit = {}, onDismissDemoAlert: () -> Unit = {}) {
-    ScreenLayout(stringResource(R.string.diagnostic_title), stringResource(R.string.diagnostic_description), onBack) {
+    ScreenLayout(stringResource(R.string.detector_lab_title), stringResource(R.string.diagnostic_description), onBack) {
         PresentationSection("Conexión del dispositivo") {
         StatusBadge(stringResource(state.connection.status.labelResource()), state.connection.status.tone())
         state.connection.device?.let {
