@@ -28,8 +28,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tecsup.asistente.conduccion.feature.ble.BleScreen
-import com.tecsup.asistente.conduccion.feature.diagnostic.DetectorLaboratoryScreen
 import com.tecsup.asistente.conduccion.feature.diagnostic.DiagnosticScreen
+import com.tecsup.asistente.conduccion.feature.diagnostic.VehicleLabScreen
 import com.tecsup.asistente.conduccion.feature.history.HistoryScreen
 import com.tecsup.asistente.conduccion.feature.history.TripDetailScreen
 import com.tecsup.asistente.conduccion.feature.home.HomeScreen
@@ -160,7 +160,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             com.tecsup.asistente.conduccion.feature.map.DriverMapScreen(onBack, onDevice = { navController.open(AppRoute.Ble) })
         }
         composable(AppRoute.Diagnostic.path) { DiagnosticScreen(onBack) }
-        composable(AppRoute.DetectorLaboratory.path) { DetectorLaboratoryScreen(onBack) }
+        composable(AppRoute.DetectorLaboratory.path) { VehicleLabScreen(onBack) }
         composable(AppRoute.History.path) {
             HistoryScreen(onBack, onTripSelected = { id -> navController.navigate("history/$id") },
                 excludedTripIds = if (session == null) emptySet() else demoTripIds)

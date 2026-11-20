@@ -113,5 +113,5 @@
     <string name="profile_rejected">Rechazado</string>
     <string name="profile_unknown">No disponible</string>
     <string name="diagnostic_raw_notice">Cuentas crudas int16, sin unidades convertidas, calibración ni detección de maniobras. No se guardan como eventos SENSOR ni se envían a Laravel.</string>
-    <string name="detector_lab_title">Laboratorio del detector</string>
+    <string name="detector_lab_title">Prueba del sensor</string>
 </resources>

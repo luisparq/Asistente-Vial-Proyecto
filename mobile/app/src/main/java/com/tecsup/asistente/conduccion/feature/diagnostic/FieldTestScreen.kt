@@ -24,8 +24,8 @@ import java.util.Locale
 import com.tecsup.asistente.conduccion.domain.processing.*
 
 @Composable
-fun ArchivedVehicleLabScreen(onBack: () -> Unit, viewModel: FieldTestViewModel = hiltViewModel()) {
-    if (!BuildConfig.DEBUG) { ScreenLayout("AVIGEM One", "Herramienta disponible en la versiÃ³n de pruebas.", onBack); return }
+fun VehicleLabScreen(onBack: () -> Unit, viewModel: FieldTestViewModel = hiltViewModel()) {
+    if (!BuildConfig.DEBUG) { ScreenLayout("AVIGEM One", "Herramienta disponible en la versión de pruebas.", onBack); return }
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val lab by viewModel.lab.collectAsStateWithLifecycle()
     val connection by viewModel.connection.collectAsStateWithLifecycle()
@@ -59,44 +59,44 @@ fun VehicleLabContent(state: FieldRecordingState, lab: VehicleLabState, receivin
     val idle = state.phase == FieldPhase.IDLE && lab.learning == null && !lab.testing
     val restReady = state.reference != null
     fun number(v: Double) = String.format(Locale.ROOT, "%.3f", v)
-    ScreenLayout("CalibraciÃ³n y prueba", "Conecta â†’ calibra â†’ enseÃ±a maniobras normales â†’ prueba el buzzer", onBack) {
-        Text(if (receiving) "Sensor conectado Â· recibiendo lecturas" else "Conecta AVIGEM One desde Dispositivo.")
-        Text(if (gps.status == GpsStatus.VALID) "GPS con ubicaciÃ³n" else "GPS sin ubicaciÃ³n Â· la calibraciÃ³n del MPU sigue disponible", style = MaterialTheme.typography.bodySmall)
-        PresentationSection("GrÃ¡ficas en vivo") {
-            if (lab.history.isEmpty()) Text("Esperando lecturas del acelerÃ³metro y giroscopioâ€¦")
+    ScreenLayout("Calibración y prueba", "Conecta → calibra → enseña maniobras normales → prueba el buzzer", onBack) {
+        Text(if (receiving) "Sensor conectado · recibiendo lecturas" else "Conecta AVIGEM One desde Dispositivo.")
+        Text(if (gps.status == GpsStatus.VALID) "GPS con ubicación" else "GPS sin ubicación · la calibración del MPU sigue disponible", style = MaterialTheme.typography.bodySmall)
+        PresentationSection("Gráficas en vivo") {
+            if (lab.history.isEmpty()) Text("Esperando lecturas del acelerómetro y giroscopio…")
             else {
-                Text("X azul Â· Y verde Â· Z naranja")
+                Text("X azul · Y verde · Z naranja")
                 SignalChart(lab.history, false, null)
                 SignalChart(lab.history, true, state.reference?.estimatedGyroOffsetsDps)
-                if (state.reference != null) Text("Giroscopio: la lÃ­nea discontinua muestra la correcciÃ³n del reposo.", style = MaterialTheme.typography.bodySmall)
+                if (state.reference != null) Text("Giroscopio: la línea discontinua muestra la corrección del reposo.", style = MaterialTheme.typography.bodySmall)
                 val duration = lab.history.last().receivedAtMillis - lab.history.first().receivedAtMillis
                 val hz = if (duration > 0) (lab.history.size - 1) * 1000.0 / duration else 0.0
-                Text(String.format(Locale.ROOT, "RecepciÃ³n: %.1f muestras/s", hz), style = MaterialTheme.typography.bodySmall)
+                Text(String.format(Locale.ROOT, "Recepción: %.1f muestras/s", hz), style = MaterialTheme.typography.bodySmall)
             }
         }
         PresentationSection("1. Calibrar en reposo") {
-            Text("Fija el sensor al carro. Con el carro detenido y el motor apagado, pulsa el botÃ³n y dÃ©jalo quieto 30 segundos. No tienes que escribir nada.")
+            Text("Fija el sensor al carro. Con el carro detenido y el motor apagado, pulsa el botón y déjalo quieto 30 segundos. No tienes que escribir nada.")
             if (state.phase == FieldPhase.REST) {
-                Text("${(30 - state.elapsedMillis/1000).coerceAtLeast(0)} s restantes Â· ${state.samples} muestras")
-                OutlinedButton(onClick = onCancelRest) { Text("Cancelar calibraciÃ³n") }
+                Text("${(30 - state.elapsedMillis/1000).coerceAtLeast(0)} s restantes · ${state.samples} muestras")
+                OutlinedButton(onClick = onCancelRest) { Text("Cancelar calibración") }
             } else {
                 Text(if (restReady) "Reposo calibrado" else if (lab.hasSavedProfile) "Perfil guardado: verifica el reposo antes de usarlo" else "Pendiente de calibrar")
                 Button(onClick = onRest, enabled = receiving && idle) { Text(if (restReady) "Recalibrar reposo" else "Calibrar reposo") }
             }
             Text(if (state.phase == FieldPhase.REST || !restReady) state.message else lab.message)
-            Text("Si cambias de carro, lugar u orientaciÃ³n del sensor, vuelve a calibrar y enseÃ±ar las maniobras.", style = MaterialTheme.typography.bodySmall)
+            Text("Si cambias de carro, lugar u orientación del sensor, vuelve a calibrar y enseñar las maniobras.", style = MaterialTheme.typography.bodySmall)
         }
         PresentationSection("2. Aprender lo normal") {
-            Text("El acompaÃ±ante inicia cada mediciÃ³n cuando sea posible hacerla con normalidad. Repite varias veces; no hagas maniobras bruscas para calibrar.")
+            Text("El acompañante inicia cada medición cuando sea posible hacerla con normalidad. Repite varias veces; no hagas maniobras bruscas para calibrar.")
             if (lab.learning != null) {
-                Text("Midiendo: ${lab.learning.title} Â· ${lab.learningSeconds} s Â· ${lab.learningSamples} muestras")
+                Text("Midiendo: ${lab.learning.title} · ${lab.learningSeconds} s · ${lab.learningSamples} muestras")
                 Text(when (lab.learning) {
-                    NormalManeuver.ACCELERATION -> "Acelera suavemente en lÃ­nea recta. En esta mediciÃ³n evita frenar o girar: asÃ­ se aprende el sentido de avance."
-                    NormalManeuver.BRAKING -> "Reduce la velocidad y frena suavemente en lÃ­nea recta."
+                    NormalManeuver.ACCELERATION -> "Acelera suavemente en línea recta. En esta medición evita frenar o girar: así se aprende el sentido de avance."
+                    NormalManeuver.BRAKING -> "Reduce la velocidad y frena suavemente en línea recta."
                     NormalManeuver.TURN -> "Realiza giros normales en ambos sentidos, cuando el recorrido lo permita."
                 })
-                Button(onClick = onFinishLearning) { Text("Terminar esta mediciÃ³n") }
-                Text("Se detiene como mÃ¡ximo a los 60 segundos. Si faltan muestras, te pedirÃ¡ repetir.", style = MaterialTheme.typography.bodySmall)
+                Button(onClick = onFinishLearning) { Text("Terminar esta medición") }
+                Text("Se detiene como máximo a los 60 segundos. Si faltan muestras, te pedirá repetir.", style = MaterialTheme.typography.bodySmall)
             } else {
                 NormalManeuver.entries.forEach { kind ->
                     OutlinedButton(onClick = { onLearn(kind) }, modifier = Modifier.fillMaxWidth(),
@@ -109,36 +109,36 @@ fun VehicleLabContent(state: FieldRecordingState, lab: VehicleLabState, receivin
         }
         PresentationSection("3. Detectar excesos y probar buzzer") {
             val profile = lab.profile
-            if (profile == null) Text("Completa reposo, aceleraciÃ³n, frenada y giros normales para calcular los lÃ­mites.")
+            if (profile == null) Text("Completa reposo, aceleración, frenada y giros normales para calcular los límites.")
             else {
-                Text("LÃ­mites calculados para este montaje:")
-                Text("AceleraciÃ³n: ${number(profile.accelerationLimitG)} g Â· Frenada: ${number(profile.brakingLimitG)} g Â· Giro: ${number(profile.turnLimitDps)} Â°/s")
-                lab.reading?.let { Text("Ahora: avance ${number(it.longitudinalG)} g Â· giro ${number(it.yawDps)} Â°/s") }
-                Text("Al superar un lÃ­mite de forma sostenida, el celular lo detecta y ordena sonar al ESP32. El perfil queda guardado en este telÃ©fono para ese dispositivo.")
+                Text("Límites calculados para este montaje:")
+                Text("Aceleración: ${number(profile.accelerationLimitG)} g · Frenada: ${number(profile.brakingLimitG)} g · Giro: ${number(profile.turnLimitDps)} °/s")
+                lab.reading?.let { Text("Ahora: avance ${number(it.longitudinalG)} g · giro ${number(it.yawDps)} °/s") }
+                Text("Al superar un límite de forma sostenida, el celular lo detecta y ordena sonar al ESP32. El perfil queda guardado en este teléfono para ese dispositivo.")
             }
             if (lab.testing) {
-                Text("DetecciÃ³n activa Â· ${state.samples} muestras guardadas Â· ${lab.detections.size} detecciones recientes")
+                Text("Detección activa · ${state.samples} muestras guardadas · ${lab.detections.size} detecciones recientes")
                 Button(onClick = onStopDetection, modifier = Modifier.fillMaxWidth()) { Text("Detener prueba y guardar") }
             } else Button(onClick = onStartDetection, enabled = receiving && idle && restReady && profile != null) { Text("Iniciar prueba con buzzer") }
             Text(lab.buzzer)
             OutlinedButton(onClick = onCheckBuzzer, enabled = receiving && idle) { Text("Comprobar buzzer") }
             lab.detections.takeLast(5).reversed().forEach { event ->
-                val unit = if (event.kind == NormalManeuver.TURN) "Â°/s" else "g"
-                Text("${when(event.kind) { NormalManeuver.ACCELERATION -> "AceleraciÃ³n"; NormalManeuver.BRAKING -> "Frenada"; NormalManeuver.TURN -> "Giro" }} sobre lÃ­mite: ${number(event.value)} $unit (lÃ­mite ${number(event.limit)})")
+                val unit = if (event.kind == NormalManeuver.TURN) "°/s" else "g"
+                Text("${when(event.kind) { NormalManeuver.ACCELERATION -> "Aceleración"; NormalManeuver.BRAKING -> "Frenada"; NormalManeuver.TURN -> "Giro" }} sobre límite: ${number(event.value)} $unit (límite ${number(event.limit)})")
             }
-            Text("MantÃ©n esta pantalla abierta. Una desconexiÃ³n detiene la prueba. Son lÃ­mites experimentales de lo aprendido; no certifican que una maniobra sea peligrosa.", style = MaterialTheme.typography.bodySmall)
+            Text("Mantén esta pantalla abierta. Una desconexión detiene la prueba. Son límites experimentales de lo aprendido; no certifican que una maniobra sea peligrosa.", style = MaterialTheme.typography.bodySmall)
         }
         TextButton(onClick = { details = !details }) { Text(if (details) "Ocultar datos y archivos" else "Ver datos y archivos guardados") }
         if (details) PresentationSection("Datos y resultados") {
             state.latest?.let { Text("RAW a: ${it.ax}, ${it.ay}, ${it.az}\nRAW g: ${it.gx}, ${it.gy}, ${it.gz}") }
-            Text("Las seÃ±ales se conservan en CSV durante reposo, aprendizaje y prueba. Guarda una copia para revisarla en Laravel.")
+            Text("Las señales se conservan en CSV durante reposo, aprendizaje y prueba. Guarda una copia para revisarla en Laravel.")
             if (idle) (if (allFiles) state.files else state.files.take(5)).forEach { file ->
                 OutlinedButton(onClick = { onExport(file) }) { Text("Exportar ${file.name}") }
             }
             if (state.files.size > 5 && idle) TextButton(onClick = { allFiles = !allFiles }) { Text(if (allFiles) "Ver recientes" else "Ver todos") }
-            Text("Margen inicial: 1.8 veces el percentil 95 normal, con mÃ­nimos de 0.12 g y 10 Â°/s y margen de ruido. Requiere 3 muestras y al menos 300 ms; pausa entre avisos de 3 s. Estos criterios son provisionales y requieren validaciÃ³n en el carro.")
-            Text("Se aprende el sentido de avance con la aceleraciÃ³n recta y el eje vertical con el reposo. Cambios de inclinaciÃ³n, pendientes o vibraciones pueden alterar la lectura. La resta de reposo no es una compensaciÃ³n completa de gravedad.")
-            Text("El firmware actual entrega aproximadamente 4 muestras/s: puede perder picos breves. La detecciÃ³n de esta prueba estÃ¡ en el celular; el ESP32 ejecuta la orden del buzzer por BLE.")
+            Text("Margen inicial: 1.8 veces el percentil 95 normal, con mínimos de 0.12 g y 10 °/s y margen de ruido. Requiere 3 muestras y al menos 300 ms; pausa entre avisos de 3 s. Estos criterios son provisionales y requieren validación en el carro.")
+            Text("Se aprende el sentido de avance con la aceleración recta y el eje vertical con el reposo. Cambios de inclinación, pendientes o vibraciones pueden alterar la lectura. La resta de reposo no es una compensación completa de gravedad.")
+            Text("La gráfica indica la frecuencia de recepción por Bluetooth. En esta prueba el celular calcula la detección y el ESP32 ejecuta la orden del buzzer.")
         }
     }
 }

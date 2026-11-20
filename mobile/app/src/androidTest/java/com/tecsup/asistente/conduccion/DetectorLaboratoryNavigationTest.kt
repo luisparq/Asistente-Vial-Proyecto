@@ -51,7 +51,11 @@ class DetectorLaboratoryNavigationTest {
         compose.onNodeWithText(bluetooth).performScrollTo().performClick()
         compose.onNodeWithTag("ble_list").performScrollToNode(hasText(laboratory))
         compose.onNodeWithText(laboratory).performClick()
-        compose.onNodeWithText("Laboratorio del detector · TEST_ONLY").assertExists()
+        compose.onNodeWithText("Calibración y prueba").assertIsDisplayed()
+        compose.onNodeWithText("Gráficas en vivo").assertExists()
+        compose.onNodeWithText("Calibrar reposo").assertExists()
+        compose.onNodeWithText("Comprobar buzzer").assertExists()
+        compose.onNodeWithText("Laboratorio del detector · TEST_ONLY").assertDoesNotExist()
 
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.back)).performClick()
         compose.onNodeWithTag("ble_list").performScrollToNode(hasText(relay))

@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.tecsup.asistente.conduccion.BuildConfig
 import com.tecsup.asistente.conduccion.R
 import com.tecsup.asistente.conduccion.core.ui.ScreenLayout
 import com.tecsup.asistente.conduccion.core.ui.PresentationSection
@@ -74,8 +75,10 @@ fun BleContent(
                     Text(if (state.reconnection.enabled) "Reconexión automática habilitada para esta cuenta." else "Reconexión automática suspendida.")
                     state.connection.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Text(stringResource(R.string.ble_not_verified))
-                    OutlinedButton(onClick = onLaboratory, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.detector_lab_title))
+                    if (BuildConfig.DEBUG) {
+                        OutlinedButton(onClick = onLaboratory, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.detector_lab_title))
+                        }
                     }
                 }
             }
