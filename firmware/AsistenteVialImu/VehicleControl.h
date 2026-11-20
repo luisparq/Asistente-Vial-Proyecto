@@ -3,6 +3,8 @@
 #include <Preferences.h>
 #include <math.h>
 #include <algorithm>
+#include <memory>
+#include <new>
 
 // Experimental onboard envelope learner. No phone/server is involved in detection.
 namespace VehicleControl {
@@ -36,8 +38,8 @@ bool hadSample=false,hadEvent=false,invalid=false,restReady=false,finishRequeste
 uint8_t candidate=0;
 uint16_t evidence=0,count=0;
 float means[6]={},m2[6]={};
-Vec vectors[1200];
-float values[1200];
+constexpr uint16_t MAX_LESSON_SAMPLES = 1200;
+std::unique_ptr<Vec[]> lessonVectors;
 float normalA=0,normalB=0,normalT=0;
 bool persist(){
   if(storageReady && prefs.putBytes("profile",&profile,sizeof(profile))==sizeof(profile))return true;
@@ -66,14 +68,21 @@ void begin(){
 void resetEvidence(){candidate=0;evidence=0;hadSample=false;}
 void command(const char *id,const char *op,uint32_t now){
   if(duplicateCommand(id))return;
-  if(strcmp(op,"disable")==0){stage=0;profile.enabled=false;range=4;event=0;resetEvidence();if(persist())status="DISABLED";return;}
+  if(strcmp(op,"disable")==0){stage=0;lessonVectors.reset();profile.enabled=false;range=4;event=0;resetEvidence();if(persist())status="DISABLED";return;}
   if(strcmp(op,"enable")==0){if(profile.ready){profile.enabled=true;resetEvidence();if(persist())status="ENABLED";}else status="NEEDS_CALIBRATION";return;}
   if(strcmp(op,"finish")==0){if(stage>1)finishRequested=true;return;}
   uint8_t next=strcmp(op,"rest")==0?1:strcmp(op,"acceleration")==0?2:strcmp(op,"braking")==0?3:strcmp(op,"turn")==0?4:0;
   if(!next){status="UNKNOWN_COMMAND";return;}
   if(stage){status="FINISH_CURRENT_LESSON";return;}
   if(next!=1 && (!restReady || (next>2 && !(lessons&1)))){status="NEEDS_REST_AND_FORWARD";return;}
-  profile.enabled=false;profile.ready=false;range=4;event=0;if(!persist())return;stage=next;started=now;count=0;finishRequested=false;invalid=false;resetEvidence();
+  std::unique_ptr<Vec[]> samples;
+  if(next>1){
+    samples.reset(new (std::nothrow) Vec[MAX_LESSON_SAMPLES]);
+    if(!samples){status="LESSON_MEMORY_UNAVAILABLE";return;}
+  }
+  profile.enabled=false;profile.ready=false;range=4;event=0;if(!persist())return;
+  lessonVectors=std::move(samples);
+  stage=next;started=now;count=0;finishRequested=false;invalid=false;resetEvidence();
   memset(means,0,sizeof(means));memset(m2,0,sizeof(m2));
   if(next==1){restReady=false;lessons=0;}
   if(next==2)lessons=0;
@@ -81,9 +90,14 @@ void command(const char *id,const char *op,uint32_t now){
   if(next==4)lessons&=~4;
   status="LEARNING";
 }
-float p95(uint16_t n){std::sort(values,values+n);return values[(uint16_t)ceilf((n-1)*0.95f)];}
+float p95(Vec *values,uint16_t n){
+  std::sort(values,values+n,[](const Vec &a,const Vec &b){return a.x<b.x;});
+  return values[(uint16_t)ceilf((n-1)*0.95f)].x;
+}
 void finish(){
   if(!stage)return;
+  auto samples=std::move(lessonVectors);
+  Vec *vectors=samples.get();
   uint8_t completed=stage;stage=0;resetEvidence();
   if(invalid || count<(completed==1?100:12)){status="INSUFFICIENT_OR_INTERRUPTED";return;}
   if(completed==1){
@@ -98,16 +112,16 @@ void finish(){
     for(int i=0;i<count;i++)if(norm(vectors[i])>0.03f){sum.x+=vectors[i].x;sum.y+=vectors[i].y;sum.z+=vectors[i].z;lengths+=norm(vectors[i]);}
     if(lengths==0 || norm(sum)/lengths<0.8f){status="REPEAT_STRAIGHT_ACCELERATION";return;}
     profile.forward=unit(sum);
-    for(int i=0;i<count;i++){float v=dot(vectors[i],profile.forward);if(v>0.03f)values[useful++]=v;}
-    if(useful>=8){normalA=p95(useful);lessons|=1;}
+    for(int i=0;i<count;i++){float v=dot(vectors[i],profile.forward);if(v>0.03f)vectors[useful++].x=v;}
+    if(useful>=8){normalA=p95(vectors,useful);lessons|=1;}
   }else if(completed==3){
-    for(int i=0;i<count;i++){float v=-dot(vectors[i],profile.forward);if(v>0.03f)values[useful++]=v;}
-    if(useful>=8){normalB=p95(useful);lessons|=2;}
+    for(int i=0;i<count;i++){float v=-dot(vectors[i],profile.forward);if(v>0.03f)vectors[useful++].x=v;}
+    if(useful>=8){normalB=p95(vectors,useful);lessons|=2;}
   }else{
     int positive=0,negative=0;
-    for(int i=0;i<count;i++){float v=vectors[i].x;if(v>2)positive++;if(v< -2)negative++;if(fabsf(v)>2)values[useful++]=fabsf(v);}
+    for(int i=0;i<count;i++){float v=vectors[i].x;if(v>2)positive++;if(v< -2)negative++;if(fabsf(v)>2)vectors[useful++].x=fabsf(v);}
     if(positive<4 || negative<4){status="NEEDS_LEFT_AND_RIGHT_TURNS";return;}
-    if(useful>=8){normalT=p95(useful);lessons|=4;}
+    if(useful>=8){normalT=p95(vectors,useful);lessons|=4;}
   }
   if(useful<8){status="MANEUVER_NOT_OBSERVED";return;}
   status="LESSON_READY";
@@ -138,9 +152,9 @@ uint8_t accept(const int16_t raw[6],uint32_t now){
   if(hadSample && uint32_t(now-last)>250){invalid=true;candidate=0;evidence=0;}last=now;hadSample=true;
   if(stage){
     range=4;
-    if(count<1200){
+    if(count<MAX_LESSON_SAMPLES){
       if(stage==1){float v[]={a.x,a.y,a.z,g.x,g.y,g.z};for(int i=0;i<6;i++){float d=v[i]-means[i];means[i]+=d/(count+1);m2[i]+=d*(v[i]-means[i]);}}
-      else{Vec up=unit(profile.rest),d=sub(a,profile.rest);vectors[count]=stage==4?Vec{dot(sub(g,profile.bias),up),0,0}:sub(d,mul(up,dot(d,up)));}
+      else{Vec up=unit(profile.rest),d=sub(a,profile.rest);lessonVectors[count]=stage==4?Vec{dot(sub(g,profile.bias),up),0,0}:sub(d,mul(up,dot(d,up)));}
       count++;
     }
     poll(now);

@@ -7,7 +7,8 @@ aprenden durante pruebas guiadas desde Vialigent y se guardan con Preferences/NV
 
 ## Compilación
 
-ESP32 Dev Module, core Espressif 3.3.12, biblioteca PubSubClient 2.8 y partición
+ESP32 Dev Module, core Espressif 3.3.12, bibliotecas PubSubClient 2.8 y
+ESP_SSLClient 3.1.3, y partición
 **Huge APP (3 MB No OTA/1 MB SPIFFS)** de un ESP32 de 4 MB. La partición predeterminada
 de 1.2 MB no alcanza para la combinación BLE + Wi-Fi/MQTT/TLS + calibración.
 

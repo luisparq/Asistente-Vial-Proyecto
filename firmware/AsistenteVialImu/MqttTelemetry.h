@@ -1,11 +1,13 @@
 #pragma once
 
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
+#include <ESP_SSLClient.h>
 #include <PubSubClient.h>
 #include <esp_system.h>
 #include <esp_random.h>
+#include <esp_heap_caps.h>
 #include <ctype.h>
+#include <time.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
@@ -34,7 +36,7 @@ struct RawSample {
 };
 
 WiFiClient plainNetwork;
-WiFiClientSecure secureNetwork;
+ESP_SSLClient secureNetwork;
 
 Client &networkClient() {
   return MQTT_USE_TLS ? static_cast<Client &>(secureNetwork) : static_cast<Client &>(plainNetwork);
@@ -104,16 +106,32 @@ void maintainConnection() {
   }
   if (!wifiReported) {
     wifiReported = true;
+    if (MQTT_USE_TLS) configTime(0, 0, "pool.ntp.org", "time.google.com");
     Serial.printf("Wi-Fi conectado: %s\n", WiFi.localIP().toString().c_str());
   }
   if (!mqtt.connected()) {
     if (int32_t(now - nextMqttAttempt) < 0) return;
     nextMqttAttempt = now + 5000;
+    if (MQTT_USE_TLS && time(nullptr) < 1700000000) {
+      Serial.println("MQTT TLS: esperando sincronizacion de hora.");
+      return;
+    }
     const String clientId = String("avigem-one-") + String((uint32_t)ESP.getEfuseMac(), HEX);
+    const uint32_t tlsHeap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const uint32_t tlsLargest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (MQTT_USE_TLS) secureNetwork.setX509Time(time(nullptr));
     const bool ok = mqtt.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD);
-    if(ok)mqtt.subscribe(commandTopic,1);
-    Serial.println(ok ? "MQTT conectado; Diagnostics recibira IMU_RAW." :
-                        "MQTT no disponible; nuevo intento en 5 s.");
+    if (ok) {
+      mqtt.subscribe(commandTopic, 1);
+      Serial.println("MQTT conectado; Diagnostics recibira IMU_RAW.");
+    } else if (MQTT_USE_TLS) {
+      char tlsError[128] = {};
+      const int tlsCode = secureNetwork.getLastSSLError(tlsError, sizeof(tlsError));
+      Serial.printf("MQTT no disponible (estado %d, TLS %d: %s; heap %lu, bloque %lu).\n",
+                    mqtt.state(), tlsCode, tlsError, (unsigned long)tlsHeap, (unsigned long)tlsLargest);
+    } else {
+      Serial.printf("MQTT no disponible (estado %d).\n", mqtt.state());
+    }
     return;
   }
   mqtt.loop();
@@ -163,6 +181,9 @@ void begin() {
       return;
     }
     secureNetwork.setCACert(MQTT_CA_CERT);
+    secureNetwork.setClient(&plainNetwork);
+    secureNetwork.setSSLVersion(BR_TLS12, BR_TLS12);
+    secureNetwork.setBufferSizes(4096, 1024);
   }
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
   mqtt.setBufferSize(1024);
