@@ -62,7 +62,7 @@ fun ImuLaboratoryContent(lab: LaboratoryUiState, calibration: CalibrationUiState
 }
 
 @Composable
-private fun SignalChart(samples: List<PhysicalImuSample>, gyro: Boolean, offsets: Vector3?, thresholdMarkerMillis: Long? = null) {
+internal fun SignalChart(samples: List<PhysicalImuSample>, gyro: Boolean, offsets: Vector3?, thresholdMarkerMillis: Long? = null) {
     fun vector(s: PhysicalImuSample) = if(gyro) s.angularVelocityDps else s.accelerationG
     val values = samples.flatMap { val v = vector(it); listOf(v.x, v.y, v.z) +
         (offsets?.let { o -> val c = v - o; listOf(c.x, c.y, c.z) } ?: emptyList()) }

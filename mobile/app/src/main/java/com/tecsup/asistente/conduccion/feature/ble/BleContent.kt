@@ -134,7 +134,7 @@ fun BleContent(
             }
             item {
                 TextButton(onClick = onDiagnostic, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.diagnostic_title)) }
-                Text("Herramienta técnica: consulta de mediciones del dispositivo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Reenvía las muestras Bluetooth a Laravel para la empresa y Vialigent.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

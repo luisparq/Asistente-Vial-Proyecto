@@ -31,6 +31,22 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
     private class AndroidSession(private val listener: GattTransport.Listener) : GattTransport.Session {
         var gatt: BluetoothGatt? = null
         private var closed = false
+        private val identityUuid=UUID.fromString("e77a0a04-3641-40f2-87b7-f178622259cd")
+        private val relayUuid=UUID.fromString("e77a0a05-3641-40f2-87b7-f178622259cd")
+        private var relayCharacteristic:BluetoothGattCharacteristic?=null
+        private var relaySubscribed=false
+        private var discoveredProfile:GattProfileDescription?=null
+        private var identityCharacteristic:BluetoothGattCharacteristic?=null
+        private var identityReadStarted=false
+        private var identityValid=false
+        private val identityTimeout=Runnable{gatt?.let{readIdentity(it)}}
+        private fun readIdentity(active:BluetoothGatt){
+            if(closed || identityReadStarted || identityCharacteristic==null)return
+            identityReadStarted=true
+            handler.removeCallbacks(identityTimeout)
+            val target=identityCharacteristic
+            if(target==null || !active.readCharacteristic(target))discoveredProfile?.let(listener::services)
+        }
         private var characteristic: BluetoothGattCharacteristic? = null
         private var gpsCharacteristic: BluetoothGattCharacteristic? = null
         private var gpsSubscribed = false
@@ -64,10 +80,32 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
                 characteristic = service?.getCharacteristic(characteristicUuid)
                 gpsCharacteristic = service?.getCharacteristic(UUID.fromString(TelemetryGattProfile.GPS))
                 buzzerCharacteristic = service?.getCharacteristic(UUID.fromString(TelemetryGattProfile.BUZZER))
+                relayCharacteristic=service?.getCharacteristic(relayUuid)
                 val target = characteristic
-                listener.services(GattProfileDescription(service != null, target != null,
+                discoveredProfile=GattProfileDescription(service != null, target != null,
                     target != null && (target.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0,
-                    target?.getDescriptor(cccdUuid) != null))
+                    target?.getDescriptor(cccdUuid) != null)
+                identityCharacteristic=service?.getCharacteristic(identityUuid)
+                if(identityCharacteristic==null) listener.services(discoveredProfile!!)
+                else if(gatt.requestMtu(185))handler.postDelayed(identityTimeout,2000)
+                else readIdentity(gatt)
+
+            }
+            override fun onMtuChanged(gatt:BluetoothGatt,mtu:Int,status:Int){if(current(gatt))readIdentity(gatt)}
+            override fun onCharacteristicRead(gatt:BluetoothGatt,c:BluetoothGattCharacteristic,value:ByteArray,status:Int){
+                if(!current(gatt) || c.uuid!=identityUuid)return
+                if(status==BluetoothGatt.GATT_SUCCESS)runCatching{
+                    val json=org.json.JSONObject(String(value,Charsets.UTF_8))
+                    val code=json.getString("deviceCode");val session=json.getString("sessionId")
+                    require(code.matches(Regex("[A-Za-z0-9][A-Za-z0-9_-]{0,62}")))
+                    val boot=UUID.fromString(session);require(boot.version()==4 && boot.variant()==2)
+                    listener.sensorIdentity(code,session);identityValid=true
+                }
+                discoveredProfile?.let(listener::services)
+            }
+            @Suppress("DEPRECATION")
+            override fun onCharacteristicRead(gatt:BluetoothGatt,c:BluetoothGattCharacteristic,status:Int){
+                if(Build.VERSION.SDK_INT<33)onCharacteristicRead(gatt,c,c.value ?: byteArrayOf(),status)
             }
             override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
                 if (!current(gatt) || descriptor.uuid != cccdUuid) return
@@ -84,12 +122,14 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
                     handler.removeCallbacks(gpsTimeout)
                     gpsSubscribed = status == BluetoothGatt.GATT_SUCCESS
                     if (!gpsSubscribed) listener.gpsUnavailable()
-                }
+                    subscribeRelay()
+                } else if(descriptor.characteristic===relayCharacteristic){relaySubscribed=status==BluetoothGatt.GATT_SUCCESS}
             }
             // Android 13+ provides a memory-safe snapshot of the notification value.
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
                 if (current(gatt)) {
-                    if (characteristic === this@AndroidSession.characteristic) listener.frame(value.copyOf())
+                    if (characteristic === this@AndroidSession.characteristic && !relaySubscribed) listener.frame(value.copyOf())
+                    else if (characteristic===relayCharacteristic && relaySubscribed)listener.relayFrame(value.copyOf())
                     else if (gpsSubscribed && characteristic === gpsCharacteristic) listener.gpsFrame(value.copyOf())
                     else if (buzzerSubscribed && characteristic === buzzerCharacteristic) {
                         val text = String(value, Charsets.UTF_8).trim()
@@ -104,7 +144,8 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 if (Build.VERSION.SDK_INT < 33 && current(gatt)) {
                     characteristic.value?.let {
-                        if (characteristic === this@AndroidSession.characteristic) listener.frame(it.copyOf())
+                        if (characteristic === this@AndroidSession.characteristic && !relaySubscribed) listener.frame(it.copyOf())
+                        else if (characteristic===relayCharacteristic && relaySubscribed)listener.relayFrame(it.copyOf())
                         else if (gpsSubscribed && characteristic === gpsCharacteristic) listener.gpsFrame(it.copyOf())
                         else if (buzzerSubscribed && characteristic === buzzerCharacteristic) {
                             val text = String(it, Charsets.UTF_8).trim()
@@ -129,6 +170,7 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
               catch (_: IllegalStateException) { false }
         }
 
+        private fun subscribeRelay(){if(!identityValid)return;relayCharacteristic?.let { runCatching{enable(it)} }}
         private fun subscribeGps() {
             val gps = gpsCharacteristic
             val requested = try {
@@ -136,7 +178,7 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
             } catch (_: SecurityException) { false }
               catch (_: IllegalStateException) { false }
             if (requested) handler.postDelayed(gpsTimeout, 5000)
-            else listener.gpsUnavailable()
+            else { listener.gpsUnavailable(); subscribeRelay() }
         }
 
         override fun writeBuzzer(command: ByteArray): Boolean {
@@ -172,6 +214,7 @@ class AndroidGattTransport @Inject constructor(@ApplicationContext private val c
             if (closed) return
             closed = true
             handler.removeCallbacks(gpsTimeout)
+            handler.removeCallbacks(identityTimeout)
             gpsSubscribed = false
             gpsCharacteristic = null
             buzzerSubscribed = false

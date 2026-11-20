@@ -21,6 +21,11 @@ Route::middleware(DashboardHeaders::class)->group(function () {
     Route::prefix('dashboard')->name('dashboard.')->middleware(['auth:web', 'auth.session', FleetAdmin::class])->group(function () {
         Route::get('/devices', [\App\Http\Controllers\DeviceController::class, 'fleet'])->name('devices');
         Route::get('/devices/diagnostics', MqttDiagnosticsController::class)->name('devices.diagnostics');
+        Route::post('/devices/diagnostics/start', [MqttDiagnosticsController::class, 'start'])->name('devices.diagnostics.start');
+        Route::post('/devices/diagnostics/import', [MqttDiagnosticsController::class, 'import'])->name('devices.diagnostics.import');
+        Route::post('/devices/diagnostics/trials/{trial}/stop', [MqttDiagnosticsController::class, 'stop'])->whereNumber('trial')->name('devices.diagnostics.stop');
+        Route::post('/devices/diagnostics/trials/{trial}/label', [MqttDiagnosticsController::class, 'label'])->whereNumber('trial')->name('devices.diagnostics.label');
+        Route::get('/devices/diagnostics/trials/{trial}/export', [MqttDiagnosticsController::class, 'export'])->whereNumber('trial')->name('devices.diagnostics.export');
         $support=\App\Http\Controllers\SupportController::class;
         Route::get('/support',[$support,'index'])->name('support');
         Route::get('/support/devices',[$support,'devices'])->name('support.devices');
@@ -82,6 +87,13 @@ Route::middleware(DashboardHeaders::class)->group(function () {
     Route::post('/admin/logout', [SessionController::class, 'destroy'])->middleware('auth:web')->name('platform.logout');
     Route::prefix('admin')->name('platform.')->middleware(['auth:web', 'auth.session', PlatformAdmin::class])->group(function () {
         Route::get('/devices', [\App\Http\Controllers\DeviceController::class, 'platform'])->name('devices');
+        Route::post('/devices/diagnostics/control', [MqttDiagnosticsController::class, 'control'])->name('devices.diagnostics.control');
+        Route::get('/devices/diagnostics', MqttDiagnosticsController::class)->name('devices.diagnostics');
+        Route::post('/devices/diagnostics/start', [MqttDiagnosticsController::class, 'start'])->name('devices.diagnostics.start');
+        Route::post('/devices/diagnostics/import', [MqttDiagnosticsController::class, 'import'])->name('devices.diagnostics.import');
+        Route::post('/devices/diagnostics/trials/{trial}/stop', [MqttDiagnosticsController::class, 'stop'])->whereNumber('trial')->name('devices.diagnostics.stop');
+        Route::post('/devices/diagnostics/trials/{trial}/label', [MqttDiagnosticsController::class, 'label'])->whereNumber('trial')->name('devices.diagnostics.label');
+        Route::get('/devices/diagnostics/trials/{trial}/export', [MqttDiagnosticsController::class, 'export'])->whereNumber('trial')->name('devices.diagnostics.export');
         Route::get('/analytics', [\App\Http\Controllers\PlatformAnalyticsController::class,'index'])->name('analytics');
         Route::get('/analytics/export', [\App\Http\Controllers\PlatformAnalyticsController::class,'export'])->name('analytics.export');
         $support=\App\Http\Controllers\SupportController::class;

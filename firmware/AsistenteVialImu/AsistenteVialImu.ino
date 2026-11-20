@@ -1,5 +1,5 @@
-/* AVIGEM One: MPU6050 -> BLE IMU_RAW + MQTT Diagnostics.
- * GPS UART independiente; buzzer manual y control BLE.
+/* AVIGEM One: IMU autonoma 20 Hz + BLE/MQTT Diagnostics.
+ * GPS UART independiente; calibracion Vialigent y buzzer local.
  * Arduino ESP32 Dev Module, core Espressif 3.3.12.
  * Protocolo permanente: ../../docs/ETAPA_3B_BLE.md
  */
@@ -12,6 +12,7 @@
 #include <atomic>
 #include "GpsTelemetry.h"
 #include "ManualBuzzer.h"
+#include "MqttTelemetry.h"
 
 constexpr char DEVICE_NAME[] = "AsistenteVial-IMU";
 constexpr char SERVICE_UUID[] = "73e8ca02-41d7-45bd-9d39-7187649746ca";
@@ -21,9 +22,13 @@ constexpr char BUZZER_UUID[] = "b84c0001-5120-4a8f-b98a-2415d86121a9";
 constexpr uint8_t MPU_ADDRESS = 0x68;
 constexpr int SDA_PIN = 21;
 constexpr int SCL_PIN = 22;
-constexpr uint32_t SAMPLE_PERIOD_MS = 250;
+constexpr uint32_t SAMPLE_PERIOD_MS = 50;
 constexpr size_t FRAME_SIZE = 12;
 
+constexpr char IDENTITY_UUID[]="e77a0a04-3641-40f2-87b7-f178622259cd";
+constexpr char RELAY_UUID[]="e77a0a05-3641-40f2-87b7-f178622259cd";
+BLECharacteristic *relayTelemetry=nullptr;
+BLE2902 *relayCccd=nullptr;
 BLECharacteristic *imuRaw = nullptr;
 BLE2902 *cccd = nullptr;
 BLECharacteristic *gpsTelemetry = nullptr;
@@ -31,6 +36,7 @@ BLE2902 *gpsCccd = nullptr;
 BLECharacteristic *buzzerCharacteristic = nullptr;
 BLE2902 *buzzerCccd = nullptr;
 std::atomic_bool pendingBuzzerDone{false};
+std::atomic_bool pendingBuzzerRequest{false};
 uint32_t lastGps = 0;
 std::atomic_bool connected{false};
 std::atomic_bool subscribed{false};
@@ -141,7 +147,7 @@ bool verifyMpuIdentity() {
   if (identityReceived) {
     Serial.printf("ADVERTENCIA: WHO_AM_I anomalo = 0x%02X\n", lastIdentity);
     Serial.println("Modo experimental: identidad del sensor no confirmada");
-    Serial.println("Solo mediciones crudas para pruebas controladas; no son detecciones validadas.");
+    Serial.println("Conversion y deteccion experimentales; no son mediciones fisicamente validadas.");
     return true; // Communication checked, NOT a valid MPU6050 identification.
   }
   Serial.println("MPU INIT ERROR: WHO_AM_I no pudo leerse; no se publicaran muestras.");
@@ -226,7 +232,9 @@ class ServerCallbacks : public BLEServerCallbacks {
     cccd->setNotifications(false);
     gpsCccd->setNotifications(false);
     if (buzzerCccd) buzzerCccd->setNotifications(false);
+    if (relayCccd) relayCccd->setNotifications(false);
     pendingBuzzerDone.store(false);
+    pendingBuzzerRequest.store(false);
     connected.store(true);
     Serial.println("BLE conectado; esperando suscripcion CCCD.");
   }
@@ -234,6 +242,7 @@ class ServerCallbacks : public BLEServerCallbacks {
     connected.store(false);
     subscribed.store(false);
     pendingBuzzerDone.store(false);
+    pendingBuzzerRequest.store(false);
     restartAdvertising.store(true);
     Serial.println("BLE desconectado; se reanudara el anuncio.");
   }
@@ -242,11 +251,9 @@ class ServerCallbacks : public BLEServerCallbacks {
 class BuzzerCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *characteristic) override {
     Serial.println("BLE WRITE: orden de activacion de buzzer recibida de Android.");
-    if (ManualBuzzer::trigger()) {
-      pendingBuzzerDone.store(true);
-    } else {
-      Serial.println("BLE WRITE: buzzer ocupado o en cooldown; no activado.");
-    }
+    // GATT callbacks run on another task. Execute every trigger on loop(),
+    // together with MQTT, serial and onboard detections, to avoid timer races.
+    pendingBuzzerRequest.store(true);
   }
 };
 
@@ -261,15 +268,17 @@ class SubscriptionCallbacks : public BLEDescriptorCallbacks {
   void onWrite(BLEDescriptor *) override {
     const bool enabled = cccd->getNotifications();
     subscribed.store(enabled);
-    Serial.println(enabled ? "NOTIFY habilitado: IMU_RAW, 12 bytes, 4 Hz." : "NOTIFY deshabilitado.");
+    Serial.println(enabled ? "NOTIFY habilitado: IMU_RAW, 12 bytes, 20 Hz." : "NOTIFY deshabilitado.");
   }
 };
 
 void setup() {
   Serial.begin(115200);
   ManualBuzzer::begin();
+  VehicleControl::begin();
+  MqttTelemetry::makeSessionId();
   delay(300);
-  Serial.println("Asistente Vial - Etapa 3B - solo mediciones crudas.");
+  Serial.println("AVIGEM One - deteccion autonoma y telemetria BLE/MQTT a 20 Hz.");
   if (!initializeI2c()) {
     while (true) delay(1000);
   }
@@ -282,9 +291,10 @@ void setup() {
       : "Dispositivo I2C listo en modo experimental: identidad NO confirmada, 0x68, SDA=21, SCL=22.");
   GpsTelemetry::begin();
   BLEDevice::init(DEVICE_NAME);
+  BLEDevice::setMTU(185);
   BLEServer *server = BLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
-  BLEService *service = server->createService(SERVICE_UUID);
+  BLEService *service = server->createService(BLEUUID(SERVICE_UUID), 24);
   imuRaw = service->createCharacteristic(IMU_RAW_UUID, BLECharacteristic::PROPERTY_NOTIFY);
   cccd = new BLE2902(); // Standard 0x2902, not a third custom UUID.
   cccd->setCallbacks(new SubscriptionCallbacks());
@@ -299,6 +309,10 @@ void setup() {
   buzzerCccd = new BLE2902();
   buzzerCccd->setCallbacks(new BuzzerCccdCallbacks());
   buzzerCharacteristic->addDescriptor(buzzerCccd);
+  auto identity=service->createCharacteristic(IDENTITY_UUID,BLECharacteristic::PROPERTY_READ);
+  char metadata[160];snprintf(metadata,sizeof(metadata),"{\"deviceCode\":\"%s\",\"sessionId\":\"%s\"}",DEVICE_CODE,MqttTelemetry::sessionId);identity->setValue(metadata);
+  relayTelemetry=service->createCharacteristic(RELAY_UUID,BLECharacteristic::PROPERTY_NOTIFY);
+  relayCccd=new BLE2902();relayTelemetry->addDescriptor(relayCccd);
   service->start();
   BLEAdvertising *advertising = BLEDevice::getAdvertising();
   advertising->addServiceUUID(SERVICE_UUID);
@@ -308,11 +322,18 @@ void setup() {
   advertising->setScanResponseData(scanResponse);
   advertising->setScanResponse(true);
   BLEDevice::startAdvertising();
+  MqttTelemetry::begin();
+  Serial.printf("Heap libre: %lu bytes; minimo desde arranque: %lu bytes.\n", (unsigned long)ESP.getFreeHeap(), (unsigned long)ESP.getMinFreeHeap());
   Serial.printf("Anunciando %s\nServicio: %s\nIMU_RAW: %s\n", DEVICE_NAME, SERVICE_UUID, IMU_RAW_UUID);
 }
 
 void loop() {
   ManualBuzzer::poll();
+  MqttTelemetry::pollCommands();
+  if (pendingBuzzerRequest.exchange(false) && connected.load()) {
+    if (ManualBuzzer::trigger()) pendingBuzzerDone.store(true);
+    else Serial.println("BLE WRITE: buzzer ocupado o en cooldown; no activado.");
+  }
   if (ManualBuzzer::checkCompleted()) {
     Serial.println("Pulso terminado: GPIO4 LOW.");
     if (pendingBuzzerDone.exchange(false)) {
@@ -338,12 +359,23 @@ void loop() {
       for (size_t i = 0; i < 6; ++i) {
         raw[i] = int16_t(uint16_t(frame[i * 2]) | (uint16_t(frame[i * 2 + 1]) << 8));
       }
+      if(VehicleControl::accept(raw,now))ManualBuzzer::trigger();
+      auto envelope=MqttTelemetry::makeSample(raw);
+      MqttTelemetry::publishSample(envelope);
+      if(connected.load() && relayCccd->getNotifications()){
+        uint8_t wire[20];memcpy(wire,frame,12);memcpy(wire+12,&envelope.sequence,4);memcpy(wire+16,&envelope.version,2);
+        wire[18]=(envelope.range<<4)|envelope.event;wire[19]=envelope.flags;
+        relayTelemetry->setValue(wire,20);relayTelemetry->notify();
+      }
       if (connected.load() && subscribed.load()) {
         imuRaw->setValue(frame, sizeof(frame));
         imuRaw->notify();
-        Serial.printf("RAW ax=%d ay=%d az=%d gx=%d gy=%d gz=%d\n", raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
+        if(envelope.sequence%5==0)Serial.printf("RAW ax=%d ay=%d az=%d gx=%d gy=%d gz=%d\n", raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
       }
-    } else Serial.println("ERROR lectura MPU6050: muestra omitida, no se envian valores sustitutos.");
+    } else {
+      VehicleControl::sensorFailure();
+      Serial.println("ERROR lectura MPU6050: muestra omitida, no se envian valores sustitutos.");
+    }
   }
   if (uint32_t(now - lastGps) >= 1000) {
     lastGps = now;
@@ -358,5 +390,6 @@ void loop() {
       gpsTelemetry->setValue(gpsFrame,sizeof(gpsFrame)); gpsTelemetry->notify();
     }
   }
+  VehicleControl::poll(millis());
   delay(1);
 }

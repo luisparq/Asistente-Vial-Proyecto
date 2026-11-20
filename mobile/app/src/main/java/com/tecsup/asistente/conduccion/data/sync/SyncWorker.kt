@@ -18,11 +18,13 @@ class SyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val engine: SyncEngine,
     private val deviceReports: DeviceReportSync,
+    private val sensorRelay: com.tecsup.asistente.conduccion.data.diagnostics.SensorRelay,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val tripsRetry = engine.drain()
         val devicesRetry = deviceReports.flush()
-        return if (tripsRetry || devicesRetry) Result.retry() else Result.success()
+        val relayRetry=sensorRelay.flush()
+        return if (tripsRetry || devicesRetry || relayRetry) Result.retry() else Result.success()
     }
 }
 

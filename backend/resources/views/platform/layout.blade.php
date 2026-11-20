@@ -6,6 +6,7 @@
     <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ asset('css/avigem-tokens.css') }}">
     <link rel="stylesheet" href="{{ asset('css/avigem.css') }}">
+    @stack('head')
 </head>
 <body class="fleet-page admin-ui">
 <a class="skip" href="#main">Saltar al contenido</a>
@@ -14,7 +15,7 @@
         <a class="brand" href="{{ route('platform.index') }}"><span class="brand-mark"><x-avigem-mark :size="26"/></span><span>Vialigent<small>Platform</small></span></a>
         <a class="button new-company" href="{{ route('platform.companies.create') }}" @if(request()->routeIs('platform.companies.create')) aria-current="page" @endif>+ Nueva empresa</a>
         <nav aria-label="Plataforma">
-            @foreach(['index'=>'Resumen global','analytics'=>'Análisis global','companies'=>'Empresas','accounts'=>'Cuentas administrativas','devices'=>'Dispositivos','support'=>'Soporte técnico','reports'=>'Reportes','audits'=>'Auditoría'] as $route=>$label)
+            @foreach(['index'=>'Resumen global','analytics'=>'Análisis global','companies'=>'Empresas','accounts'=>'Cuentas administrativas','devices'=>'Dispositivos','devices.diagnostics'=>'Diagnóstico','support'=>'Soporte técnico','reports'=>'Reportes','audits'=>'Auditoría'] as $route=>$label)
                 <a href="{{ route('platform.'.$route) }}" @if(request()->routeIs('platform.'.$route)) aria-current="page" @endif><x-nav-icon :name="$route"/><span>{{ $label }}</span></a>
             @endforeach
         </nav>

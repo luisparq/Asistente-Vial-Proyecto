@@ -92,6 +92,8 @@ class GattBleConnection @Inject constructor(
                         mutableState.value = BleConnectionState(ConnectionStatus.CONNECTED, device)
                     }
                 }
+                override fun sensorIdentity(deviceCode:String,sessionId:String) = event { source.identity(deviceCode,sessionId) }
+                override fun relayFrame(bytes:ByteArray){val copy=bytes.copyOf();event{if(phase==Phase.STREAMING)source.acceptRelay(copy)}}
                 override fun gpsFrame(bytes: ByteArray) {
                     val copy = bytes.copyOf()
                     event { if (phase == Phase.STREAMING) source.acceptGps(copy) }

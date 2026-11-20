@@ -11,7 +11,7 @@
     <string name="trip_title">Viaje</string>
     <string name="ble_title">Dispositivo</string>
     <string name="ble_description">Busca y conecta tu AVIGEM One. Aparece como AsistenteVial-IMU.</string>
-    <string name="diagnostic_title">Diagnóstico avanzado</string>
+    <string name="diagnostic_title">Enviar muestras a administrador</string>
     <string name="diagnostic_description">Mediciones crudas de la IMU y procesamiento nominal. Mantén esta pantalla abierta para comparar las señales recibidas.</string>
     <string name="history_title">Historial</string>
     <string name="history_description">Recorridos guardados en este dispositivo, incluidos los activos. Sus eventos son simulados de prueba, no detecciones reales ni infracciones.</string>

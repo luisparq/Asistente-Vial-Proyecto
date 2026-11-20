@@ -4,16 +4,23 @@
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <esp_system.h>
+#include <esp_random.h>
+#include <ctype.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
+#if __has_include("MqttSecrets.h")
 #include "MqttSecrets.h"
+#else
+#include "MqttSecrets.example.h"
+#endif
+#include "VehicleControl.h"
 
 // Wi-Fi y MQTT viven en su propia tarea: connect()/publish() pueden bloquear segundos
 // sin detener IMU, GPS, BLE ni buzzer. PubSubClient no es thread-safe: solo lo usa esta tarea.
 namespace MqttTelemetry {
 
-constexpr UBaseType_t QUEUE_LENGTH = 8;  // 2 s a 4 Hz; si se llena, la muestra se descarta.
+constexpr UBaseType_t QUEUE_LENGTH = 32;  // 1.6 s a 20 Hz; si se llena, la muestra se descarta.
 constexpr uint32_t TASK_STACK_BYTES = 10240;  // Margen para el handshake TLS.
 constexpr UBaseType_t TASK_PRIORITY = 1;
 constexpr BaseType_t TASK_CORE = 0;  // loop() corre en el núcleo 1.
@@ -22,6 +29,8 @@ constexpr uint32_t WIFI_ATTEMPT_MS = 30000;  // Con BLE activo, conectar tarda m
 
 struct RawSample {
   int16_t axes[6];
+  uint32_t sequence; uint16_t version; uint8_t event, range, flags;
+  float accel,brake,turn; char ack[37]; char status[48];
 };
 
 WiFiClient plainNetwork;
@@ -35,17 +44,38 @@ PubSubClient mqtt(networkClient());
 QueueHandle_t samples = nullptr;
 char topic[96];
 char sessionId[37];
-uint64_t sequenceNumber = 0;
+uint32_t sequenceNumber = 0;
+struct Command {char id[37];char op[20];};
+QueueHandle_t commands=nullptr;
+char commandTopic[96];
+void receiveCommand(char *receivedTopic,uint8_t *payload,unsigned int length){
+  if(strcmp(receivedTopic,commandTopic)!=0 || length<38 || length>=60)return;
+  char text[64];memcpy(text,payload,length);text[length]=0;
+  if(text[36]!='|')return;
+  for(int i=0;i<36;i++){if(i==8||i==13||i==18||i==23){if(text[i]!='-')return;}else if(!isxdigit((unsigned char)text[i]))return;}
+  Command c={};memcpy(c.id,text,36);strlcpy(c.op,text+37,sizeof(c.op));
+  xQueueSend(commands,&c,0);
+}
+void pollCommands(){Command c;if(commands && xQueueReceive(commands,&c,0)==pdTRUE){
+  if(strcmp(c.op,"buzzer")==0){if(!VehicleControl::duplicateCommand(c.id))ManualBuzzer::trigger();}
+  else VehicleControl::command(c.id,c.op,millis());
+}}
 uint32_t nextWifiAttempt = 0;
 uint32_t nextMqttAttempt = 0;
 bool wifiReported = false;
 
 void makeSessionId() {
-  const uint32_t a = esp_random(), b = esp_random(), c = esp_random(), d = esp_random();
-  snprintf(sessionId, sizeof(sessionId), "%08lx-%04lx-4%03lx-a%03lx-%08lx%04lx",
-           (unsigned long)a, (unsigned long)(b & 0xffff),
-           (unsigned long)(c & 0xfff), (unsigned long)(d & 0xfff),
-           (unsigned long)b, (unsigned long)(c & 0xffff));
+  uint8_t bytes[16];
+  esp_fill_random(bytes,sizeof(bytes));
+  bytes[6]=(bytes[6]&0x0f)|0x40;
+  bytes[8]=(bytes[8]&0x3f)|0x80;
+  static constexpr char hex[]="0123456789abcdef";
+  size_t out=0;
+  for(size_t i=0;i<16;i++){
+    if(i==4 || i==6 || i==8 || i==10)sessionId[out++]='-';
+    sessionId[out++]=hex[bytes[i]>>4];sessionId[out++]=hex[bytes[i]&0x0f];
+  }
+  sessionId[out]=0;
 }
 
 void reportWifiDisconnect(WiFiEvent_t, WiFiEventInfo_t info) {
@@ -81,6 +111,7 @@ void maintainConnection() {
     nextMqttAttempt = now + 5000;
     const String clientId = String("avigem-one-") + String((uint32_t)ESP.getEfuseMac(), HEX);
     const bool ok = mqtt.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD);
+    if(ok)mqtt.subscribe(commandTopic,1);
     Serial.println(ok ? "MQTT conectado; Diagnostics recibira IMU_RAW." :
                         "MQTT no disponible; nuevo intento en 5 s.");
     return;
@@ -89,17 +120,20 @@ void maintainConnection() {
 }
 
 void publish(const RawSample &sample) {
-  char payload[320];
-  snprintf(payload, sizeof(payload),
-    "{\"sessionId\":\"%s\",\"deviceCode\":\"%s\",\"sequence\":%llu,"
-    "\"axRaw\":%d,\"ayRaw\":%d,\"azRaw\":%d,\"gxRaw\":%d,\"gyRaw\":%d,\"gzRaw\":%d}",
-    sessionId, DEVICE_CODE, (unsigned long long)sequenceNumber,
-    sample.axes[0], sample.axes[1], sample.axes[2], sample.axes[3], sample.axes[4], sample.axes[5]);
+  char payload[900];
+  snprintf(payload,sizeof(payload),
+    "{\"protocol\":2,\"sessionId\":\"%s\",\"deviceCode\":\"%s\",\"sequence\":%lu,"
+    "\"axRaw\":%d,\"ayRaw\":%d,\"azRaw\":%d,\"gxRaw\":%d,\"gyRaw\":%d,\"gzRaw\":%d,"
+    "\"profileVersion\":%u,\"event\":%u,\"range\":%u,\"flags\":%u,"
+    "\"accelerationLimit\":%.6f,\"brakingLimit\":%.6f,\"turnLimit\":%.6f,\"ack\":\"%s\",\"calibrationStatus\":\"%s\"}",
+    sessionId,DEVICE_CODE,(unsigned long)sample.sequence,
+    sample.axes[0],sample.axes[1],sample.axes[2],sample.axes[3],sample.axes[4],sample.axes[5],
+    sample.version,sample.event,sample.range,sample.flags,sample.accel,sample.brake,sample.turn,sample.ack,sample.status);
   if (!mqtt.publish(topic, payload, false)) {
     Serial.println("MQTT: muestra no publicada; no se inventan sustitutos.");
     return;
   }
-  ++sequenceNumber;
+
 }
 
 void run(void *) {
@@ -118,7 +152,10 @@ void run(void *) {
 }
 
 void begin() {
-  makeSessionId();
+  if(!sessionId[0])makeSessionId();
+  commands=xQueueCreate(8,sizeof(Command));
+  snprintf(commandTopic,sizeof(commandTopic),"avigem/devices/%s/control",DEVICE_CODE);
+  if(!commands)return;
   snprintf(topic, sizeof(topic), "avigem/devices/%s/imu", DEVICE_CODE);
   if (MQTT_USE_TLS) {
     if (strlen(MQTT_CA_CERT) == 0) {
@@ -128,7 +165,8 @@ void begin() {
     secureNetwork.setCACert(MQTT_CA_CERT);
   }
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
-  mqtt.setBufferSize(384);
+  mqtt.setBufferSize(1024);
+  mqtt.setCallback(receiveCommand);
   mqtt.setSocketTimeout(1);
   mqtt.setKeepAlive(20);
   QueueHandle_t queue = xQueueCreate(QUEUE_LENGTH, sizeof(RawSample));
@@ -147,11 +185,11 @@ void begin() {
 }
 
 // Llamada desde loop(): nunca espera. Si la cola esta llena, descarta la muestra.
-bool publishRaw(const int16_t (&axes)[6]) {
-  if (samples == nullptr) return false;
-  RawSample sample;
-  memcpy(sample.axes, axes, sizeof(sample.axes));
-  return xQueueSend(samples, &sample, 0) == pdTRUE;
+RawSample makeSample(const int16_t (&axes)[6]) {
+  RawSample sample={};memcpy(sample.axes,axes,sizeof(sample.axes));sample.sequence=sequenceNumber++;
+  sample.version=VehicleControl::profile.version;sample.event=VehicleControl::event;sample.range=VehicleControl::range;sample.flags=VehicleControl::flags();
+  sample.accel=VehicleControl::profile.accel;sample.brake=VehicleControl::profile.brake;sample.turn=VehicleControl::profile.turn;
+  strlcpy(sample.ack,VehicleControl::acknowledged,37);strlcpy(sample.status,VehicleControl::status,48);return sample;
 }
-
+bool publishSample(const RawSample &sample){return samples && xQueueSend(samples,&sample,0)==pdTRUE;}
 }  // namespace MqttTelemetry

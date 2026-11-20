@@ -26,7 +26,7 @@ class MqttDiagnosticsTest extends TestCase
         $this->assertTrue($this->receive('TEST-ESP-A'));
         $original = DB::table('diagnostic_samples')->first();
         $this->travel(40)->seconds();
-        $this->assertTrue($this->receive('TEST-ESP-A', ['axRaw' => 999]));
+        $this->assertFalse($this->receive('TEST-ESP-A', ['axRaw' => 999]));
         $this->assertTrue($this->receive('TEST-ESP-A', ['sequence' => 1]));
         $this->assertDatabaseCount('diagnostic_sessions', 1);
         $this->assertDatabaseCount('diagnostic_samples', 2);

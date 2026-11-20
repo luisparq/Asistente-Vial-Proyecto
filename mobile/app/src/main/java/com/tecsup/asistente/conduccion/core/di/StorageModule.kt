@@ -25,11 +25,15 @@ object StorageModule {
             .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2,
                 com.tecsup.asistente.conduccion.data.local.MIGRATION_2_3,
                 com.tecsup.asistente.conduccion.data.local.MIGRATION_3_4,
-                com.tecsup.asistente.conduccion.data.local.MIGRATION_4_5)
+                com.tecsup.asistente.conduccion.data.local.MIGRATION_4_5,
+                com.tecsup.asistente.conduccion.data.diagnostics.MIGRATION_5_6)
             .build()
 
     @Provides
     fun maneuverAlertRule() = ManeuverAlertRule()
+
+    @Provides
+    fun sensorRelayDao(db: AsistenteVialDatabase) = db.sensorRelayDao()
 
     @Provides
     fun diagnosticsUploadDao(db: AsistenteVialDatabase) = db.diagnosticsUploadDao()

@@ -14,7 +14,7 @@ class ApiBoundary
         if (app()->environment('production') && ! $request->secure()) {
             throw new ApiProblem(400, 'https_required', 'Se requiere HTTPS.');
         }
-        if (strlen($request->getContent()) > 16384) {
+        if (strlen($request->getContent()) > ($request->routeIs('sensor-samples.store') ? 65536 : 16384)) {
             throw new ApiProblem(413, 'payload_too_large', 'La petición excede el límite permitido.');
         }
         if (in_array($request->method(), ['PUT', 'POST'], true)) {

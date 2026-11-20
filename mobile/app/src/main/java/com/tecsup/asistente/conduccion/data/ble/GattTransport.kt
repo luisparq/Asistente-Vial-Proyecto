@@ -13,6 +13,8 @@ interface GattTransport {
         fun connected()
         fun services(profile: GattProfileDescription)
         fun subscribed()
+        fun sensorIdentity(deviceCode:String,sessionId:String) {}
+        fun relayFrame(bytes:ByteArray) {}
         fun gpsFrame(bytes: ByteArray) {}
         fun gpsUnavailable() {}
         fun frame(bytes: ByteArray)

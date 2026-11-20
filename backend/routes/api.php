@@ -27,6 +27,7 @@ Route::prefix('v1')->middleware(ApiBoundary::class)->group(function () {
         Route::get('road/traffic-incidents', [\App\Http\Controllers\RoadAssistanceController::class, 'trafficIncidents'])->middleware('throttle:60,1')->name('road.traffic-incidents');
         Route::get('road/schools', [\App\Http\Controllers\RoadAssistanceController::class, 'schools'])->middleware('throttle:60,1')->name('road.schools');
         Route::put('devices/{client_device_id}/status', [\App\Http\Controllers\DeviceController::class, 'report']);
+        Route::post('sensor-samples', [\App\Http\Controllers\SensorRelayController::class, 'store'])->name('sensor-samples.store');
         Route::get('me', [AuthController::class, 'me']);
         Route::get('me/driver', [DriverProfileController::class, 'show']);
         Route::delete('auth/token', [AuthController::class, 'revoke']);

@@ -11,6 +11,19 @@ import kotlinx.coroutines.flow.*
 
 @Singleton
 class RawSensorDataSource @Inject constructor(@BleScope private val scope: CoroutineScope, private val clock: Clock = Clock.systemUTC()) : SensorDataSource {
+    private val dropped=MutableStateFlow(0)
+    override val relayDrops=dropped.asStateFlow()
+    private val relays=MutableSharedFlow<SensorRelaySample>(extraBufferCapacity=128)
+    override val relayFrames=relays.asSharedFlow()
+    private val identityReady=MutableStateFlow(false)
+    override val relayIdentity=identityReady.asStateFlow()
+    private var relayDevice=""
+    private var relaySession=""
+    fun identity(device:String,session:String){relayDevice=device;relaySession=session;identityReady.value=false}
+    fun acceptRelay(bytes:ByteArray){
+        val row=runCatching{SensorRelayDecoder.decode(bytes,relayDevice,relaySession,clock.millis())}.getOrNull() ?: return
+        identityReady.value=true;accept(bytes.copyOfRange(0,12));if(!relays.tryEmit(row))dropped.value++
+    }
     private val mutableStatus = MutableStateFlow(SensorDataStatus.DISCONNECTED)
     override val status = mutableStatus.asStateFlow()
     private val mutableSample = MutableStateFlow<RawImuSample?>(null)
@@ -43,6 +56,7 @@ class RawSensorDataSource @Inject constructor(@BleScope private val scope: Corou
     }
 
     fun reset(status: SensorDataStatus) {
+        identityReady.value=false;relayDevice="";relaySession=""
         gpsFreshness?.cancel()
         mutableGps.value = GpsTelemetry(if (status == SensorDataStatus.WAITING_FOR_DATA) GpsStatus.WAITING else GpsStatus.DISCONNECTED)
         freshness?.cancel()
@@ -56,6 +70,7 @@ class RawSensorDataSource @Inject constructor(@BleScope private val scope: Corou
         if (bytes.size != ImuRawDecoder.FRAME_SIZE) {
             freshness?.cancel()
             mutableSample.value = null
+            identityReady.value=false
             mutableStatus.value = SensorDataStatus.FAILED
             return
         }
@@ -67,6 +82,7 @@ class RawSensorDataSource @Inject constructor(@BleScope private val scope: Corou
         freshness = scope.launch {
             delay(STALE_AFTER_MILLIS)
             mutableSample.value = null
+            identityReady.value=false
             mutableStatus.value = SensorDataStatus.WAITING_FOR_DATA
         }
     }

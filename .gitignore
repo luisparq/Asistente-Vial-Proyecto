@@ -101,3 +101,6 @@ Desktop.ini
 
 # Composer is installed separately.
 /backend/composer.phar
+
+# Local Arduino builds (may embed configured network credentials)
+/firmware/.build-*/
