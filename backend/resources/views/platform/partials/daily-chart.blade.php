@@ -4,7 +4,7 @@
     $total=collect($series)->sum(fn($row)=>array_sum(array_intersect_key($row,array_flip($fields))));
     $width=640/count($series);
 @endphp
-@if($total===0)<div class="global-empty">Sin registros para este periodo.</div>@else
+@if($total===0)<div class="global-empty">Sin registros para este periodo. Puedes ampliar el periodo para consultar más fechas.</div>@else
 <svg viewBox="0 0 700 240" role="img" aria-label="{{ $kind==='trips'?'Viajes':'Eventos por origen' }} por día. Total: {{ $total }}. Detalle disponible debajo.">
 <line x1="35" y1="195" x2="680" y2="195" class="c-axis"/><text x="5" y="32" class="c-label" font-size="12">{{ $maximum }}</text>
 @foreach($series as $row)
