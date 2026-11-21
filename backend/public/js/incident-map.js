@@ -8,13 +8,18 @@
   if (!window.maplibregl) { status.textContent = 'No se pudo iniciar el mapa. Comprueba soporte WebGL en este navegador.'; return; }
   const styleSelect = document.getElementById('incident-style');
   const cartography = styleSelect && window.fleetMapStyle(styleSelect, container.dataset);
+  const showLoading = loading => {
+    container.toggleAttribute('data-loading', loading);
+    container.setAttribute('aria-busy', String(loading));
+  };
   let map;
   try { map = new maplibregl.Map({container, style:cartography?.initial ?? container.dataset.style, center:focused ? focused.geometry.coordinates : [0,0], zoom:focused ? 16 : 1, attributionControl:true}); }
   catch (_) { status.textContent = 'No se pudo iniciar el mapa. Los registros siguen disponibles en Eventos.'; return; }
+  showLoading(true);
   new ResizeObserver(() => map.resize()).observe(container);
   map.addControl(new maplibregl.NavigationControl());
-  cartography?.bind(map, () => { status.textContent = 'Cargando cartografía…'; });
-  map.on('error', () => { status.textContent = 'No se pudo cargar parte de la cartografía. Comprueba Internet o el proveedor configurado.'; });
+  cartography?.bind(map, () => { showLoading(true); status.textContent = 'Cargando cartografía…'; });
+  map.on('error', () => { showLoading(false); status.textContent = 'No se pudo cargar parte de la cartografía. Comprueba Internet o el proveedor configurado.'; });
   const select = document.getElementById('event-select');
   function detail(feature) {
     // Render canonical stored coordinates, not tile-quantized hit-test geometry.
@@ -66,6 +71,7 @@
       map.fitBounds(bounds,{padding:50,maxZoom:15,duration:0});
     }
     status.textContent = data.features.length ? 'Mapa listo. Selecciona un punto para consultar sus datos.' : 'Mapa listo. Sin registros georreferenciados para estos filtros.';
+    showLoading(false);
     container.dataset.ready='true';
   });
   // Expose only the current page map for diagnostics / focused browser tests.

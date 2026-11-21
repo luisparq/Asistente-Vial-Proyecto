@@ -393,10 +393,10 @@ td .button.quiet{min-height:34px;padding:var(--s1) var(--s3)}
 .global-device-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:var(--s3);margin:var(--s4) 0}
 .device-stat{display:grid;min-width:0;overflow-wrap:anywhere;gap:var(--s1);padding:var(--s4);border:1px solid var(--border);border-radius:var(--r-md);background:var(--metric-surface)}
 .device-stat strong{font-size:clamp(1.625rem,3vw,2.125rem);font-weight:720;line-height:1.1;font-variant-numeric:tabular-nums}
-.device-stat span{display:flex;align-items:center;gap:var(--s2);align-self:start;font-size:var(--t-sm);color:var(--text-2)}
-.device-stat span::before{content:"";flex:none;width:12px;height:12px;background:var(--idle);-webkit-mask:var(--i-minus) center/contain no-repeat;mask:var(--i-minus) center/contain no-repeat}
-.device-stat.recent span::before{background:var(--ok);-webkit-mask-image:var(--i-check);mask-image:var(--i-check)}
-.device-stat.stale span::before{background:var(--warn);-webkit-mask-image:var(--i-warn);mask-image:var(--i-warn)}
+.device-stat>span{display:flex;align-items:center;gap:var(--s2);align-self:start;font-size:var(--t-sm);color:var(--text-2)}
+.device-stat>span::before{content:"";flex:none;width:12px;height:12px;background:var(--idle);-webkit-mask:var(--i-minus) center/contain no-repeat;mask:var(--i-minus) center/contain no-repeat}
+.device-stat.recent>span::before{background:var(--ok);-webkit-mask-image:var(--i-check);mask-image:var(--i-check)}
+.device-stat.stale>span::before{background:var(--warn);-webkit-mask-image:var(--i-warn);mask-image:var(--i-warn)}
 .global-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s5)}
 .global-chart-grid svg,.analytics-daily svg{display:block;width:100%;height:auto;margin:var(--s4) 0;max-height:360px}
 .c-1{fill:var(--chart-1)}.c-test{fill:var(--chart-test)}.c-sensor{fill:var(--chart-sensor)}.c-axis{stroke:var(--chart-axis)}.c-label{fill:var(--chart-label)}
@@ -709,3 +709,71 @@ a.fleet-service-queue-item:hover{background:var(--surface-2)}
 }
 .new-company{display:block;margin:0 var(--s2) var(--s2);text-align:center}
 .code-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3)}.code-row .activation-code{display:inline-block;padding:var(--s3) var(--s4);font-size:1.25rem;letter-spacing:.08em}
+
+/* Platform conserva su política sin scripts para estas vistas. */
+.admin-ui .table-wrap{container-type:inline-size}
+.admin-ui .table-wrap:focus-visible{outline-offset:-2px}
+.admin-ui .table-wrap::before{position:sticky;inset-inline-start:0;display:block;width:fit-content;max-width:100%;box-sizing:border-box;padding:var(--s2) var(--s3);margin-bottom:var(--s2);border-radius:var(--r-sm);background:var(--info-bg);color:var(--info);font-size:var(--t-xs)}
+@container (width < 760px){
+  .admin-ui .table-wrap:has(>table thead tr>:nth-child(6))::before{content:"↔ Desplaza la tabla para ver más columnas."}
+}
+@container (width < 520px){
+  .admin-ui .table-wrap:has(>table thead tr>:last-child:nth-child(4),>table thead tr>:last-child:nth-child(5))::before{content:"↔ Desplaza la tabla para ver más columnas."}
+}
+
+/* Movimiento de indicadores y contenido */
+.metric-count{display:none}
+#incident-map{position:relative;background:var(--surface-2)}
+#incident-map[data-loading]::after{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(110deg,transparent,var(--border-strong),transparent);
+  opacity:.35;
+}
+@media(prefers-reduced-motion:no-preference){
+  :is(.global-metrics,.global-device-summary,.support-metrics,.support-grid)>*,
+  main tbody>tr:nth-child(-n+6){animation:avigem-enter var(--base) var(--ease-out) both}
+  :is(.global-metrics,.global-device-summary,.support-metrics,.support-grid)>:nth-child(even),
+  main tbody>tr:nth-child(2){animation-delay:30ms}
+  :is(.global-metrics,.global-device-summary,.support-metrics)>:nth-child(3),
+  main tbody>tr:nth-child(3){animation-delay:60ms}
+  main tbody>tr:nth-child(n+4):nth-child(-n+6){animation-delay:90ms}
+  .bars meter,.device-stat meter{transform-origin:left;animation:avigem-fill var(--slow) var(--ease-out) both}
+  :is(.global-chart-grid,.analytics-daily) svg rect{
+    transform-box:fill-box;transform-origin:center bottom;
+    animation:avigem-bar var(--slow) var(--ease-out) both;
+  }
+  .device-stat.recent>span::before,.comm-recent::before{animation:avigem-pulse var(--slow) var(--ease-out) 2}
+  #incident-map[data-loading]::after{animation:avigem-shimmer var(--slow) var(--ease-out) 2}
+  ::view-transition-old(root),::view-transition-new(root){animation-duration:var(--base);animation-timing-function:var(--ease-out)}
+  @supports (transition-behavior:allow-discrete){
+    details::details-content{
+      opacity:0;transform:translateY(-3px);
+      transition:opacity var(--fast) var(--ease-out),transform var(--fast) var(--ease-out),content-visibility var(--fast) allow-discrete;
+    }
+    details[open]::details-content{opacity:1;transform:translateY(0)}
+  }
+  @supports (counter-reset:metric attr(data-count type(<integer>))){
+    .metric-number{position:relative}
+    .metric-number:has(.metric-count) .metric-value{animation:avigem-show-value var(--slow) step-end both}
+    .metric-count{
+      display:block;position:absolute;inset:0;
+      --avigem-count:attr(data-count type(<integer>),0);
+      counter-reset:metric var(--avigem-count);
+      animation:avigem-count-up var(--slow) var(--ease-out),avigem-hide-count var(--slow) step-end both;
+    }
+    .metric-count::before{content:counter(metric)}
+  }
+}
+@media(hover:hover) and (pointer:fine){
+  .global-metric{transition:transform var(--fast) var(--ease-out)}
+  .global-metric:hover{transform:translateY(-2px);box-shadow:var(--shadow-1),inset 0 0 0 1px var(--border)}
+}
+@property --avigem-count{syntax:"<integer>";inherits:false;initial-value:0}
+@keyframes avigem-count-up{from{--avigem-count:0}}
+@keyframes avigem-show-value{from{opacity:0}to{opacity:1}}
+@keyframes avigem-hide-count{from{opacity:1}to{opacity:0}}
+@keyframes avigem-enter{from{opacity:.72;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes avigem-fill{from{opacity:.6;transform:scaleX(.06)}to{opacity:1;transform:scaleX(1)}}
+@keyframes avigem-bar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes avigem-pulse{50%{opacity:.7;transform:scale(1.15)}}
+@keyframes avigem-shimmer{from{opacity:0;transform:translateX(-70%)}to{opacity:.35;transform:translateX(70%)}}

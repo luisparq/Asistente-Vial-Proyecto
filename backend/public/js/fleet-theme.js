@@ -23,11 +23,18 @@
         buttons.forEach(button => button.addEventListener('click', () => {
             const next = button.dataset.fleetTheme;
             if (next === theme) return;
-            theme = next;
-            root.classList.toggle('theme-dark', theme === 'dark');
-            updateButtons();
-            try { localStorage.setItem(key, theme); } catch { /* Preferencia solo para esta página. */ }
-            document.dispatchEvent(new CustomEvent('fleet-theme-change', { detail: theme }));
+            const applyTheme = () => {
+                theme = next;
+                root.classList.toggle('theme-dark', theme === 'dark');
+                updateButtons();
+                try { localStorage.setItem(key, theme); } catch { /* Preferencia solo para esta página. */ }
+                document.dispatchEvent(new CustomEvent('fleet-theme-change', { detail: theme }));
+            };
+            if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.startViewTransition(applyTheme);
+            } else {
+                applyTheme();
+            }
         }));
     });
 
