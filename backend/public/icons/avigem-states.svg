@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <view id="check" viewBox="0 0 16 16"/>
+  <g transform="translate(0 0)"><path d='M3 8.5 6.5 12 13 4.5' fill='none' stroke='#000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/></g>
+  <view id="pulse" viewBox="16 0 16 16"/>
+  <g transform="translate(16 0)"><circle cx='8' cy='8' r='3.5'/><circle cx='8' cy='8' r='6.5' fill='none' stroke='#000' stroke-width='1.5'/></g>
+  <view id="warn" viewBox="32 0 16 16"/>
+  <g transform="translate(32 0)"><path fill-rule='evenodd' d='M8 1.2 15.4 14.6H.6zM7.1 6v4.4h1.8V6zm0 5.4v1.7h1.8v-1.7z'/></g>
+  <view id="x" viewBox="48 0 16 16"/>
+  <g transform="translate(48 0)"><path d='m3.5 3.5 9 9m0-9-9 9' fill='none' stroke='#000' stroke-width='2.2' stroke-linecap='round'/></g>
+  <view id="minus" viewBox="64 0 16 16"/>
+  <g transform="translate(64 0)"><path d='M3 8h10' fill='none' stroke='#000' stroke-width='2.4' stroke-linecap='round'/></g>
+  <view id="flask" viewBox="80 0 16 16"/>
+  <g transform="translate(80 0)"><path fill-rule='evenodd' d='M5.5 1h5v1.4h-.8v3.8l4.2 7A1.2 1.2 0 0 1 12.9 15H3.1a1.2 1.2 0 0 1-1-1.8l4.2-7V2.4h-.8zm2.2 1.4v4.2L6.4 8.8h3.2L8.3 6.6V2.4z'/></g>
+  <view id="arrow" viewBox="96 0 16 16"/>
+  <g transform="translate(96 0)"><path d='M3 8h9.5M8.5 4l4 4-4 4' fill='none' stroke='#000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></g>
+  <view id="back" viewBox="112 0 16 16"/>
+  <g transform="translate(112 0)"><path d='M13 8H3.5M7.5 4l-4 4 4 4' fill='none' stroke='#000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></g>
+  <view id="chev" viewBox="128 0 16 16"/>
+  <g transform="translate(128 0)"><path d='m6 3.5 4.5 4.5L6 12.5' fill='none' stroke='#000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></g>
+</svg>
