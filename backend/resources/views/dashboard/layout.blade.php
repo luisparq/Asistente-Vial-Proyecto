@@ -7,6 +7,7 @@
     <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ asset('css/avigem-tokens.css') }}">
     <link rel="stylesheet" href="{{ asset('css/avigem.css') }}">
+    <script src="{{ asset('js/avigem-tables.js') }}" nonce="{{ request()->attributes->get('fleet_script_nonce') }}" defer></script>
     @stack('head')
 </head>
 <body class="fleet-ui {{ request()->routeIs('dashboard.drivers*', 'dashboard.vehicles*') ? 'fleet-page' : '' }} {{ request()->routeIs('dashboard.support.*') ? 'fleet-support-flow' : '' }}">
