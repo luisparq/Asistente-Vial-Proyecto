@@ -14,10 +14,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tecsup.asistente.conduccion.feature.trip.TripVoice
+import com.tecsup.asistente.conduccion.feature.trip.MANEUVER_ALERT_MESSAGE
 
 @Composable
 fun DemonstrationScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hiltViewModel()) {
     val demo by viewModel.demo.collectAsStateWithLifecycle()
+    val groupedAlert by viewModel.groupedAlert.collectAsStateWithLifecycle()
     val publishError by viewModel.publishError.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.stopCharts() }
@@ -43,11 +45,23 @@ fun DemonstrationScreen(onBack: () -> Unit, viewModel: DiagnosticViewModel = hil
                     viewModel.startDemoTest(publish = true)
                 }
             }) { Text(if (demo.active) "Detener demostración" else "Iniciar modo demostración") }
-            if (publishError) Text("No se pudo guardar el evento de demostración.", color = Color.White)
+            if (publishError) Text("No se pudieron guardar los datos de demostración.", color = Color.White)
+            groupedAlert?.let { alert ->
+                if (alert.state != "ACKED") Text(
+                    if (alert.state.startsWith("BLOCKED_")) "Laravel no ha confirmado la alerta de demostración."
+                    else "Alerta de demostración pendiente de sincronizar.",
+                    color = Color.White,
+                )
+            }
             if (!demo.active && demo.statusText != "Inactiva") Text(demo.statusText, color = Color.White)
         }
     }
     DemonstrationAlert(demo, viewModel::dismissDemoAlert)
+    groupedAlert?.takeIf { it.state == "ACKED" && !demo.alertVisible }?.let { alert ->
+        TripVoice(false, alert.id, onAlertDone = { viewModel.dismissGroupedAlert() })
+        DemoAlertOverlay("Maniobras bruscas", "", "", viewModel::dismissGroupedAlert,
+            message = MANEUVER_ALERT_MESSAGE)
+    }
 }
 
 @Composable

@@ -33,7 +33,10 @@ data class TripActionState(
 class TripViewModel @Inject constructor(
     private val repository: TripRepository,
     private val savedState: SavedStateHandle = SavedStateHandle(),
+    private val sensorMonitor: TripSensorMonitor? = null,
 ) : ViewModel() {
+    val sensorNotice = sensorMonitor?.notice ?: MutableStateFlow<TripSensorNotice?>(null).asStateFlow()
+
     val trip = repository.observeActiveTrip()
         .flatMapLatest { active ->
             active?.let { repository.observeTrip(it.id) } ?: flowOf(null)

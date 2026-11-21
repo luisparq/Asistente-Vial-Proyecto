@@ -44,7 +44,7 @@ Se inyecta `Clock.systemUTC()` y se usan `clock.millis()` e `Instant.ofEpochMill
 
 No hay usuario autenticado, empresa, conductor, vehículo ni dispositivo asociado a los viajes. Login permite explorar la aplicación. No hay cliente HTTP, permiso `INTERNET`, cola, identificadores globales, revisiones ni estados de sincronización.
 
-`SENSOR` está reservado. La fuente pendiente expone estado `PENDING_HARDWARE` y un flujo vacío de bytes; no existe protocolo de mediciones ni generador de eventos físicos. La selección BLE no establece una conexión GATT real. Una dirección BLE observada no identifica de forma fiable un dispositivo de flota y no debe convertirse en identidad del ESP32.
+Durante un recorrido activo, Android puede generar eventos `SENSOR` a partir de lecturas BLE y del perfil guardado para el mismo módulo. La dirección BLE permite recuperar ese perfil local.
 
 ## 2. Identificación local y remota propuesta
 
@@ -108,7 +108,7 @@ Los eventos serán inmutables en esta primera versión. No se permite cambiar ti
 
 `SIMULATED` significa **dato de prueba generado manualmente**. No demuestra una maniobra física ni una infracción legal. La primera integración solo admitirá altas con ese origen.
 
-`SENSOR` permanecerá en el vocabulario reservado del contrato, pero las altas estarán deshabilitadas inicialmente con `422 origin_not_enabled`. Se habilitará expresamente cuando exista la integración y el productor de eventos correspondiente. Recibir bytes del MPU6050 no equivale por sí mismo a detectar una maniobra; esa futura transformación necesitará diseño y validación propios. El origen `SENSOR` tampoco certificará validez experimental o legal.
+La API admite `SENSOR` y `SIMULATED` para recorridos autorizados. `SENSOR` indica que el cliente reportó una detección basada en lecturas del módulo. Los eventos conservan su origen y el servidor mantiene los mismos controles de acceso y de reintento para ambos orígenes.
 
 No se agregan velocidad, coordenadas, aceleración, giroscopio, severidad, puntuación o confianza: no están presentes en los modelos revisados.
 
@@ -230,7 +230,7 @@ Formato propuesto: objeto `error` con `code` estable, `message` legible y `field
 - `403`: falta de capacidad para la operación dentro del ámbito autorizado.
 - `404`: recurso inexistente o fuera del ámbito visible; no revelar su existencia en otra empresa.
 - `409`: conflicto de identidad, contenido o revisión.
-- `422`: campos, fechas, enums o combinación de estado inválidos; incluye `origin_not_enabled`.
+- `422`: campos, fechas, enums o combinación de estado inválidos.
 - `429`: límite de frecuencia; respetar `Retry-After`.
 - `5xx`: fallo del servidor; reintentar con las mismas claves y contenido cuando sea transitorio.
 

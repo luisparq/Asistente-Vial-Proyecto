@@ -78,6 +78,27 @@ class VehicleLearningTest {
         repeat(16) { ready.acceptLearning(sample(yaw=10.0,time=it*250L)) }
         assertFalse(ready.finish());assertNull(ready.profile)
     }
+    @Test fun learningCanRecoverAfterAReceptionGap() {
+        val engine = VehicleLearning()
+        engine.setReference(reference())
+        assertTrue(engine.begin(NormalManeuver.ACCELERATION))
+        repeat(16) { engine.acceptLearning(sample(ax = -0.1, time = it * 250L)) }
+        engine.acceptLearning(sample(ax = 0.1, time = 5000))
+        assertEquals(1, engine.sampleCount)
+        repeat(16) { engine.acceptLearning(sample(ax = 0.1, time = 5000 + it * 250L)) }
+        assertTrue(engine.finish())
+        assertTrue(NormalManeuver.ACCELERATION in engine.learned)
+    }
+    @Test fun accelerationLessonUsesTheCoherentPulseBeforeAnOppositeSignal() {
+        val engine = VehicleLearning()
+        engine.setReference(reference())
+        assertTrue(engine.begin(NormalManeuver.ACCELERATION))
+        repeat(20) {
+            engine.acceptLearning(sample(ax = if (it < 10) 0.08 else -0.1, time = it * 250L))
+        }
+        assertTrue(engine.finish())
+        assertTrue(NormalManeuver.ACCELERATION in engine.learned)
+    }
     @Test fun profileRoundTripAndNewRestUpdateGyroBiasWithoutInventingNewLimits() {
         val p=trained().profile!!
         val saved=LearnedVehicleProfile.read(p.properties())
@@ -86,5 +107,40 @@ class VehicleLearningTest {
         assertEquals(p.accelerationLimitG,e.profile!!.accelerationLimitG,0.0)
         assertEquals(-1.0,e.profile!!.gyroBias.x,0.0)
         e.reset();assertNull(e.profile)
+    }
+
+    @Test fun manualLimitsCanBeLowerThanTheLearnedNormalAndSurviveRestVerification() {
+        val engine = trained()
+        engine.updateLimits(0.09, 0.20, 15.0)
+        val saved = LearnedVehicleProfile.read(engine.profile!!.properties())
+        engine.setReference(reference(), saved)
+        val restored = engine.profile!!
+        assertTrue(restored.manualLimits)
+        assertEquals(0.09, restored.accelerationLimitG, 0.0)
+        assertEquals(0.20, restored.brakingLimitG, 0.0)
+        assertEquals(15.0, restored.turnLimitDps, 0.0)
+        assertEquals(0.10, restored.normalAccelerationG, 0.0001)
+    }
+
+    @Test fun roadTestDefaultsKeepTheCalibrationAndDriveDetection() {
+        val engine = trained()
+        val learned = engine.profile!!
+        val defaults = RoadTestLimits.applyTo(learned)
+        val restored = LearnedVehicleProfile.read(defaults.properties())
+        assertEquals(learned.restAcceleration, restored.restAcceleration)
+        assertEquals(learned.forward, restored.forward)
+        assertEquals(learned.gyroBias, restored.gyroBias)
+        assertEquals(0.265, restored.accelerationLimitG, 0.0)
+        assertEquals(0.510, restored.brakingLimitG, 0.0)
+        assertEquals(18.5, restored.turnLimitDps, 0.0)
+
+        engine.restore(restored)
+        repeat(8) { assertNull(engine.detect(sample(ax = 0.26, time = it * 50L))) }
+        repeat(6) { assertNull(engine.detect(sample(ax = 0.27, time = 400 + it * 50L))) }
+        assertEquals(NormalManeuver.ACCELERATION, engine.detect(sample(ax = 0.27, time = 700))!!.kind)
+        repeat(6) { assertNull(engine.detect(sample(ax = -0.52, time = 4000 + it * 50L))) }
+        assertEquals(NormalManeuver.BRAKING, engine.detect(sample(ax = -0.52, time = 4300))!!.kind)
+        repeat(6) { assertNull(engine.detect(sample(yaw = 19.0, time = 8000 + it * 50L))) }
+        assertEquals(NormalManeuver.TURN, engine.detect(sample(yaw = 19.0, time = 8300))!!.kind)
     }
 }

@@ -6,13 +6,28 @@ import java.util.Properties
 enum class NormalManeuver(val title: String) {
     ACCELERATION("Aceleración normal"), BRAKING("Frenada normal"), TURN("Giros normales")
 }
+
+object RoadTestLimits {
+    const val ACCELERATION_G = 0.265
+    const val BRAKING_G = 0.510
+    const val TURN_DPS = 18.5
+
+    fun applyTo(profile: LearnedVehicleProfile): LearnedVehicleProfile = profile.copy(
+        accelerationLimitG = ACCELERATION_G,
+        brakingLimitG = BRAKING_G,
+        turnLimitDps = TURN_DPS,
+        manualLimits = true,
+    )
+}
 data class LearnedVehicleProfile(
     val restAcceleration: Vector3, val gyroBias: Vector3, val forward: Vector3,
     val accelerationLimitG: Double, val brakingLimitG: Double, val turnLimitDps: Double,
-    val normalAccelerationG: Double, val normalBrakingG: Double, val normalTurnDps: Double
+    val normalAccelerationG: Double, val normalBrakingG: Double, val normalTurnDps: Double,
+    val manualLimits: Boolean = false
 ) {
     fun properties() = Properties().apply {
         setProperty("version", "1")
+        if (manualLimits) setProperty("manualLimits", "true")
         listOf(restAcceleration, gyroBias, forward).forEachIndexed { i,v -> setProperty("v$i", "${v.x},${v.y},${v.z}") }
         listOf(accelerationLimitG, brakingLimitG, turnLimitDps, normalAccelerationG, normalBrakingG, normalTurnDps)
             .forEachIndexed { i,v -> setProperty("n$i", v.toString()) }
@@ -23,8 +38,9 @@ data class LearnedVehicleProfile(
             val v = (0..2).map { i -> p.getProperty("v$i").split(',').map(String::toDouble).let { Vector3(it[0],it[1],it[2]) } }
             val n = (0..5).map { p.getProperty("n$it").toDouble().also { value -> require(value.isFinite() && value > 0) } }
             require(norm(v[0]) in 0.7..1.3 && abs(norm(v[2])-1)<0.01 && abs(dot(v[0],v[2]))<0.02)
-            require(n[0]>n[3] && n[1]>n[4] && n[2]>n[5])
-            return LearnedVehicleProfile(v[0],v[1],v[2],n[0],n[1],n[2],n[3],n[4],n[5])
+            val manual = p.getProperty("manualLimits") == "true"
+            require(manual || (n[0]>n[3] && n[1]>n[4] && n[2]>n[5]))
+            return LearnedVehicleProfile(v[0],v[1],v[2],n[0],n[1],n[2],n[3],n[4],n[5],manual)
         }
     }
 }
@@ -80,6 +96,16 @@ class VehicleLearning {
             message="Reposo actualizado. Perfil anterior listo; requiere conservar el mismo montaje."
         }
     }
+    fun updateLimits(acceleration: Double, braking: Double, turn: Double) {
+        require(listOf(acceleration, braking, turn).all { it.isFinite() && it > 0 })
+        profile = checkNotNull(profile).copy(
+            accelerationLimitG = acceleration, brakingLimitG = braking, turnLimitDps = turn,
+            manualLimits = true,
+        )
+        resetDetection()
+        message = "Límites manuales guardados para este dispositivo."
+    }
+
     fun restore(saved: LearnedVehicleProfile) {
         reset(); profile=saved; forward=saved.forward
         normalAcceleration=saved.normalAccelerationG; normalBraking=saved.normalBrakingG; normalTurn=saved.normalTurnDps
@@ -102,7 +128,16 @@ class VehicleLearning {
     }
     fun acceptLearning(s: PhysicalImuSample) {
         if (learning==null) return
-        if (samples.lastOrNull()?.let { s.receivedAtMillis<=it.receivedAtMillis || s.receivedAtMillis-it.receivedAtMillis>750 } == true) invalidWindow=true
+        val previousSample = samples.lastOrNull()
+        if (previousSample != null) {
+            val gap = s.receivedAtMillis - previousSample.receivedAtMillis
+            if (gap < 0) return
+            if (gap > 750) {
+                samples.clear()
+                invalidWindow = false
+                message = "Hubo una pausa en las muestras. Repite la maniobra cuando sea seguro y termina la medición."
+            }
+        }
         if (samples.size<2400) samples.add(s) else invalidWindow=true
     }
     fun cancelLearning() { learning=null; samples.clear(); message="Aprendizaje cancelado. Repite esa maniobra." }
@@ -111,17 +146,30 @@ class VehicleLearning {
         val kind=learning ?: return false
         learning=null
         if (invalidWindow || samples.size<12 || samples.last().receivedAtMillis-samples.first().receivedAtMillis<3_000) {
-            message="Faltan muestras continuas. Repite la maniobra normal."; return false
+            message="El tramo continuo necesita al menos 12 muestras y 3 segundos. Repite la maniobra cuando sea seguro."; return false
         }
         var values: List<Double>
         if (kind==NormalManeuver.ACCELERATION) {
             // Direction comes from coherent horizontal acceleration, not an assumed board axis.
             val h=samples.map(::horizontal).filter { norm(it)>0.03 }
             if (h.size<8) { message="No se observó aceleración suficiente. Repite en línea recta."; return false }
-            val sum=Vector3(h.sumOf { it.x },h.sumOf { it.y },h.sumOf { it.z })
-            if (norm(sum)/h.sumOf(::norm)<0.8) { message="La dirección cambió: repite solo aceleración recta, sin frenar ni girar."; return false }
+            val segment = mutableListOf<Vector3>()
+            var sum = Vector3(0.0, 0.0, 0.0)
+            for (reading in h) {
+                if (segment.isNotEmpty() && dot(unit(sum), unit(reading)) < 0.8) {
+                    if (segment.size >= 8) break
+                    segment.clear()
+                    sum = Vector3(0.0, 0.0, 0.0)
+                }
+                segment.add(reading)
+                sum = Vector3(sum.x + reading.x, sum.y + reading.y, sum.z + reading.z)
+            }
+            if (segment.size < 8) {
+                message = "No se encontró un tramo de aceleración en una dirección estable."
+                return false
+            }
             forward=unit(sum)
-            values=h.map { dot(it,forward!!) }.filter { it>0.03 }
+            values=segment.map { dot(it,forward!!) }.filter { it>0.03 }
         } else if (kind==NormalManeuver.BRAKING) {
             values=samples.map { -dot(horizontal(it),forward!!) }.filter { it>0.03 }
         } else {

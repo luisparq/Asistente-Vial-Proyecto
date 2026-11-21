@@ -62,7 +62,7 @@ class TripRoadData @Inject constructor(
                 }
             }
             launch {
-                traffic.poll({ current.takeIf { heading != null } }, 90.0, 15_000, 50_000) { point ->
+                traffic.poll({ current.takeIf { heading != null } }, 60.0, 8_000, 25_000, direction = { heading }) { point ->
                     val direction = heading ?: return@poll null
                     val ahead = point.ahead(direction, 180.0)
                     if (!ahead.valid()) return@poll null
@@ -114,10 +114,14 @@ class TripRoadData @Inject constructor(
             }
 
             val catalog = osm.fresh(now)
-            val nearbySchools = schools.fresh(now, point, 1000.0)
-                ?: catalog?.zones?.map { it.point }.orEmpty()
-            schoolZone.update(nearbySchools.minOfOrNull { it.distanceTo(point) }) {
-                speak("school", "Precaución, estás en zona escolar")
+            val providerSchools = schools.fresh(now, point, 1000.0)
+            val catalogSchools = catalog?.takeIf { it.osmAvailable }?.zones?.map { it.point }
+            if (providerSchools != null || catalogSchools != null) {
+                val schoolDistance = (providerSchools.orEmpty() + catalogSchools.orEmpty())
+                    .minOfOrNull { it.distanceTo(point) } ?: Double.POSITIVE_INFINITY
+                schoolZone.update(schoolDistance) {
+                    speak("school", "Precaución, zona escolar cercana")
+                }
             }
 
             val direction = heading ?: return@collect
@@ -165,15 +169,21 @@ private class RoadLookup<T>(private val ttl: Long) {
 
     suspend fun poll(
         position: () -> RoadPoint?, distance: Double, interval: Long, refresh: Long,
+        direction: () -> Int? = { null },
         request: suspend (RoadPoint) -> LookupResult<T>?,
     ) {
         var lastRequest: RoadPoint? = null
+        var lastHeading: Int? = null
         var lastAt = 0L
         while (true) {
             val point = position()
             val now = SystemClock.elapsedRealtime()
-            if (point != null && (lastRequest == null || now - lastAt >= refresh || lastRequest.distanceTo(point) >= distance)) {
+            val heading = direction()
+            val changedDirection = lastHeading?.let { heading != null && cornerDifference(heading, it) > 35 } == true
+            if (point != null && (lastRequest == null || now - lastAt >= refresh ||
+                    lastRequest.distanceTo(point) >= distance || changedDirection)) {
                 lastRequest = point
+                lastHeading = heading
                 lastAt = now
                 val result = request(point)
                 if (result != null && result.retryAfter == 0L) {
@@ -225,13 +235,17 @@ internal data class Congestion(val line: List<RoadPoint>, val heading: Int) {
             val (x, y) = start.offsetFrom(position)
             val (dx, dy) = end.offsetFrom(start)
             val length = hypot(dx, dy)
-            if (length < 1 || (dx * east + dy * north) / length < 0.8) return@any false
-            val fraction = ((180 - (x * east + y * north)) / (dx * east + dy * north)).coerceIn(0.0, 1.0)
-            val candidateX = x + fraction * dx
-            val candidateY = y + fraction * dy
-            val ahead = candidateX * east + candidateY * north
-            val lateral = abs(candidateX * north - candidateY * east)
-            ahead in 35.0..450.0 && lateral <= 25.0
+            val progress = dx * east + dy * north
+            if (length < 1 || progress / length < 0.8) return@any false
+            val ahead = x * east + y * north
+            val from = maxOf(0.0, (35.0 - ahead) / progress)
+            val to = minOf(1.0, (450.0 - ahead) / progress)
+            if (from > to) return@any false
+            val lateral = x * north - y * east
+            val drift = dx * north - dy * east
+            val startOffset = lateral + from * drift
+            val endOffset = lateral + to * drift
+            minOf(startOffset, endOffset) <= 25.0 && maxOf(startOffset, endOffset) >= -25.0
         }
     }
 }
@@ -242,8 +256,8 @@ internal class SchoolProximity {
     fun update(distance: Double?, announce: () -> Boolean) {
         when {
             distance == null -> Unit
-            distance <= 65 && !inside -> inside = announce()
-            distance > 85 -> inside = false
+            distance <= 120 && !inside -> inside = announce()
+            distance > 150 -> inside = false
         }
     }
 }

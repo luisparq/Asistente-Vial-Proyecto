@@ -7,20 +7,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TripRoadDataTest {
-    @Test fun schoolVoiceWaitsForEntryAndDoesNotRepeatAtTheEdge() {
+    @Test fun schoolVoiceWarnsBeforeEntryAndDoesNotRepeatAtTheEdge() {
         val school = SchoolProximity()
         var announcements = 0
         val speak = { announcements++; true }
-        school.update(66.0, speak)
+        school.update(121.0, speak)
         assertEquals(0, announcements)
-        school.update(65.0, speak)
-        school.update(80.0, speak)
+        school.update(120.0, speak)
+        school.update(140.0, speak)
         school.update(null, speak)
-        school.update(63.0, speak)
+        school.update(118.0, speak)
         assertEquals(1, announcements)
-        school.update(86.0, speak)
-        school.update(64.0, speak)
+        school.update(151.0, speak)
+        school.update(119.0, speak)
         assertEquals(2, announcements)
+    }
+
+    @Test fun congestionCanEnterThePathBeforeTheLookaheadPoint() {
+        val position = RoadPoint(0.0, 0.0)
+        val bendsAway = listOf(RoadPoint(0.00045, 0.0), RoadPoint(0.0018, 0.0006))
+        assertTrue(Congestion(bendsAway, 0).isAhead(position, 0))
     }
 
     @Test fun trafficMustBeAheadInTheSameTravelDirectionAndNearTheProjectedPath() {

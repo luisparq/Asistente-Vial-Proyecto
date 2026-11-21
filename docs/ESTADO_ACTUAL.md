@@ -1,6 +1,16 @@
 # Estado actual del proyecto
 
-> Estado vigente al 18/11/2026 en [CHECKPOINT_2026_11_18.md](CHECKPOINT_2026_11_18.md), con Room v5, MQTT, mapa en vivo, TomTom y alertas demostrativas.
+## Prueba real del sensor en Android
+
+Con un recorrido activo, una conexión Bluetooth a AVIGEM One y un perfil del montaje, Android aplica como valores iniciales 0,265 g para aceleración, 0,510 g para frenada y 18,5 °/s para giro. El detector exige al menos tres muestras consecutivas por encima del límite durante 300 ms y deja 3 s entre detecciones. El laboratorio permite revisar el perfil y ajustar los límites. Un montaje diferente requiere su propio perfil.
+
+Android registra la maniobra con origen `SENSOR`, envía la orden del buzzer al ESP32 y publica una notificación si el usuario dio permiso. El aviso agrupado se muestra después de que Laravel confirma la sincronización. La cola reintenta el envío si falta conexión. El panel de eventos muestra el origen y, cuando hay una lectura reciente del GPS del dispositivo, la ubicación. Los puntos del recorrido se sincronizan por separado.
+
+Los avisos por voz durante el recorrido combinan colegios de TomTom y OpenStreetMap y advierten a 120 m de un colegio cercano. Para tráfico, Android consulta TomTom por delante del vehículo y verifica que el tramo congestionado esté en el sentido de circulación y cerca de la trayectoria proyectada. Ambos avisos dependen de tener GPS válido. El tráfico requiere además que el servidor tenga acceso al proveedor.
+
+Para validar la instalación quedan pendientes un recorrido físico de punta a punta con el APK y el firmware montados, la confirmación del buzzer y del GPS, y la recepción de eventos y alertas en el VPS. Los archivos de calibración y perfiles personalizados se conservan localmente.
+
+> El [checkpoint del 18/11/2026](CHECKPOINT_2026_11_18.md) describe Room v5, MQTT y el mapa en vivo. El resto de este documento conserva el historial de las fases anteriores.
 
 Resumen histórico: **2026-10-03**, con ampliación 3C posterior. La actualización vigente (GPS, Room 3, mapas, administración y buzzer) está en [CHECKPOINT_2026_10_10.md](CHECKPOINT_2026_10_10.md); prevalece sobre las funciones pendientes de este resumen. La evidencia física procede del reporte del responsable del proyecto.
 
@@ -52,7 +62,7 @@ API `/api/v1`:
 - PUT `/trips/{client_trip_id}`; GET `/trips` y `/trips/{client_trip_id}`.
 - PUT `/trips/{client_trip_id}/events/{client_event_id}`; GET `/trips/{client_trip_id}/events`.
 
-UUID públicos por empresa, revisión 1 ACTIVE / 2 COMPLETED, eventos inmutables, conflictos 409, revisión antigua coherente `stale_ignored`. Validación de fechas RFC3339 UTC con milisegundos y respuestas verificadas por Android antes de ACKED. Escritura `SENSOR` rechazada con 422 `origin_not_enabled`. El contexto de empresa procede de la cuenta/token; no se acepta una empresa arbitraria del payload. Recursos y consultas aplican aislamiento y permisos.
+UUID públicos por empresa, revisión 1 ACTIVE / 2 COMPLETED, eventos inmutables, conflictos 409, revisión antigua coherente `stale_ignored`. Validación de fechas RFC3339 UTC con milisegundos y respuestas verificadas por Android antes de ACKED. La API acepta eventos `SENSOR` del recorrido autorizado y conserva el origen al sincronizarlos. El contexto de empresa procede de la cuenta/token; no se acepta una empresa arbitraria del payload. Recursos y consultas aplican aislamiento y permisos.
 
 Dashboard Blade + CSS local: login web separado de Sanctum, resumen, recorridos/detalles, eventos, conteos/analíticas y ajustes. Muestra registros recibidos, no cola offline ni presencia en tiempo real. No modifica viajes/eventos. Gestión de flota: conductores, vehículos, asignaciones con historial, documentos privados/revisión y acceso mediante códigos de un uso. Área `/platform` para administración global de empresas/cuentas/auditoría, separada del dashboard de cada empresa. Roles member/driver/fleet_admin/platform_admin; plataforma no obtiene tokens Android.
 

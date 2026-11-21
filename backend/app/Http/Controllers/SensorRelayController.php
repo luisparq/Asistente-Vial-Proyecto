@@ -16,6 +16,8 @@ class SensorRelayController extends Controller
         $results = DB::transaction(function () use ($data, $ingest, $user) {
             $results = [];
             foreach ($data['samples'] as $sample) {
+                // Android omits default values when it serializes queued BLE v2 samples.
+                $sample += ['protocol' => 2];
                 $code = $sample['deviceCode'] ?? '';
                 abort_unless(is_string($code) && preg_match('/\A'.MqttDiagnosticsIngest::CODE_PATTERN.'\z/', $code), 422);
                 $ok = $ingest->store("avigem/devices/$code/imu", json_encode($sample), false, 'BLE_API', $user->id);

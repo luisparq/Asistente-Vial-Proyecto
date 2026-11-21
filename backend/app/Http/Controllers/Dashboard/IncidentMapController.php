@@ -45,7 +45,7 @@ class IncidentMapController extends Controller
                 return ['type'=>'Feature', 'id'=>$event->client_event_id,
                     'geometry'=>['type'=>'Point','coordinates'=>[$event->longitude,$event->latitude]],
                     'properties'=>['uuid'=>$event->client_event_id,'label'=>DashboardDisplay::type($event->type),
-                        'origin_label'=>'Dato de prueba',
+                        'origin_label'=>DashboardDisplay::origin($event->origin), 'origin'=>$event->origin,
                         'date'=>DashboardDisplay::date($event->occurred_at),'location_origin'=>$event->location_origin,
                         'vehicle'=>$event->trip->vehicle?->plate,
                         'trip_url'=>route('dashboard.trip', ['uuid' => $event->trip->client_trip_id] + $tripReturn)]];

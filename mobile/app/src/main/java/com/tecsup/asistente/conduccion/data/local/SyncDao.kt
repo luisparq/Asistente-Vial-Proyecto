@@ -12,6 +12,11 @@ interface SyncDao {
     @Insert suspend fun insertEvent(meta: EventSyncEntity)
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun enqueue(operation: OutboxEntity)
     @Query("SELECT * FROM trip_sync WHERE localTripId = :id") suspend fun trip(id: Long): TripSyncEntity?
+    @Query("SELECT * FROM trip_sync WHERE clientTripId = :id AND ownerKey = :owner")
+    suspend fun tripByClientId(id: String, owner: String): TripSyncEntity?
+    @Query("SELECT state FROM sync_outbox WHERE operationId = :id")
+    fun operationState(id: String): Flow<String?>
+
     @Query("SELECT * FROM event_sync WHERE localEventId = :id") suspend fun event(id: Long): EventSyncEntity?
     @Query("UPDATE trip_sync SET revision = :revision WHERE localTripId = :id") suspend fun revision(id: Long, revision: Int)
     @Query("UPDATE trip_sync SET ownerKey = :owner WHERE localTripId = :id AND ownerKey IS NULL") suspend fun adopt(id: Long, owner: String): Int
@@ -58,9 +63,19 @@ interface SyncDao {
     // Explicit manual retry only: never release HTTP Retry-After, blocked rows or live leases.
     @Query("UPDATE sync_outbox SET nextAttemptAt = 0 WHERE state = 'RETRY_WAIT' AND errorCode = 'network_unavailable' AND localTripId IN (SELECT localTripId FROM trip_sync WHERE ownerKey = :owner)")
     suspend fun advanceNetworkRetries(owner: String)
+    @Query("""
+        UPDATE sync_outbox SET state = 'PENDING', errorCode = NULL, nextAttemptAt = 0
+        WHERE state = 'BLOCKED_VALIDATION' AND errorCode = 'HTTP_422' AND eventUuid IN (
+            SELECT s.clientEventId FROM event_sync s
+            JOIN driving_events e ON e.id = s.localEventId
+            JOIN trip_sync t ON t.localTripId = e.tripId
+            WHERE t.ownerKey = :owner AND e.origin = 'SENSOR'
+        )
+    """)
+    suspend fun retryRejectedSensorEvents(owner: String)
     @Query("SELECT COUNT(*) FROM sync_outbox o JOIN trip_sync m ON m.localTripId = o.localTripId WHERE ownerKey = :owner AND o.state IN ('PENDING','RETRY_WAIT','IN_FLIGHT')")
     suspend fun pending(owner: String): Int
-    @Query("SELECT trips.* FROM trips JOIN trip_sync m ON m.localTripId = trips.id WHERE status = 'ACTIVE' AND (m.ownerKey IS NULL OR m.ownerKey = :owner) LIMIT 1")
+    @Query("SELECT trips.* FROM trips JOIN trip_sync m ON m.localTripId = trips.id WHERE status = 'ACTIVE' AND activeSlot = 1 AND (m.ownerKey IS NULL OR m.ownerKey = :owner) LIMIT 1")
     fun active(owner: String?): Flow<TripEntity?>
     @Query("SELECT trips.*, (SELECT COUNT(*) FROM driving_events WHERE tripId = trips.id) AS eventCount FROM trips JOIN trip_sync m ON m.localTripId = trips.id WHERE m.ownerKey IS NULL OR m.ownerKey = :owner ORDER BY startedAt DESC, id DESC")
     fun history(owner: String?): Flow<List<TripSummaryEntity>>

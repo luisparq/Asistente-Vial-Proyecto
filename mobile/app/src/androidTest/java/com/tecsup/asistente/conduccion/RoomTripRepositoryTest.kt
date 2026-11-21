@@ -80,7 +80,7 @@ class RoomTripRepositoryTest {
     }
 
     @Test
-    fun authenticatedDemonstrationQueuesATestEventOutsideTheActiveTrip() = runBlocking {
+    fun authenticatedDemonstrationGroupsFourEventsAndQueuesOneTestAlert() = runBlocking {
         val session = com.tecsup.asistente.conduccion.domain.sync.MemorySessionStore()
         val account = com.tecsup.asistente.conduccion.domain.sync.Session(
             "http://127.0.0.1/", 1, 2, "TEST", "test@example.invalid", "TEST-token",
@@ -88,20 +88,32 @@ class RoomTripRepositoryTest {
         session.save(account)
         val trips = RoomTripRepository(database, clock, session)
         val active = trips.startOrResumeTrip()
-        clock.advance()
-        trips.recordDemonstration(DrivingEventType.SHARP_TURN)
+        val demoId = java.util.UUID.randomUUID().toString()
+        repeat(3) {
+            clock.advance(3)
+            assertNull(trips.recordDemonstration(demoId, DrivingEventType.SHARP_TURN))
+        }
+        clock.advance(3)
+        val alertId = checkNotNull(trips.recordDemonstration(demoId, DrivingEventType.HARSH_BRAKING))
+        assertEquals("PENDING", trips.observeDemonstrationOutbox(alertId).first())
+        trips.finishDemonstration(demoId)
 
         assertEquals(active, trips.observeActiveTrip().first())
         assertTrue(trips.observeTrip(active.id).first()!!.events.isEmpty())
         val demo = trips.observeHistory().first().single { it.trip.status == TripStatus.COMPLETED }
         assertEquals(account.ownerKey, database.syncDao().trip(demo.trip.id)?.ownerKey)
-        val event = trips.observeTrip(demo.trip.id).first()!!.events.single()
-        assertEquals(DataOrigin.SIMULATED, event.origin)
-        assertEquals(DrivingEventType.SHARP_TURN, event.type)
+        val events = trips.observeTrip(demo.trip.id).first()!!.events
+        assertEquals(4, events.size)
+        assertTrue(events.all { it.origin == DataOrigin.SIMULATED })
+        assertEquals(DrivingEventType.HARSH_BRAKING, events.last().type)
+        val alert = checkNotNull(database.tripDao().latestManeuverAlert(demo.trip.id))
+        assertEquals(alertId, alert.id)
+        assertTrue(alert.testOnly)
         val queue = database.syncDao().all().filter { it.localTripId == demo.trip.id }
-        assertEquals(2, queue.size)
+        assertEquals(7, queue.size)
+        assertEquals(4, queue.count { it.eventUuid != null })
         assertTrue(queue.any { it.revision == 2 })
-        assertTrue(queue.any { it.eventUuid != null })
+        assertTrue(queue.single { it.operationId == alertId }.path.endsWith("/alerts/$alertId"))
     }
 
     @Test

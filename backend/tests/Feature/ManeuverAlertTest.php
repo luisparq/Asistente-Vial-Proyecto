@@ -87,21 +87,34 @@ class ManeuverAlertTest extends TestCase
             'name' => 'Contacto reservado', 'relationship' => 'Familiar', 'phone' => '999000111']);
         $trip = $this->trip($account);
         $testEvent = $this->event($trip, 'SHARP_TURN');
-        $realEvent = $this->event($trip, 'HARSH_BRAKING', 'SENSOR');
+        $sensorId = (string) Str::uuid();
         $testId = (string) Str::uuid();
         $realId = (string) Str::uuid();
         $base = "/api/v1/trips/{$trip->client_trip_id}/alerts";
         $headers = $this->headers($account);
+        $this->putJson("/api/v1/trips/{$trip->client_trip_id}/events/$sensorId", [
+            'origin' => 'SENSOR', 'type' => 'HARSH_BRAKING', 'occurred_at' => '2026-11-15T14:01:00.000Z',
+            'latitude' => -16.25, 'longitude' => -71.5, 'location_origin' => 'GPS_NEO6M',
+            'gps_received_at' => '2026-11-15T14:00:59.500Z', 'gps_age_ms' => 500,
+        ], $headers)->assertCreated()->assertJsonPath('data.origin', 'SENSOR');
         $data = ['event_ids' => [$testEvent->client_event_id], 'occurred_at' => '2026-11-15T14:01:05.000Z',
             'test_only' => true, 'location_status' => 'AVAILABLE', 'latitude' => -16.25, 'longitude' => -71.5,
             'location_captured_at' => '2026-11-15T14:01:04.000Z'];
         $this->putJson("$base/$testId", $data, $headers)->assertCreated();
-        $this->putJson("$base/$realId", array_replace($data, ['event_ids' => [$realEvent->client_event_id],
+        $this->putJson("$base/$realId", array_replace($data, ['event_ids' => [$sensorId],
             'test_only' => false, 'location_status' => 'MISSING', 'latitude' => null, 'longitude' => null,
             'location_captured_at' => null]), $headers)->assertCreated();
 
         Auth::forgetGuards();
         $this->actingAs($admin, 'web')->get('/dashboard')->assertOk()->assertViewHas('pendingAlerts', 1);
+        $this->get('/dashboard/events?tab=map&origin=SENSOR')->assertOk()->assertSee($sensorId)
+            ->assertViewHas('geojson', fn ($data) => count($data['features']) === 1
+                && $data['features'][0]['properties']['origin'] === 'SENSOR'
+                && $data['features'][0]['geometry']['coordinates'] === [-71.5, -16.25]);
+        $this->get('/dashboard/events?origin=SENSOR')->assertOk()->assertSee($sensorId)
+            ->assertSee('Lectura del dispositivo');
+        $this->get('/dashboard/trips/'.$trip->client_trip_id)->assertOk()->assertSee($sensorId)
+            ->assertSee('Lectura del dispositivo');
         $this->get('/dashboard/notifications')->assertOk()->assertSee('Ada Prueba')->assertSee('TEST-123')
             ->assertSee('15/11/2026 09:01:05')->assertSee('Alerta de prueba')->assertDontSee($contact->phone);
         $this->get('/dashboard/events?kind=alerts&alert_status=pending')->assertOk()->assertSee($realId)->assertDontSee($testId);

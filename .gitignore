@@ -104,3 +104,11 @@ Desktop.ini
 
 # Local Arduino builds (may embed configured network credentials)
 /firmware/.build-*/
+
+# Private AVIGEM field recordings, personalized debug profiles and local VPS helpers
+/muestras recogidas de calibracion/
+/muestras recogidas de calibracion.zip
+/mobile/app/src/debug/assets/road-test-profiles/
+/.codex-ssh-askpass.cmd
+/.codex-make-mqtt-secrets.sh
+/.codex-vps-config.sh

@@ -18,41 +18,42 @@ class LoginPresentationTest {
     @Test fun conventionalLoginSendsFieldsAndSupportsPasswordVisibility() {
         var submitted: Pair<String, String>? = null
         compose.setContent { MaterialTheme {
-            LoginScreen({}, {}, { email, password -> submitted = email to password }, {})
+            LoginScreen({}, { email, password -> submitted = email to password }, {})
         } }
         compose.onNodeWithText("URL base del servidor").assertDoesNotExist()
-        compose.onNodeWithText("Iniciar sesión").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("Correo").performTextInput("TEST@example.invalid")
+        compose.onNodeWithText("Iniciar sesión").performScrollTo().performClick()
+        compose.onNodeWithText("Entrar").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Correo electrónico").performTextInput("TEST@example.invalid")
         compose.onNodeWithText("Contraseña").performTextInput("TEST password 123")
         compose.onNodeWithText("Mostrar").performClick()
         compose.onNodeWithText("Ocultar").assertIsDisplayed().performClick()
-        compose.onNodeWithText("Iniciar sesión").performClick()
+        compose.onNodeWithText("Entrar").performScrollTo().performClick()
         assertEquals("TEST@example.invalid" to "TEST password 123", submitted)
     }
 
-    @Test fun demoAndActivationAreSeparateSecondaryActions() {
-        var demo = 0
+    @Test fun accessShowsActivationAndHidesDemonstration() {
         var activation = 0
-        compose.setContent { MaterialTheme { LoginScreen({ demo++ }, { activation++ }, { _, _ -> }, {}) } }
+        compose.setContent { MaterialTheme { LoginScreen({ activation++ }, { _, _ -> }, {}) } }
+        compose.onNodeWithText("Probar modo demostración").assertDoesNotExist()
+        compose.onNodeWithText("Iniciar sesión").performScrollTo().performClick()
         compose.onNodeWithText("Activar cuenta").performScrollTo().performClick()
-        compose.onNodeWithText("Probar modo demostración").performScrollTo().performClick()
         assertEquals(1, activation)
-        assertEquals(1, demo)
     }
 
     @Test fun busyLoginPreventsExtraSubmissions() {
         compose.setContent { MaterialTheme {
-            LoginScreen({}, {}, { _, _ -> }, {}, AccessState(busy = true))
+            LoginScreen({}, { _, _ -> }, {}, AccessState(busy = true))
         } }
+        compose.onNodeWithText("Iniciar sesión").performScrollTo().performClick()
         compose.onNodeWithText("Iniciando sesión…").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("Activar cuenta").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("Probar modo demostración").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Probar modo demostración").assertDoesNotExist()
     }
 
     @Test fun welcomeUsesProvidedNameWithoutInventingProfile() {
         compose.setContent { MaterialTheme { WelcomeScreen("TEST conductor", {}) } }
-        compose.onNodeWithText("Hola, TEST conductor").assertIsDisplayed()
-        compose.onNodeWithText("Bienvenido a AVIGEM").assertIsDisplayed()
+        compose.onNodeWithText("Hola, TEST").assertIsDisplayed()
+        compose.onNodeWithText("AVIGEM").assertIsDisplayed()
     }
 
     @Test fun demoShowsExplicitSimulatedNotice() {

@@ -53,7 +53,7 @@ class EventLocationTest extends TestCase
         [$url,$headers]=$this->setupTrip();
         foreach ([['latitude'=>91],['longitude'=>181],['location_origin'=>'SIMULATED'],['gps_age_ms'=>2001],
             ['gps_utc_seconds'=>86400],['longitude'=>null],['gps_received_at'=>'2026-10-09T12:00:02.001Z'],
-            ['gps_received_at'=>'2026-10-09T11:59:59.000Z'],['gps_age_ms'=>499],['origin'=>'SENSOR']] as $change) {
+            ['gps_received_at'=>'2026-10-09T11:59:59.000Z'],['gps_age_ms'=>499],['origin'=>'UNKNOWN']] as $change) {
             $this->putJson($url.'/events/'.Str::uuid(),array_replace($this->event(),$change),$headers)->assertUnprocessable();
         }
         $this->assertDatabaseCount('driving_events',0);

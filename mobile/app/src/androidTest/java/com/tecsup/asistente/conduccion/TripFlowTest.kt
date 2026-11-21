@@ -35,7 +35,7 @@ class TripFlowTest {
             .addMigrations(com.tecsup.asistente.conduccion.data.local.MIGRATION_1_2, com.tecsup.asistente.conduccion.data.local.MIGRATION_2_3, com.tecsup.asistente.conduccion.data.local.MIGRATION_3_4, com.tecsup.asistente.conduccion.data.local.MIGRATION_4_5).build()
         val repository = RoomTripRepository(database, Clock.systemUTC())
         try {
-            compose.clickText(text(R.string.explore))
+            compose.openAnonymousTripFixture()
             val existing = runBlocking { repository.observeActiveTrip().first() }
             compose.clickText(text(if (existing == null) R.string.start_trip else R.string.resume_trip))
             compose.waitForText(text(R.string.trip_active))

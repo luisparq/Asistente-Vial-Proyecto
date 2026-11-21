@@ -66,6 +66,16 @@ class SensorRelayApiTest extends TestCase
         $this->assertDatabaseCount('diagnostic_sensor_events', 1);
     }
 
+    public function test_accepts_queued_android_samples_with_the_default_protocol_omitted(): void
+    {
+        [$driver, , $sample] = $this->fixture();
+        unset($sample['protocol']);
+
+        $this->postJson('/api/v1/sensor-samples', ['samples' => [$sample]], $this->headers($driver))
+            ->assertOk()->assertJsonPath('accepted.0.sequence', $sample['sequence']);
+        $this->assertDatabaseCount('diagnostic_samples', 1);
+    }
+
     public function test_unauthorized_foreign_and_inactive_driver_requests_are_denied(): void
     {
         [$driver,$device,$sample] = $this->fixture();

@@ -119,15 +119,18 @@ class ApiContractTest extends TestCase
         $this->assertDatabaseCount('driving_events', 1);
     }
 
-    public function test_sensor_is_reserved_and_orphans_are_rejected(): void
+    public function test_sensor_events_require_an_existing_trip_and_retries_keep_the_origin(): void
     {
         $headers = $this->bearer(User::factory()->create());
         $url = '/api/v1/trips/'.Str::uuid();
         $eventUrl = $url.'/events/'.Str::uuid();
-        $this->putJson($eventUrl, $this->event(), $headers)->assertNotFound();
+        $sensor = $this->event(['origin' => 'SENSOR']);
+        $this->putJson($eventUrl, $sensor, $headers)->assertNotFound();
         $this->putJson($url, $this->active(), $headers)->assertCreated();
-        $this->putJson($eventUrl, $this->event(['origin' => 'SENSOR']), $headers)->assertUnprocessable()->assertJsonPath('error.code', 'origin_not_enabled');
-        $this->assertDatabaseCount('driving_events', 0);
+        $this->putJson($eventUrl, $sensor, $headers)->assertCreated()->assertJsonPath('data.origin', 'SENSOR');
+        $this->putJson($eventUrl, $sensor, $headers)->assertOk()->assertJsonPath('sync.disposition', 'already_applied');
+        $this->putJson($eventUrl, $this->event(), $headers)->assertConflict();
+        $this->assertDatabaseCount('driving_events', 1);
     }
 
     public function test_company_isolation_and_same_uuid_in_different_companies(): void

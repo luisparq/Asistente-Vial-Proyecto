@@ -24,7 +24,7 @@ class NavigationTest {
 
     @Test
     fun mapLayersAllowSelectionAndExplainWhenLoginIsRequired() {
-        compose.clickText(compose.activity.getString(R.string.explore))
+        compose.openAnonymousTripFixture()
         compose.waitForText("Mi mapa")
         compose.clickText("Mapa")
         compose.clickText("Capas")
@@ -38,7 +38,7 @@ class NavigationTest {
 
     @Test
     fun opensOptionalDriverMapAndReturnsWithoutGpsOrAnActiveTrip() {
-        compose.clickText(compose.activity.getString(R.string.explore))
+        compose.openAnonymousTripFixture()
         compose.waitForText("Mi mapa")
         compose.onNodeWithText("Mapa").performClick()
         compose.onNodeWithText("AVIGEM One desconectado").assertIsDisplayed()
@@ -64,7 +64,7 @@ class NavigationTest {
     @Test
     fun exploresEveryScreenAndReturnsToAccess() {
         fun text(id: Int) = compose.activity.getString(id)
-        compose.clickText(text(R.string.explore))
+        compose.openAnonymousTripFixture()
         listOf("Perfil" to R.string.profile_title, "Historial" to R.string.history_title).forEach { (tab, title) ->
             compose.clickText(tab)
             compose.onAllNodesWithText(text(title)).onFirst().assertIsDisplayed()
@@ -78,9 +78,7 @@ class NavigationTest {
         compose.onNodeWithContentDescription(text(R.string.back)).performClick()
         compose.onNodeWithContentDescription(text(R.string.settings_title)).performClick()
         compose.onNodeWithText(text(R.string.return_access)).performScrollTo().performClick()
-        compose.onNodeWithText(text(R.string.explore)).performScrollTo().assertIsDisplayed()
-        // Reentrar confirma que el retorno al acceso permite iniciar otra exploración.
-        compose.onNodeWithText(text(R.string.explore)).performClick()
-        compose.onAllNodesWithText(text(R.string.home_title)).onFirst().assertIsDisplayed()
+        compose.onNodeWithText("Iniciar sesión").assertIsDisplayed()
+        compose.onNodeWithText("Probar modo demostración").assertDoesNotExist()
     }
 }

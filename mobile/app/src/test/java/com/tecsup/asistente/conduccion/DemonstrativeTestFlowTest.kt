@@ -21,9 +21,9 @@ import java.time.ZoneOffset
 @OptIn(ExperimentalCoroutinesApi::class)
 class DemonstrativeTestFlowTest {
     private val restFrame = rawFrame()
-    private val turnFrame = rawFrame(gz = 6000)    // 45.8 °/s nominal.
-    private val accelFrame = rawFrame(ax = 4500)   // +0.27 g nominal.
-    private val brakeFrame = rawFrame(ax = -4500)  // -0.27 g nominal.
+    private val turnFrame = rawFrame(gz = 10000)   // 76.3 °/s nominal.
+    private val accelFrame = rawFrame(ax = 8192)    // +0.50 g nominal.
+    private val brakeFrame = rawFrame(ax = -8192)   // -0.50 g nominal.
 
     private fun rawFrame(ax: Short = 0, az: Short = 16384, gz: Short = 0): ByteArray =
         ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN).apply {
@@ -98,7 +98,7 @@ class DemonstrativeTestFlowTest {
             assertEquals("Giro brusco detectado", alertTitle)
             assertEquals("Hey, detecté un giro brusco. Gira con suavidad.", alertMessage)
             assertTrue(alertObserved, alertObserved.contains("GIRO_BRUSCO_TEST"))
-            assertEquals("|gz| > 45.0 °/s", alertThreshold)
+            assertEquals("|gz| > 70.0 °/s", alertThreshold)
         }
         assertEquals(1, fixture.transport.latest.buzzerWrites.size)
 
@@ -122,7 +122,7 @@ class DemonstrativeTestFlowTest {
         repeat(2) { feed(fixture, accelFrame) }
         assertEquals("Aceleración brusca detectada", diagnostic.demo.value.alertTitle)
         assertEquals("Hey, detecté una aceleración brusca. Acelera poco a poco.", diagnostic.demo.value.alertMessage)
-        assertEquals("ax corregido > +0.25 g", diagnostic.demo.value.alertThreshold)
+        assertEquals("ax corregido > +0.40 g", diagnostic.demo.value.alertThreshold)
         fixture.transport.latest.listener.buzzerDone(); runCurrent()
         diagnostic.dismissDemoAlert(); runCurrent()
 
@@ -133,7 +133,7 @@ class DemonstrativeTestFlowTest {
         repeat(2) { feed(fixture, brakeFrame) }
         assertEquals("Frenado brusco detectado", diagnostic.demo.value.alertTitle)
         assertEquals("Hey, detecté un frenado brusco. Mantén tu distancia.", diagnostic.demo.value.alertMessage)
-        assertEquals("ax corregido < -0.25 g", diagnostic.demo.value.alertThreshold)
+        assertEquals("ax corregido < -0.40 g", diagnostic.demo.value.alertThreshold)
         assertEquals(2, fixture.transport.latest.buzzerWrites.size)
     }
 

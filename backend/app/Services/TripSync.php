@@ -122,9 +122,6 @@ class TripSync
         return DB::transaction(function () use ($user, $tripUuid, $eventUuid, $data) {
             $this->lockCompany($user);
             $trip = $this->access->writable($user, $tripUuid);
-            if ($data['origin'] !== 'SIMULATED') {
-                throw new ApiProblem(422, 'origin_not_enabled', 'SENSOR está reservado; solo se admiten datos SIMULATED de prueba.');
-            }
             $event = DrivingEvent::where('company_id', $user->company_id)->where('client_event_id', $eventUuid)->first();
             if ($event) {
                 // Check visibility of the existing owner before exposing a conflict.

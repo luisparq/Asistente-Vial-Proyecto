@@ -19,10 +19,10 @@ data class TripSummaryEntity(@Embedded val trip: TripEntity, val eventCount: Int
 
 @Dao
 interface TripDao {
-    @Query("SELECT * FROM trips WHERE status = 'ACTIVE' LIMIT 1")
+    @Query("SELECT * FROM trips WHERE status = 'ACTIVE' AND activeSlot = 1 LIMIT 1")
     fun observeActive(): Flow<TripEntity?>
 
-    @Query("SELECT * FROM trips WHERE status = 'ACTIVE' LIMIT 1")
+    @Query("SELECT * FROM trips WHERE status = 'ACTIVE' AND activeSlot = 1 LIMIT 1")
     suspend fun findActive(): TripEntity?
 
     @Query("SELECT * FROM trips WHERE id = :id")
@@ -44,10 +44,12 @@ interface TripDao {
     @Query("""
         SELECT s.clientEventId AS eventId, e.occurredAt FROM driving_events e
         JOIN event_sync s ON s.localEventId = e.id
-        WHERE e.tripId = :tripId AND e.origin = 'SIMULATED'
+        WHERE e.tripId = :tripId AND e.origin = :origin
         ORDER BY e.occurredAt, e.id
     """)
-    suspend fun simulatedManeuvers(tripId: Long): List<IdentifiedManeuver>
+    suspend fun maneuversByOrigin(tripId: Long, origin: String): List<IdentifiedManeuver>
+
+    suspend fun simulatedManeuvers(tripId: Long) = maneuversByOrigin(tripId, "SIMULATED")
 
     @Query("SELECT * FROM maneuver_alerts WHERE tripId = :tripId ORDER BY occurredAt DESC, rowid DESC LIMIT 1")
     suspend fun latestManeuverAlert(tripId: Long): ManeuverAlertEntity?

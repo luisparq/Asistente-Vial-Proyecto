@@ -43,7 +43,7 @@ class RestartPersistenceTest {
 
     @Test
     fun aPrepareActiveTrip(): Unit = withRepository { repository ->
-        compose.clickText(text(R.string.explore))
+        compose.openAnonymousTripFixture()
         val active = runBlocking { repository.observeActiveTrip().first() }
         compose.clickText(text(if (active == null) R.string.start_trip else R.string.resume_trip))
         compose.waitForText(text(R.string.trip_active))
@@ -66,7 +66,7 @@ class RestartPersistenceTest {
         val persisted = runBlocking { repository.observeTrip(id).first()!! }
         assertEquals(fixture.getString("active", null), snapshotJson(persisted))
         assertEquals(TripStatus.ACTIVE, persisted.trip.status)
-        compose.clickText(text(R.string.explore))
+        compose.openAnonymousTripFixture()
         compose.clickText(text(R.string.resume_trip))
         compose.waitForText(text(R.string.trip_active))
         // El evento guardado es simulado: no aparece en la pantalla activa.
@@ -88,7 +88,7 @@ class RestartPersistenceTest {
         val saved = runBlocking { repository.observeTrip(id).first()!! }
         assertEquals(fixture.getString("completed", null), snapshotJson(saved))
         assertNull(runBlocking { repository.observeActiveTrip().first() })
-        compose.clickText(text(R.string.explore))
+        compose.openAnonymousTripFixture()
         compose.waitForText(text(R.string.start_trip))
         compose.clickText(text(R.string.history_title))
         val title = text(R.string.trip_number, id)

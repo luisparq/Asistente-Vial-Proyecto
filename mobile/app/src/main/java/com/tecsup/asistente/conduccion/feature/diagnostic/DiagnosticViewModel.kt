@@ -1,6 +1,10 @@
 package com.tecsup.asistente.conduccion.feature.diagnostic
 
 import com.tecsup.asistente.conduccion.data.local.defaultFallback
+import com.tecsup.asistente.conduccion.core.di.BleScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
+import java.util.UUID
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -95,13 +99,17 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
     private val awarenessPhrases: com.tecsup.asistente.conduccion.data.local.AwarenessPhrasesRepository? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val trips: com.tecsup.asistente.conduccion.data.repository.RoomTripRepository? = null,
+    @BleScope private val persistenceScope: CoroutineScope? = null,
 ) : ViewModel() {
     val realBleUpload = diagnosticsCapture?.state ?: MutableStateFlow(com.tecsup.asistente.conduccion.data.diagnostics.DiagnosticsCaptureState()).asStateFlow()
     private val mutableLab = MutableStateFlow(LaboratoryUiState())
     val laboratory = mutableLab.asStateFlow()
     private val mutableDemo = MutableStateFlow(DemoTestUiState())
     val demo = mutableDemo.asStateFlow()
-    private var publishDemonstration = false
+    private var demoSessionId: String? = null
+    private var alertSyncJob: Job? = null
+    private val mutableGroupedAlert = MutableStateFlow<DemoGroupedAlert?>(null)
+    val groupedAlert = mutableGroupedAlert.asStateFlow()
     private val mutablePublishError = MutableStateFlow(false)
     val publishError = mutablePublishError.asStateFlow()
     private var demoJob: Job? = null
@@ -279,6 +287,12 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
         }
     }
 
+    data class DemoGroupedAlert(val id: String, val state: String)
+
+    fun dismissGroupedAlert() {
+        if (mutableGroupedAlert.value?.state == "ACKED") mutableGroupedAlert.value = null
+    }
+
     fun startDemoTest(publish: Boolean = false) {
         if (mutableDemo.value.active) return
         val conn = repository.connection.value
@@ -287,7 +301,9 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
             mutableDemo.value = DemoTestUiState(statusText = "Conecta el dispositivo y espera recepción IMU antes de iniciar.")
             return
         }
-        publishDemonstration = publish
+        demoSessionId = if (publish) UUID.randomUUID().toString() else null
+        alertSyncJob?.cancel()
+        mutableGroupedAlert.value = null
         mutablePublishError.value = false
         demoTracker.reset()
         demoProcessor = ImuProcessor()
@@ -317,6 +333,17 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
         demoConfirmationJob = null
         demoTracker.reset()
         val current = mutableDemo.value
+        demoSessionId?.takeIf { current.active }?.let { id ->
+            (persistenceScope ?: viewModelScope).launch {
+                try {
+                    trips?.finishDemonstration(id)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    if (demoSessionId == id) mutablePublishError.value = true
+                }
+            }
+        }
         mutableDemo.value = current.copy(
             active = false,
             buzzerPending = false,
@@ -335,7 +362,7 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
     private fun evaluateDemo(sample: PhysicalImuSample) {
         val current = mutableDemo.value
         if (!current.active) return
-        val reading = demoTracker.accept(demoProcessor.process(sample), blocked = current.buzzerPending || current.alertVisible)
+        val reading = demoTracker.accept(demoProcessor.process(sample), blocked = current.buzzerPending || current.alertVisible || mutableGroupedAlert.value?.state == "ACKED")
         val updated = current.copy(
             restReady = reading.restReady,
             axCorrectedG = reading.axCorrectedG,
@@ -354,13 +381,27 @@ class DiagnosticViewModel @Inject constructor(private val repository: BleReposit
             return
         }
         val alert = detection.alertText(awarenessPhrases)
-        if (publishDemonstration) viewModelScope.launch {
-            try {
-                checkNotNull(trips).recordDemonstration(detection.type)
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                mutablePublishError.value = true
+        demoSessionId?.let { id ->
+            (persistenceScope ?: viewModelScope).launch {
+                try {
+                    val repository = checkNotNull(trips)
+                    val alertId = repository.recordDemonstration(id, detection.type)
+                    if (alertId != null && demoSessionId == id) {
+                        mutableGroupedAlert.value = DemoGroupedAlert(alertId, "PENDING")
+                        alertSyncJob?.cancel()
+                        alertSyncJob = viewModelScope.launch {
+                            repository.observeDemonstrationOutbox(alertId)
+                                .first { state ->
+                                    if (state != null) mutableGroupedAlert.value = DemoGroupedAlert(alertId, state)
+                                    state == "ACKED"
+                                }
+                        }
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    if (demoSessionId == id) mutablePublishError.value = true
+                }
             }
         }
         // Alerta y voz primero; pending antes de escribir para impedir una segunda orden GATT.

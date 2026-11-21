@@ -14,15 +14,13 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import com.tecsup.asistente.conduccion.domain.processing.*
-import android.util.AtomicFile
-import java.util.Properties
-import java.security.MessageDigest
+import com.tecsup.asistente.conduccion.data.local.VehicleProfileStore
 
 data class VehicleLabState(
     val history: List<PhysicalImuSample> = emptyList(),
     val learning: NormalManeuver? = null, val learningSamples: Int = 0,
     val learned: Set<NormalManeuver> = emptySet(), val testing: Boolean = false,
-    val profile: LearnedVehicleProfile? = null, val hasSavedProfile: Boolean = false,
+    val profile: LearnedVehicleProfile? = null, val savedProfile: LearnedVehicleProfile? = null,
     val message: String = "Conecta el sensor y mide el reposo.",
     val detections: List<VehicleExcess> = emptyList(),
     val buzzer: String = "Sin órdenes", val reading: VehicleReading? = null,
@@ -32,7 +30,8 @@ data class VehicleLabState(
 @HiltViewModel
 class FieldTestViewModel @Inject constructor(
     private val ble: BleRepository, private val source: SensorDataSource,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val profiles: VehicleProfileStore,
 ) : ViewModel() {
     private val recorder = FieldRecording(File(context.filesDir, "field-tests"))
     private val mutable = MutableStateFlow(FieldRecordingState())
@@ -61,7 +60,7 @@ class FieldTestViewModel @Inject constructor(
                         operation(); mutable.value = recorder.state
                         mutableLab.value = mutableLab.value.copy(learning = learner.learning,
                             learningSamples = learner.sampleCount, learned = learner.learned,
-                            profile = learner.profile, hasSavedProfile = savedProfile != null, message = learner.message)
+                            profile = learner.profile, savedProfile = savedProfile, message = learner.message)
                     }
                     catch (e: Exception) {
                         recorder.abandon()
@@ -111,19 +110,17 @@ class FieldTestViewModel @Inject constructor(
                     if(deviceAddress!=c.device?.address) {
                         learner.reset(); sessionVerified=false; charts.clear(); savedProfile=null
                         deviceAddress=c.device?.address
-                        deviceAddress?.let { address ->
-                            runCatching { profileFile(address).openRead().use { stream ->
-                                savedProfile=LearnedVehicleProfile.read(Properties().apply { load(stream) })
-                            } }
+                        savedProfile = deviceAddress?.let { address ->
+                            runCatching { profiles.load(address) }.getOrNull()
                         }
-                        mutableLab.value=VehicleLabState(hasSavedProfile=savedProfile!=null)
+                        mutableLab.value=VehicleLabState(savedProfile=savedProfile)
                     }
                 }
                 if (c.status != ConnectionStatus.CONNECTED || s != SensorDataStatus.RECEIVING) {
                     operations.send {
                         recorder.finish("Conexión o recepción perdida", (System.nanoTime() / 1_000_000), invalidate = true)
                         learner.reset(); sessionVerified=false; charts.clear(); buzzerDeadline=null
-                        mutableLab.value=VehicleLabState(hasSavedProfile=savedProfile!=null)
+                        mutableLab.value=VehicleLabState(savedProfile=savedProfile)
                     }
                 }
             }
@@ -175,16 +172,10 @@ class FieldTestViewModel @Inject constructor(
     fun stop() = command { recorder.finish("Detenida por el usuario", (System.nanoTime() / 1_000_000),
         invalidate = recorder.state.phase == FieldPhase.REST) }
     private val fixedMounting="Montaje fijo; orientación longitudinal aprendida por aceleración recta"
-    private fun profileFile(address: String): AtomicFile {
-        val key=MessageDigest.getInstance("SHA-256").digest(address.toByteArray()).take(8).joinToString("") { "%02x".format(it) }
-        return AtomicFile(File(context.filesDir,"vehicle-profile-$key.properties"))
-    }
     private fun persistProfile() {
-        val p=learner.profile ?: return
-        val file=profileFile(deviceAddress ?: return)
-        val out=file.startWrite()
-        try { p.properties().store(out,"Perfil experimental aprendido; conservar montaje"); file.finishWrite(out); savedProfile=p }
-        catch(e: Exception) { file.failWrite(out); throw e }
+        val profile = learner.profile ?: return
+        profiles.save(deviceAddress ?: return, profile)
+        savedProfile = profile
     }
     fun measureRest() = command {
         if(!visible || !ready() || recorder.state.phase!=FieldPhase.IDLE) return@command
@@ -194,8 +185,8 @@ class FieldTestViewModel @Inject constructor(
     fun learn(kind: NormalManeuver) = command {
         if(!visible || !ready() || !sessionVerified || recorder.state.phase!=FieldPhase.IDLE || mutableLab.value.testing) return@command
         if(learner.begin(kind)) {
-            savedProfile=null // A changed lesson invalidates the old envelope until all lessons complete.
-            profileFile(deviceAddress ?: return@command).delete()
+            // Keep the last complete profile on disk until the new lessons are complete.
+            savedProfile = null
             learningStarted=System.nanoTime()/1_000_000
             recorder.begin(false,learningStarted,deviceAddress!!,fixedMounting)
             recorder.label(when(kind) { NormalManeuver.ACCELERATION -> FieldLabel.ACCELERATION; NormalManeuver.BRAKING -> FieldLabel.BRAKING; NormalManeuver.TURN -> FieldLabel.NORMAL })
@@ -205,9 +196,20 @@ class FieldTestViewModel @Inject constructor(
         val kind=learner.learning
         learner.finish()
         recorder.finish("Aprendizaje: ${kind?.title}. ${learner.message}",System.nanoTime()/1_000_000)
-        persistProfile()
+        learner.profile?.let {
+            learner.updateLimits(RoadTestLimits.ACCELERATION_G, RoadTestLimits.BRAKING_G, RoadTestLimits.TURN_DPS)
+            persistProfile()
+        }
     }
     fun finishLearning() = command { if(learner.learning!=null) finishLearningInternal() }
+    fun saveLimits(acceleration: Double, braking: Double, turn: Double) = command {
+        if (!visible || !ready() || deviceAddress == null || recorder.state.phase != FieldPhase.IDLE ||
+            learner.learning != null || mutableLab.value.testing) return@command
+        if (learner.profile == null) learner.restore(savedProfile ?: return@command)
+        learner.updateLimits(acceleration, braking, turn)
+        persistProfile()
+    }
+
     fun startDetection() = command {
         if(!visible || !ready() || !sessionVerified || learner.profile==null || recorder.state.phase!=FieldPhase.IDLE) return@command
         learner.resetDetection(); buzzerDeadline=null

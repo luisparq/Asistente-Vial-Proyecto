@@ -47,7 +47,7 @@
     </section>
 <section class="panel incident-panel" id="mapa-incidencias">
 <div class="panel-heading"><div><h2>Mapa de incidencias</h2><p>{{ count($geojson['features']) }} {{ $showAlerts ? (count($geojson['features']) === 1 ? 'alerta' : 'alertas') : (count($geojson['features']) === 1 ? 'evento' : 'eventos') }} con ubicación</p></div><div class="map-modes" role="group" aria-label="Visualización del mapa"><button id="mode-markers" type="button" class="button primary" aria-pressed="true" disabled>Marcadores</button><button id="mode-heat" type="button" class="button" aria-pressed="false" disabled>Mapa de calor</button></div></div>
-<div class="map-legend"><span>{{ $showAlerts ? 'Marcadores naranjas: alertas de prueba' : 'Dato de prueba' }}</span><span id="heat-legend" hidden>Menor concentración <i class="heat-scale"></i> Mayor concentración<small>El color indica cuántos registros se concentran en el área visible. La validación del riesgo vial sigue pendiente.</small></span></div>
+<div class="map-legend"><span>{{ $showAlerts ? 'Naranja: alerta de prueba · Azul: alerta operativa' : 'Naranja: dato de prueba · Azul: evento del sensor' }}</span><span id="heat-legend" hidden>Menor concentración <i class="heat-scale"></i> Mayor concentración<small>El color indica cuántos registros se concentran en el área visible. La validación del riesgo vial sigue pendiente.</small></span></div>
 <div class="incident-cartography incident-controls">
     @unless($showAlerts)
     <div>

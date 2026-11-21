@@ -30,6 +30,8 @@ class SyncEngine @Inject constructor(
             val before = db.syncDao().statuses(current.ownerKey).first().sumOf { if (it.state == "ACKED") it.count else 0 }
             // Advance only once per explicit action, not on each iteration/retry.
             db.syncDao().advanceNetworkRetries(current.ownerKey)
+            // Older servers rejected SENSOR with 422 and the queue stored only the HTTP status.
+            db.syncDao().retryRejectedSensorEvents(current.ownerKey)
             drain()
             check(session.state.value?.ownerKey == current.ownerKey) { "La cuenta cambió. Consulta la cola de la sesión actual." }
             val after = db.syncDao().statuses(current.ownerKey).first()

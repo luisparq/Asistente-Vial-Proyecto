@@ -5,7 +5,6 @@
     <string name="splash_description">Interfaz del conductor</string>
     <string name="login_title">AVIGEM</string>
     <string name="login_description">Un producto de Vialigent Technologies</string>
-    <string name="explore">Probar modo demostración</string>
     <string name="home_title">Inicio</string>
     <string name="home_description">Registra recorridos locales y genera eventos manuales para probar la aplicación. No se detectan maniobras reales.</string>
     <string name="trip_title">Viaje</string>

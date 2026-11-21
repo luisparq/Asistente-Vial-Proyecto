@@ -62,6 +62,7 @@ fun TripScreen(
     val state by viewModel.trip.collectAsStateWithLifecycle()
     val action by viewModel.action.collectAsStateWithLifecycle()
     val maneuverAlertId by viewModel.maneuverAlertId.collectAsStateWithLifecycle()
+    val sensorNotice by viewModel.sensorNotice.collectAsStateWithLifecycle()
     var confirmFinish by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(action.openHistory) {
         if (action.openHistory) {
@@ -89,6 +90,16 @@ fun TripScreen(
                     Text(stringResource(R.string.no_active_trip))
                 } else {
                     TripHero(detail, connection)
+                    sensorNotice?.takeIf { it.tripId == detail.trip.id }?.let { notice ->
+                        val unit = if (notice.type == DrivingEventType.SHARP_TURN) "°/s" else "g"
+                        val reading = String.format(Locale.getDefault(), "%.3f %s", notice.excess.value, unit)
+                        val limit = String.format(Locale.getDefault(), "%.3f %s", notice.excess.limit, unit)
+                        InfoCard {
+                            Text(stringResource(notice.type.labelResource()), style = MaterialTheme.typography.titleSmall)
+                            Text("Sensor · ${reading} · Límite ${limit}")
+                            Text(if (notice.buzzerSent) "Orden de buzzer enviada" else "No se pudo enviar la orden al buzzer")
+                        }
+                    }
                     Text(stringResource(R.string.event_count, detail.events.size), style = MaterialTheme.typography.titleSmall)
                     LazyColumn(
                         modifier = Modifier.weight(1f).testTag("trip_list"),

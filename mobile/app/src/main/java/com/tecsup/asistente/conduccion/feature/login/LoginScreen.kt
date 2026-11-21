@@ -25,7 +25,6 @@ import com.tecsup.asistente.conduccion.core.ui.AvigemColors
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onExplore: () -> Unit,
     onActivate: () -> Unit,
     onLogin: (String, String) -> Unit,
     onSettings: () -> Unit,
@@ -78,9 +77,6 @@ fun LoginScreen(
                         shape = MaterialTheme.shapes.medium,
                         colors = paper,
                     ) { Text("Iniciar sesión", style = typography.titleSmall) }
-                    TextButton(onClick = onExplore, enabled = !state.busy, colors = links) {
-                        Text(stringResource(R.string.explore))
-                    }
                     Text(
                         stringResource(R.string.login_description),
                         style = typography.bodySmall,

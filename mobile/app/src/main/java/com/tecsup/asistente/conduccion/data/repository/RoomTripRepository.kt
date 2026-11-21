@@ -94,25 +94,39 @@ class RoomTripRepository @Inject constructor(
         }
     }.also { scheduler.schedule() }
 
-    suspend fun recordDemonstration(type: DrivingEventType) {
+    suspend fun recordDemonstration(sessionId: String, type: DrivingEventType): String? =
         session.gate.withLock {
             val owner = checkNotNull(session.state.value?.takeIf { !it.token.isNullOrBlank() }?.ownerKey)
             database.withTransaction {
-                val now = clock.millis()
-                val initial = TripEntity(startedAt = now, endedAt = now, status = TripStatus.COMPLETED.name, activeSlot = null)
-                val trip = initial.copy(id = dao.insertTrip(initial))
-                val meta = TripSyncEntity(trip.id, UUID.randomUUID().toString(), owner, 2)
-                sync.insertTrip(meta)
-                OutboxWriter.trip(database, trip, meta)
-                val candidate = DrivingEventEntity(tripId = trip.id, type = type.name, occurredAt = now, origin = DataOrigin.SIMULATED.name)
-                val event = candidate.copy(id = dao.insertEvent(candidate))
-                val uuid = UUID.randomUUID().toString()
-                sync.insertEvent(EventSyncEntity(event.id, uuid))
-                OutboxWriter.event(database, event, meta.clientTripId, uuid)
+                val meta = sync.tripByClientId(sessionId, owner) ?: run {
+                    val initial = TripEntity(startedAt = clock.millis(), activeSlot = null)
+                    val trip = initial.copy(id = dao.insertTrip(initial))
+                    TripSyncEntity(trip.id, sessionId, owner, 1).also {
+                        sync.insertTrip(it)
+                        OutboxWriter.trip(database, trip, it)
+                    }
+                }
+                check(dao.findTrip(meta.localTripId)?.status == TripStatus.ACTIVE.name)
+                storeManeuver(meta.localTripId, type, DataOrigin.SIMULATED, includeGps = false).second
+            }
+        }.also { scheduler.schedule() }
+
+    suspend fun finishDemonstration(sessionId: String) {
+        val finished = session.gate.withLock {
+            database.withTransaction {
+                val owner = session.state.value?.ownerKey ?: return@withTransaction false
+                val meta = sync.tripByClientId(sessionId, owner) ?: return@withTransaction false
+                val trip = checkNotNull(dao.findTrip(meta.localTripId))
+                if (dao.finishTrip(trip.id, maxOf(clock.millis(), trip.startedAt)) == 0) return@withTransaction false
+                sync.revision(trip.id, 2)
+                OutboxWriter.trip(database, checkNotNull(dao.findTrip(trip.id)), meta.copy(revision = 2))
+                true
             }
         }
-        scheduler.schedule()
+        if (finished) scheduler.schedule()
     }
+
+    fun observeDemonstrationOutbox(alertId: String) = sync.operationState(alertId)
 
     override suspend fun addSimulatedEvent(tripId: Long, type: DrivingEventType): DrivingEvent =
         recordSimulatedManeuver(tripId, type).first
@@ -127,28 +141,49 @@ class RoomTripRepository @Inject constructor(
             checkAccess(tripId)
             val trip = checkNotNull(dao.findTrip(tripId)) { "El recorrido no existe." }
             check(trip.status == TripStatus.ACTIVE.name) { "El recorrido ya finalizó." }
-            val occurredAt = clock.millis()
-            val location = EventLocationPolicy.capture(sensors?.gps?.value, occurredAt, System.nanoTime() / 1_000_000)
-            val initial = DrivingEventEntity(tripId = tripId, type = type.name, occurredAt = occurredAt, origin = DataOrigin.SIMULATED.name,
-                latitude = location?.latitude, longitude = location?.longitude,
-                locationOrigin = location?.let { LocationOrigin.GPS_NEO6M.name }, gpsUtcSeconds = location?.utcSeconds,
-                gpsReceivedAt = location?.receivedAtMillis, gpsAgeMillis = location?.ageMillis)
-            val event = initial.copy(id = dao.insertEvent(initial))
-            val uuid = UUID.randomUUID().toString()
-            sync.insertEvent(EventSyncEntity(event.id, uuid))
-            OutboxWriter.event(database, event, checkNotNull(sync.trip(tripId)).clientTripId, uuid)
-            val ids = maneuverAlertRule.triggeringIds(
-                dao.simulatedManeuvers(tripId),
-                IdentifiedManeuver(uuid, occurredAt),
-                dao.latestManeuverAlert(tripId)?.occurredAt,
-            )
-            val alertId = if (ids.isEmpty()) null else storeManeuverAlert(tripId, ids, occurredAt, location)
-            event.toDomain() to alertId
+            storeManeuver(tripId, type, DataOrigin.SIMULATED, includeGps = true)
         }
     }.also { scheduler.schedule() }
 
+    suspend fun recordSensorManeuver(tripId: Long, type: DrivingEventType): Boolean {
+        val recorded = session.gate.withLock {
+            database.withTransaction {
+                val meta = sync.trip(tripId) ?: return@withTransaction false
+                if (dao.findActive()?.id != tripId || meta.ownerKey != session.state.value?.ownerKey) {
+                    return@withTransaction false
+                }
+                storeManeuver(tripId, type, DataOrigin.SENSOR, includeGps = true)
+                true
+            }
+        }
+        if (recorded) scheduler.schedule()
+        return recorded
+    }
+
+    private suspend fun storeManeuver(
+        tripId: Long, type: DrivingEventType, origin: DataOrigin, includeGps: Boolean,
+    ): Pair<DrivingEvent, String?> {
+        val occurredAt = clock.millis()
+        val location = if (includeGps) EventLocationPolicy.capture(sensors?.gps?.value, occurredAt, System.nanoTime() / 1_000_000) else null
+        val initial = DrivingEventEntity(tripId = tripId, type = type.name, occurredAt = occurredAt, origin = origin.name,
+            latitude = location?.latitude, longitude = location?.longitude,
+            locationOrigin = location?.let { LocationOrigin.GPS_NEO6M.name }, gpsUtcSeconds = location?.utcSeconds,
+            gpsReceivedAt = location?.receivedAtMillis, gpsAgeMillis = location?.ageMillis)
+        val event = initial.copy(id = dao.insertEvent(initial))
+        val uuid = UUID.randomUUID().toString()
+        sync.insertEvent(EventSyncEntity(event.id, uuid))
+        OutboxWriter.event(database, event, checkNotNull(sync.trip(tripId)).clientTripId, uuid)
+        val ids = maneuverAlertRule.triggeringIds(
+            dao.maneuversByOrigin(tripId, origin.name),
+            IdentifiedManeuver(uuid, occurredAt),
+            dao.latestManeuverAlert(tripId)?.occurredAt,
+        )
+        val alertId = if (ids.isEmpty()) null else storeManeuverAlert(tripId, ids, occurredAt, location, testOnly = origin == DataOrigin.SIMULATED)
+        return event.toDomain() to alertId
+    }
+
     private suspend fun storeManeuverAlert(
-        tripId: Long, ids: List<String>, occurredAt: Long, current: EventLocation?,
+        tripId: Long, ids: List<String>, occurredAt: Long, current: EventLocation?, testOnly: Boolean,
     ): String {
         val recordedPoint = sync.lastTrackPoint(tripId, TrackPointWriter.REVISION)?.let {
             Contract.json.decodeFromString<TrackPointDto>(it.payload)
@@ -165,7 +200,7 @@ class RoomTripRepository @Inject constructor(
 
         val id = UUID.randomUUID().toString()
         val alert = ManeuverAlertEntity(
-            id, tripId, Contract.json.encodeToString(ids), occurredAt, testOnly = true,
+            id, tripId, Contract.json.encodeToString(ids), occurredAt, testOnly = testOnly,
             latitude = recent?.first?.latitude, longitude = recent?.first?.longitude,
             locationCapturedAt = recent?.second, locationStatus = if (recent == null) "MISSING" else "AVAILABLE",
         )

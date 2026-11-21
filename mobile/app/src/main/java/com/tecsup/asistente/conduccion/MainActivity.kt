@@ -1,6 +1,10 @@
 package com.tecsup.asistente.conduccion
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -27,6 +31,18 @@ class MainActivity : ComponentActivity() {
     @javax.inject.Inject lateinit var deviceMonitor: com.tecsup.asistente.conduccion.data.devices.DeviceMonitor
     @javax.inject.Inject lateinit var trips: TripRepository
 
+    private val requestNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    private fun requestTripNotifications() {
+        if (Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) return
+        val preferences = getPreferences(MODE_PRIVATE)
+        if (preferences.getBoolean("trip_notifications_requested", false)) return
+        preferences.edit().putBoolean("trip_notifications_requested", true).apply()
+        requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     override fun onStart() { super.onStart(); ble.setForeground(true); ble.refresh(); deviceMonitor.setForeground(true) }
     override fun onStop() { deviceMonitor.setForeground(false); ble.setForeground(false); super.onStop() }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,6 +66,7 @@ class MainActivity : ComponentActivity() {
                         } catch (error: SecurityException) {
                             Log.w("AVIGEM", "Permiso Bluetooth no disponible", error)
                         }
+                        requestTripNotifications()
                     }
                 }
             }

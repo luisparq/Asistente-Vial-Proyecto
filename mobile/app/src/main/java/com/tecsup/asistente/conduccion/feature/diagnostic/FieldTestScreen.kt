@@ -45,7 +45,7 @@ fun VehicleLabScreen(onBack: () -> Unit, viewModel: FieldTestViewModel = hiltVie
     }
     VehicleLabContent(recording, lab, connection.status == ConnectionStatus.CONNECTED && sensor == SensorDataStatus.RECEIVING,
         gps, onBack, viewModel::measureRest, viewModel::stop, viewModel::learn, viewModel::finishLearning,
-        viewModel::startDetection, viewModel::stopDetection, { exportFile = it; exporter.launch(it.name) }, viewModel::checkBuzzer)
+        viewModel::startDetection, viewModel::stopDetection, { exportFile = it; exporter.launch(it.name) }, viewModel::checkBuzzer, viewModel::saveLimits)
 }
 
 @Composable
@@ -53,12 +53,41 @@ fun VehicleLabContent(state: FieldRecordingState, lab: VehicleLabState, receivin
     onBack: () -> Unit, onRest: () -> Unit, onCancelRest: () -> Unit,
     onLearn: (NormalManeuver) -> Unit, onFinishLearning: () -> Unit,
     onStartDetection: () -> Unit, onStopDetection: () -> Unit, onExport: (File) -> Unit,
-    onCheckBuzzer: () -> Unit = {}) {
+    onCheckBuzzer: () -> Unit = {}, onSaveLimits: (Double, Double, Double) -> Unit = { _, _, _ -> }) {
     var details by rememberSaveable { mutableStateOf(false) }
     var allFiles by rememberSaveable { mutableStateOf(false) }
+    var editLimits by rememberSaveable { mutableStateOf(false) }
     val idle = state.phase == FieldPhase.IDLE && lab.learning == null && !lab.testing
     val restReady = state.reference != null
     fun number(v: Double) = String.format(Locale.ROOT, "%.3f", v)
+    val profile = lab.profile ?: lab.savedProfile
+    if (editLimits && idle && receiving && profile != null) {
+        var acceleration by rememberSaveable { mutableStateOf(profile.accelerationLimitG.toString()) }
+        var braking by rememberSaveable { mutableStateOf(profile.brakingLimitG.toString()) }
+        var turn by rememberSaveable { mutableStateOf(profile.turnLimitDps.toString()) }
+        val values = listOf(acceleration, braking, turn).map { it.trim().replace(',', '.').toDoubleOrNull() }
+        AlertDialog(
+            onDismissRequest = { editLimits = false },
+            title = { Text("Ajustar límites para la prueba") },
+            text = {
+                Column {
+                    OutlinedTextField(acceleration, { acceleration = it }, label = { Text("Aceleración (g)") }, singleLine = true)
+                    OutlinedTextField(braking, { braking = it }, label = { Text("Frenada (g)") }, singleLine = true)
+                    OutlinedTextField(turn, { turn = it }, label = { Text("Giro (°/s)") }, singleLine = true)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = values.all { it != null && it.isFinite() && it > 0 },
+                    onClick = {
+                        onSaveLimits(values[0]!!, values[1]!!, values[2]!!)
+                        editLimits = false
+                    },
+                ) { Text("Guardar límites") }
+            },
+            dismissButton = { TextButton(onClick = { editLimits = false }) { Text("Cancelar") } },
+        )
+    }
     ScreenLayout("Calibración y prueba", "Conecta → calibra → enseña maniobras normales → prueba el buzzer", onBack) {
         Text(if (receiving) "Sensor conectado · recibiendo lecturas" else "Conecta AVIGEM One desde Dispositivo.")
         Text(if (gps.status == GpsStatus.VALID) "GPS con ubicación" else "GPS sin ubicación · la calibración del MPU sigue disponible", style = MaterialTheme.typography.bodySmall)
@@ -80,7 +109,7 @@ fun VehicleLabContent(state: FieldRecordingState, lab: VehicleLabState, receivin
                 Text("${(30 - state.elapsedMillis/1000).coerceAtLeast(0)} s restantes · ${state.samples} muestras")
                 OutlinedButton(onClick = onCancelRest) { Text("Cancelar calibración") }
             } else {
-                Text(if (restReady) "Reposo calibrado" else if (lab.hasSavedProfile) "Perfil guardado: verifica el reposo antes de usarlo" else "Pendiente de calibrar")
+                Text(if (restReady) "Reposo calibrado" else if (lab.savedProfile != null) "Perfil guardado: verifica el reposo antes de usarlo" else "Pendiente de calibrar")
                 Button(onClick = onRest, enabled = receiving && idle) { Text(if (restReady) "Recalibrar reposo" else "Calibrar reposo") }
             }
             Text(if (state.phase == FieldPhase.REST || !restReady) state.message else lab.message)
@@ -108,18 +137,22 @@ fun VehicleLabContent(state: FieldRecordingState, lab: VehicleLabState, receivin
             }
         }
         PresentationSection("3. Detectar excesos y probar buzzer") {
-            val profile = lab.profile
             if (profile == null) Text("Completa reposo, aceleración, frenada y giros normales para calcular los límites.")
             else {
-                Text("Límites calculados para este montaje:")
+                Text(if (profile.manualLimits) "Límites guardados para este montaje:" else "Límites calculados para este montaje:")
                 Text("Aceleración: ${number(profile.accelerationLimitG)} g · Frenada: ${number(profile.brakingLimitG)} g · Giro: ${number(profile.turnLimitDps)} °/s")
                 lab.reading?.let { Text("Ahora: avance ${number(it.longitudinalG)} g · giro ${number(it.yawDps)} °/s") }
                 Text("Al superar un límite de forma sostenida, el celular lo detecta y ordena sonar al ESP32. El perfil queda guardado en este teléfono para ese dispositivo.")
             }
+            if (profile != null) {
+                OutlinedButton(onClick = { editLimits = true }, enabled = receiving && idle) {
+                    Text("Ajustar límites")
+                }
+            }
             if (lab.testing) {
                 Text("Detección activa · ${state.samples} muestras guardadas · ${lab.detections.size} detecciones recientes")
                 Button(onClick = onStopDetection, modifier = Modifier.fillMaxWidth()) { Text("Detener prueba y guardar") }
-            } else Button(onClick = onStartDetection, enabled = receiving && idle && restReady && profile != null) { Text("Iniciar prueba con buzzer") }
+            } else Button(onClick = onStartDetection, enabled = receiving && idle && restReady && lab.profile != null) { Text("Iniciar prueba con buzzer") }
             Text(lab.buzzer)
             OutlinedButton(onClick = onCheckBuzzer, enabled = receiving && idle) { Text("Comprobar buzzer") }
             lab.detections.takeLast(5).reversed().forEach { event ->

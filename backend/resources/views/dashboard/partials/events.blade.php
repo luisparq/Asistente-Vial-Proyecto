@@ -4,7 +4,7 @@
 @foreach($events as $event)
 <tr>
 <td><strong>{{ $d::type($event->type) }}</strong><details><summary>Identificador del evento</summary><code class="uuid">{{ $event->client_event_id }}</code></details></td>
-<td><span class="badge simulated">Dato de prueba</span></td>
+<td><span class="badge {{ strtolower($event->origin) }}">{{ $d::origin($event->origin) }}</span></td>
 <td class="date">{{ $d::date($event->occurred_at) }}</td>
 @if(!isset($hideTrip))
 <td>@if($event->trip)<a class="button quiet" href="{{ route('dashboard.trip', $event->trip->client_trip_id) }}">Ver recorrido</a>@endif</td>

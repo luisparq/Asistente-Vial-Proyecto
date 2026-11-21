@@ -92,7 +92,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 configuredBaseUrl = access.configuration.baseUrl)
         }
         composable(AppRoute.Login.path) {
-            LoginScreen(onExplore = access::demo, onActivate = { navController.open(AppRoute.Activation) },
+            LoginScreen(onActivate = { navController.open(AppRoute.Activation) },
                 onLogin = access::login, onSettings = { navController.open(AppRoute.Settings) },
                 state = accessState, savedEmail = session?.email.orEmpty(),
                 onContinueSession = if (session != null) access::continueSession else null)
