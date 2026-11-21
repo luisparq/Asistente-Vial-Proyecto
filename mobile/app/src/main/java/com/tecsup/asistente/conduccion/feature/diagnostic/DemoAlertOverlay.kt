@@ -5,6 +5,8 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -39,40 +41,29 @@ fun DemoAlertOverlay(title: String, observed: String, threshold: String, onDismi
 ) {
     val reducedMotion = rememberReducedMotion()
     val entrance = remember { Animatable(if (reducedMotion) 1f else 0f) }
-    val ring = remember { Animatable(if (reducedMotion) 1f else 0f) }
-    LaunchedEffect(Unit) {
-        if (reducedMotion) return@LaunchedEffect
-        entrance.animateTo(1f, tween(220, easing = EaseOut))
-        ring.animateTo(1f, tween(520, easing = EaseOut))
+    LaunchedEffect(reducedMotion) {
+        if (reducedMotion) entrance.snapTo(1f)
+        else entrance.animateTo(1f, tween(200, easing = EaseOut))
     }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize().background(Color(0xFF800F22))) {
+        Box(
+            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer),
+            contentAlignment = Alignment.Center,
+        ) {
             Column(
-                Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 40.dp)
+                Modifier.widthIn(max = 560.dp).fillMaxWidth().verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 24.dp)
                     .graphicsLayer {
                         alpha = entrance.value
-                        val scale = 0.96f + 0.04f * entrance.value
-                        scaleX = scale
-                        scaleY = scale
+                        translationY = 6.dp.toPx() * (1f - entrance.value)
                     },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Spacer(Modifier.weight(1f))
-                Box(Modifier.size(112.dp), contentAlignment = Alignment.Center) {
-                    Canvas(Modifier.matchParentSize()) {
-                        val growth = ring.value
-                        if (growth in 0.001f..0.999f) drawCircle(
-                            AvigemColors.Citrine.copy(alpha = 1f - growth),
-                            radius = size.minDimension * (0.34f + 0.16f * growth),
-                            style = Stroke(2.dp.toPx()),
-                        )
-                    }
-                    Box(Modifier.size(76.dp).background(AvigemColors.Citrine, MaterialTheme.shapes.large), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Warning, null, Modifier.size(40.dp), tint = AvigemColors.Volcanic)
-                    }
+                Box(Modifier.size(64.dp).background(AvigemColors.Citrine, MaterialTheme.shapes.large), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Warning, null, Modifier.size(36.dp), tint = AvigemColors.Volcanic)
                 }
-                Spacer(Modifier.height(28.dp))
-                Text(if (demonstration) "Demostración" else "Alerta de conducción", style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = AvigemColors.Mineral400)
+                Spacer(Modifier.height(16.dp))
+                Text(if (demonstration) "Demostración" else "Alerta de conducción", style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onErrorContainer)
                 Spacer(Modifier.height(10.dp))
                 Text(title, style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center, color = AvigemColors.Sillar100)
                 Spacer(Modifier.height(16.dp))
@@ -80,7 +71,7 @@ fun DemoAlertOverlay(title: String, observed: String, threshold: String, onDismi
                 if (observed.isNotBlank()) Text(observed, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, color = AvigemColors.Sillar100)
                 Spacer(Modifier.height(4.dp))
                 if (threshold.isNotBlank()) Text("Umbral: $threshold", style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, color = AvigemColors.Sillar200)
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(12.dp))
                 if (demonstration && threshold.isNotBlank()) Surface(color = AvigemColors.Graphite, shape = MaterialTheme.shapes.small) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Prueba demostrativa · Umbral TEST_ONLY", style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = AvigemColors.Citrine300)

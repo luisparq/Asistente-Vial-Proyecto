@@ -1,6 +1,7 @@
 package com.tecsup.asistente.conduccion.navigation
 
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
@@ -76,8 +77,8 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
     CompositionLocalProvider(LocalDemoMode provides demo, LocalMainNav provides mainNav) {
     val reducedMotion = com.tecsup.asistente.conduccion.core.ui.rememberReducedMotion()
     NavHost(navController = navController, startDestination = AppRoute.Splash.path,
-        enterTransition = { EnterTransition.None },
-        exitTransition = { ExitTransition.None },
+        enterTransition = { if (reducedMotion) EnterTransition.None else fadeIn(tween(180)) },
+        exitTransition = { if (reducedMotion) ExitTransition.None else fadeOut(tween(140)) },
     ) {
         composable(AppRoute.Splash.path) {
             SplashScreen(onReady = {

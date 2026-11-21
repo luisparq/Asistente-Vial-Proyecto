@@ -2,6 +2,7 @@ package com.tecsup.asistente.conduccion.core.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -44,7 +45,7 @@ fun DrivingEventType.labelResource(): Int = when (this) {
 /** Tarjeta visual común de recorridos y eventos. */
 @Composable
 fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
-    val motion = if (rememberReducedMotion()) Modifier else Modifier.animateContentSize()
+    val motion = if (rememberReducedMotion()) Modifier else Modifier.animateContentSize(animationSpec = tween(180))
     Card(Modifier.fillMaxWidth().then(motion), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
